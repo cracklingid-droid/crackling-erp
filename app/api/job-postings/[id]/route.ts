@@ -11,7 +11,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     where: { id: Number(id) },
     include: {
       createdBy: { select: { id: true, name: true, username: true, role: true } },
-      candidates: { orderBy: { createdAt: "desc" } },
+      position: true,
+      candidates: {
+        orderBy: { createdAt: "desc" },
+        include: { psychTestSubmission: true, interviewSlot: true },
+      },
     },
   });
   if (!posting) return NextResponse.json({ error: "Lowongan tidak ditemukan" }, { status: 404 });

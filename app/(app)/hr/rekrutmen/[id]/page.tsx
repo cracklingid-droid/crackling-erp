@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Copy, Lock, Unlock } from "lucide-react";
+import { formatSlotWIB } from "@/lib/interview-slots";
 
 const STAGES = [
   { value: "applied", label: "Melamar" },
@@ -22,6 +23,8 @@ const STAGES = [
 ];
 const stageLabel = (v: string) => STAGES.find((s) => s.value === v)?.label ?? v;
 
+type PsychTestSubmission = { percentage: number; passed: boolean } | null;
+type InterviewSlot = { scheduledAt: string } | null;
 type Candidate = {
   id: number;
   name: string;
@@ -31,10 +34,13 @@ type Candidate = {
   notes: string | null;
   stage: string;
   createdAt: string;
+  psychTestSubmission: PsychTestSubmission;
+  interviewSlot: InterviewSlot;
 };
 type Posting = {
   id: number;
   title: string;
+  positionName: string;
   department: string | null;
   location: string | null;
   employmentType: string | null;
@@ -53,6 +59,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
   const [phone, setPhone] = useState("");
   const [source, setSource] = useState("");
   const [saving, setSaving] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
 
   function load() {
     setLoading(true);
@@ -106,6 +113,30 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
     }
   }
 
+  async function handleToggleStatus() {
+    if (!posting) return;
+    const nextStatus = posting.status === "open" ? "closed" : "open";
+    setTogglingStatus(true);
+    const res = await fetch(`/api/job-postings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: nextStatus }),
+    });
+    setTogglingStatus(false);
+    if (res.ok) {
+      toast.success(nextStatus === "open" ? "Lowongan dibuka kembali." : "Lowongan ditutup.");
+      load();
+    } else {
+      toast.error("Gagal mengubah status.");
+    }
+  }
+
+  function copyApplyLink() {
+    const url = `${window.location.origin}/lowongan/${id}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Link lamaran disalin.");
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
   if (!posting) return <p className="text-sm text-muted-foreground">Lowongan tidak ditemukan.</p>;
 
@@ -115,17 +146,40 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
         <Link href="/hr/rekrutmen" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Rekrutmen
         </Link>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-heading font-semibold tracking-tight">{posting.title}</h1>
-          <Badge variant={posting.status === "open" ? "default" : "secondary"}>
-            {posting.status === "open" ? "Dibuka" : "Ditutup"}
-          </Badge>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-heading font-semibold tracking-tight">{posting.title}</h1>
+              <Badge variant={posting.status === "open" ? "default" : "secondary"}>
+                {posting.status === "open" ? "Dibuka" : "Ditutup"}
+              </Badge>
+              <Badge variant="outline" className="font-normal">{posting.positionName}</Badge>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1">
+              {[posting.department, posting.location, posting.employmentType].filter(Boolean).join(" · ") || "-"}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleToggleStatus} disabled={togglingStatus}>
+            {posting.status === "open" ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+            {posting.status === "open" ? "Tutup Lowongan" : "Buka Kembali"}
+          </Button>
         </div>
-        <p className="text-muted-foreground text-sm mt-1">
-          {[posting.department, posting.location, posting.employmentType].filter(Boolean).join(" · ") || "-"}
-        </p>
         {posting.description && <p className="text-sm mt-2 max-w-2xl">{posting.description}</p>}
       </div>
+
+      {posting.status === "open" && (
+        <Card>
+          <CardContent className="py-3 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Link lamaran publik</p>
+              <p className="text-xs text-muted-foreground">Bagikan ke calon pelamar. Nonaktif otomatis kalau lowongan ditutup.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={copyApplyLink}>
+              <Copy className="h-3.5 w-3.5" /> Salin Link
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">Kandidat ({posting.candidates.length})</h2>
@@ -169,42 +223,64 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
       )}
 
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nama</TableHead>
-              <TableHead>Kontak</TableHead>
-              <TableHead>Sumber</TableHead>
-              <TableHead>Tahap</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {posting.candidates.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
-            )}
-            {posting.candidates.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {[c.email, c.phone].filter(Boolean).join(" · ") || "-"}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.source || "-"}</TableCell>
-                <TableCell>
-                  <Select value={c.stage} onValueChange={(v) => v && handleStageChange(c.id, v)}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STAGES.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nama</TableHead>
+                <TableHead>Kontak</TableHead>
+                <TableHead>Psikotest</TableHead>
+                <TableHead>Jadwal Interview</TableHead>
+                <TableHead>Tahap</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {posting.candidates.length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
+              )}
+              {posting.candidates.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {[c.email, c.phone].filter(Boolean).join(" · ") || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {c.psychTestSubmission ? (
+                      <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal">
+                        {c.psychTestSubmission.percentage}% · {c.psychTestSubmission.passed ? "Lulus" : "Tidak lulus"}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Belum test</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {c.interviewSlot ? (
+                      <>
+                        {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).tanggal}
+                        <br />
+                        {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).jam}
+                      </>
+                    ) : (
+                      "-"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Select value={c.stage} onValueChange={(v) => v && handleStageChange(c.id, v)}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STAGES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
     </div>
   );

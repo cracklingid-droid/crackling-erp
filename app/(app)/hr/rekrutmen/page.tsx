@@ -8,12 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Users, ArrowRight } from "lucide-react";
+import { Plus, Users, ArrowRight, ListChecks } from "lucide-react";
 
 type Posting = {
   id: number;
   title: string;
+  positionId: number;
+  positionName: string;
   department: string | null;
   location: string | null;
   employmentType: string | null;
@@ -24,11 +27,15 @@ type Posting = {
   hiredCount: number;
 };
 
+type Position = { id: number; name: string };
+
 export default function RekrutmenPage() {
   const [postings, setPostings] = useState<Posting[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
+  const [positionId, setPositionId] = useState("");
   const [department, setDepartment] = useState("");
   const [location, setLocation] = useState("");
   const [employmentType, setEmploymentType] = useState("");
@@ -44,6 +51,11 @@ export default function RekrutmenPage() {
   }
 
   useEffect(load, []);
+  useEffect(() => {
+    fetch("/api/positions")
+      .then((r) => r.json())
+      .then(setPositions);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,16 +63,21 @@ export default function RekrutmenPage() {
       toast.error("Judul lowongan wajib diisi");
       return;
     }
+    if (!positionId) {
+      toast.error("Posisi wajib dipilih");
+      return;
+    }
     setSaving(true);
     const res = await fetch("/api/job-postings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, department, location, employmentType, description }),
+      body: JSON.stringify({ title, positionId: Number(positionId), department, location, employmentType, description }),
     });
     setSaving(false);
     if (res.ok) {
       toast.success("Lowongan dibuat.");
       setTitle("");
+      setPositionId("");
       setDepartment("");
       setLocation("");
       setEmploymentType("");
@@ -80,9 +97,16 @@ export default function RekrutmenPage() {
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Rekrutmen</h1>
           <p className="text-muted-foreground text-sm">Lowongan pekerjaan & pipeline kandidat.</p>
         </div>
-        <Button onClick={() => setShowForm((v) => !v)}>
-          <Plus className="h-4 w-4" /> Lowongan Baru
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/hr/rekrutmen/posisi">
+            <Button variant="outline">
+              <ListChecks className="h-4 w-4" /> Posisi &amp; Soal
+            </Button>
+          </Link>
+          <Button onClick={() => setShowForm((v) => !v)}>
+            <Plus className="h-4 w-4" /> Lowongan Baru
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -93,8 +117,31 @@ export default function RekrutmenPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="grid gap-4">
               <div className="grid gap-1.5">
-                <Label>Judul Posisi</Label>
+                <Label>Judul Lowongan</Label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="mis. Kitchen Staff - Joglo" autoFocus />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Posisi (menentukan bank soal psikotest)</Label>
+                {positions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Belum ada posisi.{" "}
+                    <Link href="/hr/rekrutmen/posisi" className="text-primary underline">
+                      Buat posisi dulu di sini
+                    </Link>
+                    .
+                  </p>
+                ) : (
+                  <Select value={positionId} onValueChange={(v) => v && setPositionId(v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih posisi..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {positions.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
@@ -140,6 +187,7 @@ export default function RekrutmenPage() {
                     <Badge variant={p.status === "open" ? "default" : "secondary"}>
                       {p.status === "open" ? "Dibuka" : "Ditutup"}
                     </Badge>
+                    <Badge variant="outline" className="font-normal">{p.positionName}</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     {[p.department, p.location, p.employmentType].filter(Boolean).join(" · ") || "-"}

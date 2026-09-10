@@ -31,9 +31,50 @@ model HrUser {
   stageEvents        CandidateStageEvent[]
 }
 
+// Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
+// karena posisi yang sama sering dibuka-tutup berkali-kali di F&B (permintaan
+// Kevin 2026-09-10), sementara bank soal psikotest & nilai ambang batasnya
+// mau tetap sama tiap kali posisi itu dibuka lagi, tidak usah diketik ulang.
+model Position {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  // ambang lulus psikotest dalam persen (0-100) dari skor maksimum posisi ini
+  passingScore Int      @default(70)
+  createdAt    DateTime @default(now())
+
+  questions   PsychTestQuestion[]
+  jobPostings JobPosting[]
+}
+
+model PsychTestQuestion {
+  id         Int      @id @default(autoincrement())
+  positionId Int
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  order      Int      @default(0)
+  text       String
+  createdAt  DateTime @default(now())
+
+  options PsychTestOption[]
+  answers PsychTestAnswer[]
+}
+
+model PsychTestOption {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  question   PsychTestQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label      String
+  // poin kontribusi ke skor total kalau opsi ini dipilih pelamar
+  score      Int      @default(0)
+  order      Int      @default(0)
+
+  answers PsychTestAnswer[]
+}
+
 model JobPosting {
   id             Int      @id @default(autoincrement())
   title          String
+  positionId     Int
+  position       Position @relation(fields: [positionId], references: [id])
   department     String? // outlet/divisi yang butuh, mis. "Kitchen - Joglo"
   location       String?
   employmentType String? // full-time | part-time | contract | magang
@@ -50,21 +91,75 @@ model Candidate {
   id           Int      @id @default(autoincrement())
   jobPostingId Int
   jobPosting   JobPosting @relation(fields: [jobPostingId], references: [id])
+  // token acak buat pelamar akses halaman psikotest & jadwal interview
+  // miliknya sendiri tanpa perlu login (pelamar publik, bukan staff).
+  publicToken  String   @unique @default(uuid())
   name         String
   email        String?
   phone        String?
   source       String? // referral | job portal | walk-in | dst
   notes        String?
-  // applied -> screening -> interview -> offer -> hired -> rejected
+
+  // biodata diri lengkap - diisi pelamar sendiri lewat form publik
+  birthPlace       String?
+  birthDate        DateTime?
+  gender           String? // L | P
+  address          String?
+  preferredOutlet  String? // lokasi/cabang yang diinginkan
+  lastEducation    String? // SMA/SMK | D3 | S1 | dst
+  institution      String? // nama sekolah/kampus & jurusan
+  experience       String? // pengalaman kerja, free text
+  expectedSalary   Int?    // ekspektasi gaji dalam rupiah
+
+  // applied -> screening (lolos psikotest) -> interview -> offer -> hired -> rejected
   stage        String   @default("applied")
-  createdById  Int
-  createdBy    HrUser   @relation(fields: [createdById], references: [id])
+  // null kalau pelamar publik daftar sendiri (tanpa login), terisi kalau
+  // dibuatkan manual oleh staff HR.
+  createdById  Int?
+  createdBy    HrUser?  @relation(fields: [createdById], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  stageEvents CandidateStageEvent[]
+  stageEvents         CandidateStageEvent[]
+  psychTestSubmission PsychTestSubmission?
+  interviewSlot       InterviewSlot?
 
   @@index([jobPostingId, stage])
+}
+
+model PsychTestSubmission {
+  id          Int      @id @default(autoincrement())
+  candidateId Int      @unique
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  totalScore  Int
+  maxScore    Int
+  percentage  Int
+  passed      Boolean
+  submittedAt DateTime @default(now())
+
+  answers PsychTestAnswer[]
+}
+
+model PsychTestAnswer {
+  id           Int      @id @default(autoincrement())
+  submissionId Int
+  submission   PsychTestSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId   Int
+  question     PsychTestQuestion   @relation(fields: [questionId], references: [id])
+  optionId     Int
+  option       PsychTestOption     @relation(fields: [optionId], references: [id])
+  score        Int
+}
+
+// Slot interview 13.30-16.00 tiap 15 menit, berulang tiap hari kerja -
+// dihitung on-the-fly di kode, tabel ini cuma nyimpen slot yang SUDAH
+// dipilih pelamar (permintaan Kevin 2026-09-10).
+model InterviewSlot {
+  id          Int      @id @default(autoincrement())
+  candidateId Int      @unique
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  scheduledAt DateTime @unique
+  createdAt   DateTime @default(now())
 }
 
 // Jejak tiap kali kandidat pindah tahap - biar kelihatan riwayat & siapa
@@ -75,7 +170,10 @@ model CandidateStageEvent {
   candidate   Candidate @relation(fields: [candidateId], references: [id])
   stage       String
   note        String?
-  createdById Int
-  createdBy   HrUser   @relation(fields: [createdById], references: [id])
+  // null kalau perpindahan tahap otomatis (pelamar publik daftar sendiri,
+  // psikotest dinilai sistem, atau interview dijadwalkan sendiri oleh
+  // pelamar) - tidak ada staff HR yang melakukannya secara manual.
+  createdById Int?
+  createdBy   HrUser?  @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 }
