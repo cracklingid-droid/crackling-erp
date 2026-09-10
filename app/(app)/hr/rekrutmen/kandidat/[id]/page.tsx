@@ -9,16 +9,8 @@ import { toast } from "sonner";
 import { ArrowLeft, FileText, Mail, Phone, MapPin, GraduationCap, Briefcase as BriefcaseIcon, Wallet, CalendarClock, Download } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
 import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
-
-const STAGES = [
-  { value: "applied", label: "Melamar" },
-  { value: "screening", label: "Lolos Test" },
-  { value: "interview", label: "Interview" },
-  { value: "offer", label: "Penawaran" },
-  { value: "hired", label: "Diterima" },
-  { value: "rejected", label: "Ditolak" },
-];
-const stageLabel = (v: string) => STAGES.find((s) => s.value === v)?.label ?? v;
+import { OfferChecklistDialog } from "@/app/components/OfferChecklistDialog";
+import { STAGES, stageLabel, allowedNextStages } from "@/lib/candidate-stages";
 
 const GENDER_LABEL: Record<string, string> = { L: "Laki-laki", P: "Perempuan" };
 
@@ -38,6 +30,8 @@ type Candidate = {
   expectedSalary: number | null;
   cvUrl: string | null;
   cvTextPreview: string | null;
+  offerDocumentReady: boolean;
+  offerWhatsappSent: boolean;
   stage: string;
   createdAt: string;
   jobPosting: { id: number; title: string; position: { id: number; name: string; passingScore: number } };
@@ -114,13 +108,27 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
               <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {STAGES.map((s) => (
+              {STAGES.filter((s) => allowedNextStages(c.stage).includes(s.value)).map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
+
+      {c.stage === "offer" && (
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="text-base">Checklist Penawaran</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Selesaikan surat penawaran &amp; konfirmasi WA ke kandidat sebelum bisa dipindahkan ke tahap Diterima.
+            </p>
+            <OfferChecklistDialog candidate={c} onChanged={load} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

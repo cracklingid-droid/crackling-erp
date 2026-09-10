@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
 import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
+import { OfferChecklistDialog } from "@/app/components/OfferChecklistDialog";
+import { allowedNextStages } from "@/lib/candidate-stages";
 
 type Posting = {
   id: number;
@@ -38,8 +40,12 @@ type Candidate = {
   name: string;
   email: string | null;
   phone: string | null;
+  address: string | null;
+  preferredOutlet: string | null;
   stage: string;
   createdAt: string;
+  offerDocumentReady: boolean;
+  offerWhatsappSent: boolean;
   jobPosting: { id: number; title: string; status: string };
   psychTestSubmission: { percentage: number; passed: boolean } | null;
   interviewSlot: { scheduledAt: string } | null;
@@ -94,13 +100,14 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
               {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).tanggal.split(",")[0]}, {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).jam}
             </Badge>
           )}
+          {c.stage === "offer" && <OfferChecklistDialog candidate={c} onChanged={onChanged} />}
         </div>
         <Select value={c.stage} onValueChange={(v) => v && handleStageChange(v)}>
           <SelectTrigger className="h-7 text-xs w-full">
             <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {STAGES.map((s) => (
+            {STAGES.filter((s) => allowedNextStages(c.stage).includes(s.value)).map((s) => (
               <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
             ))}
           </SelectContent>

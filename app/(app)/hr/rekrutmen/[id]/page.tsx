@@ -13,16 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Plus, Copy, Lock, Unlock, FileText } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
 import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
-
-const STAGES = [
-  { value: "applied", label: "Melamar" },
-  { value: "screening", label: "Screening" },
-  { value: "interview", label: "Interview" },
-  { value: "offer", label: "Penawaran" },
-  { value: "hired", label: "Diterima" },
-  { value: "rejected", label: "Ditolak" },
-];
-const stageLabel = (v: string) => STAGES.find((s) => s.value === v)?.label ?? v;
+import { STAGES, stageLabel, allowedNextStages } from "@/lib/candidate-stages";
 
 type PsychTestSubmission = { percentage: number; passed: boolean } | null;
 type InterviewSlot = { scheduledAt: string } | null;
@@ -294,7 +285,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
                         <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {STAGES.map((s) => (
+                        {STAGES.filter((s) => allowedNextStages(c.stage).includes(s.value)).map((s) => (
                           <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                         ))}
                       </SelectContent>

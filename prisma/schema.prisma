@@ -128,6 +128,12 @@ model Candidate {
   // permintaan Kevin 2026-09-10.
   agreedStartSoon  Boolean @default(false)
 
+  // 2 syarat yang harus HR selesaikan di tahap "offer" sebelum kandidat
+  // boleh dipindah ke "hired" - surat penawaran/kontrak sudah dibuat, dan
+  // sudah dikonfirmasi ke kandidat lewat WA. Permintaan Kevin 2026-09-10.
+  offerDocumentReady Boolean @default(false)
+  offerWhatsappSent  Boolean @default(false)
+
   // applied -> screening (lolos psikotest) -> interview -> offer -> hired -> rejected
   stage        String   @default("applied")
   // null kalau pelamar publik daftar sendiri (tanpa login), terisi kalau
