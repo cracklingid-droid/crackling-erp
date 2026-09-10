@@ -196,19 +196,19 @@ export default function RekrutmenPage() {
   const columns = STAGES.map((s) => ({ ...s, items: candidates.filter((c) => c.stage === s.value) }));
 
   return (
-    <div className="max-w-7xl grid gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <div className="max-w-7xl grid gap-6 overflow-x-hidden">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Rekrutmen</h1>
           <p className="text-muted-foreground text-sm">Pusat kendali proses rekrutmen - dari lamaran sampai onboarding.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap shrink-0">
           <Link href="/hr/rekrutmen/posisi" className="flex-1 sm:flex-none">
-            <Button variant="outline" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto whitespace-nowrap">
               <ListChecks className="h-4 w-4" /> Posisi &amp; Soal
             </Button>
           </Link>
-          <Button onClick={() => setShowForm((v) => !v)} className="flex-1 sm:flex-none">
+          <Button onClick={() => setShowForm((v) => !v)} className="flex-1 sm:flex-none whitespace-nowrap">
             <Plus className="h-4 w-4" /> Lowongan Baru
           </Button>
         </div>
