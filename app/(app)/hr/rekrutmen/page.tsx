@@ -337,20 +337,29 @@ export default function RekrutmenPage() {
               <h2 className="font-heading font-semibold">Pipeline Kandidat</h2>
               <p className="text-xs text-muted-foreground md:hidden">Geser untuk lihat semua tahap →</p>
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="thin-scrollbar flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0">
               {columns.map((col) => {
                 const Icon = col.icon;
                 return (
-                  <div key={col.value} className="w-[85vw] sm:w-64 shrink-0 grid gap-3 snap-start">
+                  <div
+                    key={col.value}
+                    className="w-[85vw] sm:w-64 shrink-0 snap-start grid gap-3 content-start rounded-xl border border-border/60 bg-muted/20 p-3"
+                  >
                     <div className="flex items-center gap-2">
                       <div className={`${col.tile} flex h-7 w-7 items-center justify-center rounded-md shrink-0`}>
                         <Icon className="h-3.5 w-3.5" />
                       </div>
                       <p className="text-sm font-medium">{col.label}</p>
-                      <span className="text-xs text-muted-foreground tabular-nums">{col.items.length}</span>
+                      <span className="ml-auto rounded-full border border-border/60 bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+                        {col.items.length}
+                      </span>
                     </div>
-                    <div className="grid gap-2 max-h-[32rem] overflow-y-auto pr-1">
-                      {col.items.length === 0 && <p className="text-xs text-muted-foreground px-1">Kosong</p>}
+                    <div className="thin-scrollbar grid gap-2 max-h-[32rem] overflow-y-auto pr-1 -mr-1">
+                      {col.items.length === 0 && (
+                        <div className="rounded-lg border border-dashed border-border/70 py-6 text-center text-xs text-muted-foreground">
+                          Kosong
+                        </div>
+                      )}
                       {col.items.map((c) => (
                         <CandidateCard key={c.id} c={c} onChanged={load} />
                       ))}
