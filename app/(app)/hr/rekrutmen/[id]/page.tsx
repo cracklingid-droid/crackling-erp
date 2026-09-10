@@ -164,7 +164,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
             {posting.status === "open" ? "Tutup Lowongan" : "Buka Kembali"}
           </Button>
         </div>
-        {posting.description && <p className="text-sm mt-2 max-w-2xl">{posting.description}</p>}
+        {posting.description && <p className="text-sm mt-2 max-w-2xl whitespace-pre-line">{posting.description}</p>}
       </div>
 
       {posting.status === "open" && (

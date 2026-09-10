@@ -88,7 +88,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
         <p className="text-muted-foreground text-sm mt-1">
           {[posting.department, posting.location, posting.employmentType].filter(Boolean).join(" · ") || "-"}
         </p>
-        {posting.description && <p className="text-sm mt-3">{posting.description}</p>}
+        {posting.description && <p className="text-sm mt-3 whitespace-pre-line">{posting.description}</p>}
 
         <Card className="mt-8">
           <CardHeader>
