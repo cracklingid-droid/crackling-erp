@@ -15,6 +15,7 @@ import {
   FileCheck2, UserPlus, Handshake, PartyPopper, XCircle,
 } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
+import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
 
 type Posting = {
   id: number;
@@ -79,11 +80,14 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
           </Link>
           <p className="text-xs text-muted-foreground truncate">{c.jobPosting.title}</p>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {c.psychTestSubmission && (
-            <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal text-[10px]">
-              Test {c.psychTestSubmission.percentage}%
-            </Badge>
+            <>
+              <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal text-[10px]">
+                Test {c.psychTestSubmission.percentage}%
+              </Badge>
+              <PsychTestResultDialog candidateId={c.id} size="h-3.5 w-3.5" />
+            </>
           )}
           {c.interviewSlot && (
             <Badge variant="outline" className="font-normal text-[10px]">

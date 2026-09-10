@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Copy, Lock, Unlock, FileText } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
+import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
 
 const STAGES = [
   { value: "applied", label: "Melamar" },
@@ -264,9 +265,12 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
                   </TableCell>
                   <TableCell className="text-sm">
                     {c.psychTestSubmission ? (
-                      <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal">
-                        {c.psychTestSubmission.percentage}% · {c.psychTestSubmission.passed ? "Lulus" : "Tidak lulus"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal">
+                          {c.psychTestSubmission.percentage}% · {c.psychTestSubmission.passed ? "Lulus" : "Tidak lulus"}
+                        </Badge>
+                        <PsychTestResultDialog candidateId={c.id} />
+                      </div>
                     ) : (
                       <span className="text-muted-foreground">Belum test</span>
                     )}
