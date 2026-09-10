@@ -67,6 +67,7 @@ export async function POST(req: Request) {
       experience: String(body.experience).trim(),
       expectedSalary: Math.round(expectedSalary),
       cvUrl: typeof body.cvUrl === "string" ? body.cvUrl.trim() || null : null,
+      cvTextPreview: typeof body.cvTextPreview === "string" ? body.cvTextPreview.trim() || null : null,
       agreedB2: posting.position.requiresKitchenTerms ? true : false,
       agreedLongShift: posting.position.requiresKitchenTerms ? true : false,
       agreedNoPinjol: posting.position.requiresKitchenTerms ? true : false,

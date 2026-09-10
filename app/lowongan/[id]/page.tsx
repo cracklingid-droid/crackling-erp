@@ -55,7 +55,9 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
 
   const [cvUrl, setCvUrl] = useState("");
   const [cvFileName, setCvFileName] = useState("");
+  const [cvTextPreview, setCvTextPreview] = useState("");
   const [uploadingCv, setUploadingCv] = useState(false);
+  const [autofilled, setAutofilled] = useState<string[]>([]);
 
   async function handleCvChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -69,7 +71,27 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
       const data = await res.json();
       setCvUrl(data.url);
       setCvFileName(data.name);
-      toast.success("CV berhasil diupload.");
+      setCvTextPreview(data.textPreview || "");
+
+      const filled: string[] = [];
+      setForm((f) => {
+        const next = { ...f };
+        if (data.extractedEmail && !f.email) {
+          next.email = data.extractedEmail;
+          filled.push("Email");
+        }
+        if (data.extractedPhone && !f.phone) {
+          next.phone = data.extractedPhone;
+          filled.push("No. HP");
+        }
+        return next;
+      });
+      setAutofilled(filled);
+      toast.success(
+        filled.length > 0
+          ? `CV berhasil diupload. ${filled.join(" & ")} terisi otomatis, boleh diedit.`
+          : "CV berhasil diupload."
+      );
     } else {
       const err = await res.json();
       toast.error(err.error ?? "Gagal upload CV");
@@ -105,7 +127,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
     const res = await fetch("/api/public/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobPostingId: Number(id), ...form, cvUrl, agreedB2, agreedLongShift, agreedNoPinjol, agreedStartSoon }),
+      body: JSON.stringify({ jobPostingId: Number(id), ...form, cvUrl, cvTextPreview, agreedB2, agreedLongShift, agreedNoPinjol, agreedStartSoon }),
     });
     setSubmitting(false);
     if (res.ok) {
@@ -147,6 +169,35 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid gap-4">
+              <div className="grid gap-1.5">
+                <Label>Upload CV</Label>
+                {cvFileName ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                    <span className="flex items-center gap-2 truncate">
+                      <FileCheck className="h-4 w-4 text-primary shrink-0" /> {cvFileName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setCvUrl(""); setCvFileName(""); setCvTextPreview(""); setAutofilled([]); }}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm cursor-pointer hover:bg-muted/50 text-muted-foreground">
+                    <Upload className="h-4 w-4" />
+                    {uploadingCv ? "Mengupload..." : "Pilih file CV (PDF/DOC/DOCX, maks 5MB)"}
+                    <input type="file" accept=".pdf,.doc,.docx" className="hidden" disabled={uploadingCv} onChange={handleCvChange} />
+                  </label>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {autofilled.length > 0
+                    ? `${autofilled.join(" & ")} di bawah terisi otomatis dari CV - boleh diedit kalau kurang tepat.`
+                    : "Upload CV dulu supaya Email & No. HP bisa terisi otomatis (kalau terdeteksi)."}
+                </p>
+              </div>
+
               <div className="grid gap-1.5">
                 <Label>Nama Lengkap</Label>
                 <Input required value={form.name} onChange={(e) => set("name")(e.target.value)} />
@@ -227,29 +278,6 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
               <div className="grid gap-1.5 max-w-60">
                 <Label>Ekspektasi Gaji (Rp)</Label>
                 <Input required type="number" min={0} value={form.expectedSalary} onChange={(e) => set("expectedSalary")(e.target.value)} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Upload CV</Label>
-                {cvFileName ? (
-                  <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                    <span className="flex items-center gap-2 truncate">
-                      <FileCheck className="h-4 w-4 text-primary shrink-0" /> {cvFileName}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => { setCvUrl(""); setCvFileName(""); }}
-                      className="text-muted-foreground hover:text-foreground shrink-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm cursor-pointer hover:bg-muted/50 text-muted-foreground">
-                    <Upload className="h-4 w-4" />
-                    {uploadingCv ? "Mengupload..." : "Pilih file CV (PDF/DOC/DOCX, maks 5MB)"}
-                    <input type="file" accept=".pdf,.doc,.docx" className="hidden" disabled={uploadingCv} onChange={handleCvChange} />
-                  </label>
-                )}
               </div>
 
               {posting.requiresKitchenTerms && (

@@ -249,7 +249,9 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
               )}
               {posting.candidates.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/hr/rekrutmen/kandidat/${c.id}`} className="hover:underline">{c.name}</Link>
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {[c.email, c.phone].filter(Boolean).join(" · ") || "-"}
                   </TableCell>

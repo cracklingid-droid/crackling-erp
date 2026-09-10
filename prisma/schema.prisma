@@ -117,6 +117,7 @@ model Candidate {
   experience       String? // pengalaman kerja terakhir, mis. "Cook - Hotel ABC"
   expectedSalary   Int?    // ekspektasi gaji dalam rupiah
   cvUrl            String? // link file CV yang diupload ke Vercel Blob
+  cvTextPreview    String? // teks hasil ekstraksi CV (PDF/DOCX) untuk dibaca HR
 
   // persetujuan syarat & ketentuan khusus dapur (hanya diisi kalau posisi
   // lowongannya requiresKitchenTerms) - permintaan Kevin 2026-09-10.

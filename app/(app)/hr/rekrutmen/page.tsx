@@ -75,7 +75,7 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
     <Card className="shadow-none">
       <CardContent className="p-3 grid gap-2">
         <div>
-          <Link href={`/hr/rekrutmen/${c.jobPosting.id}`} className="font-medium text-sm hover:underline">
+          <Link href={`/hr/rekrutmen/kandidat/${c.id}`} className="font-medium text-sm hover:underline">
             {c.name}
           </Link>
           <p className="text-xs text-muted-foreground truncate">{c.jobPosting.title}</p>
@@ -269,7 +269,7 @@ export default function RekrutmenPage() {
               <CardContent className="grid gap-2">
                 {needsFollowUp.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada. Semua kandidat sudah ditindaklanjuti.</p>}
                 {needsFollowUp.map((c) => (
-                  <Link key={c.id} href={`/hr/rekrutmen/${c.jobPosting.id}`} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50">
+                  <Link key={c.id} href={`/hr/rekrutmen/kandidat/${c.id}`} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{c.name}</p>
                       <p className="text-xs text-muted-foreground truncate">Interview selesai, belum diputuskan · {c.jobPosting.title}</p>
@@ -291,7 +291,7 @@ export default function RekrutmenPage() {
                 {upcomingInterviews.map((c) => {
                   const { tanggal, jam } = formatSlotWIB(new Date(c.interviewSlot!.scheduledAt));
                   return (
-                    <Link key={c.id} href={`/hr/rekrutmen/${c.jobPosting.id}`} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50">
+                    <Link key={c.id} href={`/hr/rekrutmen/kandidat/${c.id}`} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{c.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{tanggal} · {jam}</p>

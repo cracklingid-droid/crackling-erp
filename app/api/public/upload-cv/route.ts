@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { extractCvText } from "@/lib/cv-parse";
+import { extractContactInfo } from "@/lib/cv-extract-fields";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_TEXT_PREVIEW = 20000;
 const ALLOWED_TYPES = [
   "application/pdf",
   "application/msword",
@@ -21,10 +24,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Format file harus PDF, DOC, atau DOCX" }, { status: 400 });
   }
 
+  const buffer = Buffer.from(await file.arrayBuffer());
+
   const blob = await put(`cv/${Date.now()}-${file.name}`, file, {
     access: "public",
     addRandomSuffix: true,
   });
 
-  return NextResponse.json({ url: blob.url, name: file.name });
+  const fullText = await extractCvText(buffer, file.type);
+  const { email, phone } = extractContactInfo(fullText);
+
+  return NextResponse.json({
+    url: blob.url,
+    name: file.name,
+    textPreview: fullText.slice(0, MAX_TEXT_PREVIEW),
+    extractedEmail: email,
+    extractedPhone: phone,
+  });
 }
