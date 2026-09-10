@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Copy, Lock, Unlock } from "lucide-react";
+import { ArrowLeft, Plus, Copy, Lock, Unlock, FileText } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
 
 const STAGES = [
@@ -32,6 +32,8 @@ type Candidate = {
   phone: string | null;
   source: string | null;
   notes: string | null;
+  experience: string | null;
+  cvUrl: string | null;
   stage: string;
   createdAt: string;
   psychTestSubmission: PsychTestSubmission;
@@ -229,6 +231,8 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
               <TableRow>
                 <TableHead>Nama</TableHead>
                 <TableHead>Kontak</TableHead>
+                <TableHead>Pengalaman</TableHead>
+                <TableHead>CV</TableHead>
                 <TableHead>Psikotest</TableHead>
                 <TableHead>Jadwal Interview</TableHead>
                 <TableHead>Tahap</TableHead>
@@ -236,13 +240,23 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
             </TableHeader>
             <TableBody>
               {posting.candidates.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
               )}
               {posting.candidates.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {[c.email, c.phone].filter(Boolean).join(" · ") || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.experience || "-"}</TableCell>
+                  <TableCell className="text-sm">
+                    {c.cvUrl ? (
+                      <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                        <FileText className="h-3.5 w-3.5" /> Lihat
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {c.psychTestSubmission ? (

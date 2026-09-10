@@ -3,8 +3,10 @@ import { prisma } from "@/lib/db";
 
 const REQUIRED_FIELDS = [
   "name", "email", "phone", "birthPlace", "birthDate", "gender",
-  "address", "preferredOutlet", "lastEducation", "institution", "expectedSalary",
+  "address", "preferredOutlet", "lastEducation", "institution", "expectedSalary", "experience",
 ] as const;
+
+const MIN_AGE = 18;
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -37,6 +39,13 @@ export async function POST(req: Request) {
   if (isNaN(birthDate.getTime())) {
     return NextResponse.json({ error: "Tanggal lahir tidak valid" }, { status: 400 });
   }
+  const now = new Date();
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const monthDiff = now.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) age--;
+  if (age < MIN_AGE) {
+    return NextResponse.json({ error: `Pelamar harus berusia minimal ${MIN_AGE} tahun` }, { status: 400 });
+  }
 
   const candidate = await prisma.candidate.create({
     data: {
@@ -52,8 +61,9 @@ export async function POST(req: Request) {
       preferredOutlet: String(body.preferredOutlet).trim(),
       lastEducation: String(body.lastEducation),
       institution: String(body.institution).trim(),
-      experience: typeof body.experience === "string" ? body.experience.trim() || null : null,
+      experience: String(body.experience).trim(),
       expectedSalary: Math.round(expectedSalary),
+      cvUrl: typeof body.cvUrl === "string" ? body.cvUrl.trim() || null : null,
       agreedB2: posting.position.requiresKitchenTerms ? true : false,
       agreedLongShift: posting.position.requiresKitchenTerms ? true : false,
       agreedNoPinjol: posting.position.requiresKitchenTerms ? true : false,

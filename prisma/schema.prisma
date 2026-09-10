@@ -114,8 +114,9 @@ model Candidate {
   preferredOutlet  String? // lokasi/cabang yang diinginkan
   lastEducation    String? // SMA/SMK | D3 | S1 | dst
   institution      String? // nama sekolah/kampus & jurusan
-  experience       String? // pengalaman kerja, free text
+  experience       String? // pengalaman kerja terakhir, mis. "Cook - Hotel ABC"
   expectedSalary   Int?    // ekspektasi gaji dalam rupiah
+  cvUrl            String? // link file CV yang diupload ke Vercel Blob
 
   // persetujuan syarat & ketentuan khusus dapur (hanya diisi kalau posisi
   // lowongannya requiresKitchenTerms) - permintaan Kevin 2026-09-10.

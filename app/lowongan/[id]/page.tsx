@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Upload, FileCheck, X } from "lucide-react";
 
 type Posting = {
   id: number;
@@ -25,6 +25,13 @@ type Posting = {
 
 const EDUCATION_OPTIONS = ["SD", "SMP", "SMA/SMK", "D3", "S1", "S2"];
 const OUTLET_OPTIONS = ["Joglo (Central Kitchen)", "Gading Serpong", "Kelapa Gading"];
+const MIN_AGE = 18;
+
+function maxBirthDate(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - MIN_AGE);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function LowonganDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
@@ -45,6 +52,30 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
   const [agreedLongShift, setAgreedLongShift] = useState(false);
   const [agreedNoPinjol, setAgreedNoPinjol] = useState(false);
 
+  const [cvUrl, setCvUrl] = useState("");
+  const [cvFileName, setCvFileName] = useState("");
+  const [uploadingCv, setUploadingCv] = useState(false);
+
+  async function handleCvChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCv(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/public/upload-cv", { method: "POST", body: fd });
+    setUploadingCv(false);
+    if (res.ok) {
+      const data = await res.json();
+      setCvUrl(data.url);
+      setCvFileName(data.name);
+      toast.success("CV berhasil diupload.");
+    } else {
+      const err = await res.json();
+      toast.error(err.error ?? "Gagal upload CV");
+    }
+    e.target.value = "";
+  }
+
   useEffect(() => {
     fetch(`/api/public/job-postings/${id}`)
       .then((r) => {
@@ -57,6 +88,10 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (form.birthDate > maxBirthDate()) {
+      toast.error(`Pelamar harus berusia minimal ${MIN_AGE} tahun`);
+      return;
+    }
     if (posting?.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol)) {
       toast.error("Semua Syarat & Ketentuan wajib dicentang");
       return;
@@ -65,7 +100,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
     const res = await fetch("/api/public/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobPostingId: Number(id), ...form, agreedB2, agreedLongShift, agreedNoPinjol }),
+      body: JSON.stringify({ jobPostingId: Number(id), ...form, cvUrl, agreedB2, agreedLongShift, agreedNoPinjol }),
     });
     setSubmitting(false);
     if (res.ok) {
@@ -128,7 +163,8 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 </div>
                 <div className="grid gap-1.5">
                   <Label>Tanggal Lahir</Label>
-                  <Input required type="date" value={form.birthDate} onChange={(e) => set("birthDate")(e.target.value)} />
+                  <Input required type="date" max={maxBirthDate()} value={form.birthDate} onChange={(e) => set("birthDate")(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Pelamar minimal berusia {MIN_AGE} tahun.</p>
                 </div>
               </div>
               <div className="grid gap-1.5">
@@ -174,12 +210,41 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label>Pengalaman Kerja (opsional)</Label>
-                <Textarea rows={3} value={form.experience} onChange={(e) => set("experience")(e.target.value)} placeholder="Riwayat pekerjaan sebelumnya, kalau ada" />
+                <Label>Pengalaman Kerja Terakhir (Posisi - Tempat Kerja)</Label>
+                <Input
+                  required
+                  value={form.experience}
+                  onChange={(e) => set("experience")(e.target.value)}
+                  placeholder="mis. Cook - Hotel ABC"
+                />
+                <p className="text-xs text-muted-foreground">Belum pernah bekerja? Tulis &quot;Belum ada pengalaman&quot;.</p>
               </div>
               <div className="grid gap-1.5 max-w-60">
                 <Label>Ekspektasi Gaji (Rp)</Label>
                 <Input required type="number" min={0} value={form.expectedSalary} onChange={(e) => set("expectedSalary")(e.target.value)} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Upload CV</Label>
+                {cvFileName ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                    <span className="flex items-center gap-2 truncate">
+                      <FileCheck className="h-4 w-4 text-primary shrink-0" /> {cvFileName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setCvUrl(""); setCvFileName(""); }}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm cursor-pointer hover:bg-muted/50 text-muted-foreground">
+                    <Upload className="h-4 w-4" />
+                    {uploadingCv ? "Mengupload..." : "Pilih file CV (PDF/DOC/DOCX, maks 5MB)"}
+                    <input type="file" accept=".pdf,.doc,.docx" className="hidden" disabled={uploadingCv} onChange={handleCvChange} />
+                  </label>
+                )}
               </div>
 
               {posting.requiresKitchenTerms && (
@@ -202,7 +267,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
 
               <Button
                 type="submit"
-                disabled={submitting || (posting.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol))}
+                disabled={submitting || uploadingCv || (posting.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol))}
                 className="mt-2"
               >
                 {submitting ? "Mengirim..." : "Kirim Lamaran & Lanjut Psikotest"}
