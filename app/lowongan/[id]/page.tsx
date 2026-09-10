@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, FileCheck, X } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 
 type Posting = {
   id: number;
@@ -63,39 +64,49 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingCv(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/public/upload-cv", { method: "POST", body: fd });
-    setUploadingCv(false);
-    if (res.ok) {
-      const data = await res.json();
-      setCvUrl(data.url);
-      setCvFileName(data.name);
-      setCvTextPreview(data.textPreview || "");
-
-      const filled: string[] = [];
-      setForm((f) => {
-        const next = { ...f };
-        if (data.extractedEmail && !f.email) {
-          next.email = data.extractedEmail;
-          filled.push("Email");
-        }
-        if (data.extractedPhone && !f.phone) {
-          next.phone = data.extractedPhone;
-          filled.push("No. HP");
-        }
-        return next;
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/public/upload-cv",
       });
-      setAutofilled(filled);
-      toast.success(
-        filled.length > 0
-          ? `CV berhasil diupload. ${filled.join(" & ")} terisi otomatis, boleh diedit.`
-          : "CV berhasil diupload."
-      );
-    } else {
-      const err = await res.json();
-      toast.error(err.error ?? "Gagal upload CV");
+      setCvUrl(blob.url);
+      setCvFileName(file.name);
+      toast.success("CV berhasil diupload.");
+
+      // Ekstraksi teks & deteksi email/HP jalan terpisah setelah upload
+      // selesai, tidak menghalangi form kalau prosesnya lambat/gagal.
+      fetch("/api/public/extract-cv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: blob.url, contentType: file.type }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          setCvTextPreview(data.textPreview || "");
+          const filled: string[] = [];
+          setForm((f) => {
+            const next = { ...f };
+            if (data.extractedEmail && !f.email) {
+              next.email = data.extractedEmail;
+              filled.push("Email");
+            }
+            if (data.extractedPhone && !f.phone) {
+              next.phone = data.extractedPhone;
+              filled.push("No. HP");
+            }
+            return next;
+          });
+          if (filled.length > 0) {
+            setAutofilled(filled);
+            toast.success(`${filled.join(" & ")} terisi otomatis dari CV, boleh diedit.`);
+          }
+        })
+        .catch(() => {});
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal upload CV");
     }
+    setUploadingCv(false);
     e.target.value = "";
   }
 
@@ -193,7 +204,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 ) : (
                   <label className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm cursor-pointer hover:bg-muted/50 text-muted-foreground">
                     <Upload className="h-4 w-4" />
-                    {uploadingCv ? "Mengupload..." : "Pilih file CV (PDF/DOC/DOCX, maks 5MB)"}
+                    {uploadingCv ? "Mengupload..." : "Pilih file CV (PDF/DOC/DOCX, maks 25MB)"}
                     <input type="file" accept=".pdf,.doc,.docx" className="hidden" disabled={uploadingCv} onChange={handleCvChange} />
                   </label>
                 )}
