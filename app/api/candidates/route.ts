@@ -2,6 +2,22 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+
+  const candidates = await prisma.candidate.findMany({
+    where: { jobPosting: { status: "open" } },
+    include: {
+      jobPosting: { select: { id: true, title: true, status: true } },
+      psychTestSubmission: true,
+      interviewSlot: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return NextResponse.json(candidates);
+}
+
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
