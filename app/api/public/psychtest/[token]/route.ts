@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendMail } from "@/lib/mail";
 import { getPsychTestDeadline } from "@/lib/psychtest-deadline";
+import { deleteCvForRejectedCandidate } from "@/lib/delete-cv";
 import type { Prisma } from "@prisma/client";
 
 type CandidateWithQuestions = Prisma.CandidateGetPayload<{
@@ -60,6 +61,10 @@ async function finalizeSubmission(
       },
     });
   });
+
+  if (!passed) {
+    await deleteCvForRejectedCandidate(candidate.id);
+  }
 
   try {
     if (passed) {

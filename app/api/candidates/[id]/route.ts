@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { deleteCvForRejectedCandidate } from "@/lib/delete-cv";
 
 const VALID_STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 
@@ -60,6 +61,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     return updated;
   });
+
+  if (stageChanged && body.stage === "rejected") {
+    await deleteCvForRejectedCandidate(candidateId);
+  }
 
   return NextResponse.json(candidate);
 }
