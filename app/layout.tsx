@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Oswald, Geist_Mono } from "next/font/google";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 // Font sama persis dgn Crackling Warehouse - satu keluarga tipografi utk
@@ -31,7 +33,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${bodyFont.variable} ${headingFont.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <TooltipProvider>
+          {children}
+          <Toaster />
+        </TooltipProvider>
+      </body>
     </html>
   );
 }

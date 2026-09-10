@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// Semua tabel HR sengaja diberi prefix "Hr" - Crackling ERP numpang di
+// database Postgres yang sama dengan Crackling Warehouse (satu instance
+// Neon, hemat provisioning), tapi sistem akun & datanya harus benar-benar
+// terpisah (keputusan Kevin 2026-09-10: "sistem akun baru terpisah").
+// Prefix ini menghindari tabrakan nama tabel & memudahkan lihat mana punya
+// modul mana langsung dari nama tabelnya.
+model HrUser {
+  id           Int      @id @default(autoincrement())
+  name         String
+  username     String   @unique
+  passwordHash String
+  // 'owner' | 'developer' | 'hr_manager' | 'hr_staff' - owner & developer
+  // selalu dibuatkan akun di sini juga (permintaan Kevin 2026-09-10), biar
+  // akses penuh ke semua modul ERP termasuk HR tanpa perlu akun kedua.
+  role         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  jobPostingsCreated JobPosting[]
+  candidatesCreated  Candidate[]
+  stageEvents        CandidateStageEvent[]
+}
+
+model JobPosting {
+  id             Int      @id @default(autoincrement())
+  title          String
+  department     String? // outlet/divisi yang butuh, mis. "Kitchen - Joglo"
+  location       String?
+  employmentType String? // full-time | part-time | contract | magang
+  description    String?
+  status         String   @default("open") // open | closed
+  createdById    Int
+  createdBy      HrUser   @relation(fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+
+  candidates Candidate[]
+}
+
+model Candidate {
+  id           Int      @id @default(autoincrement())
+  jobPostingId Int
+  jobPosting   JobPosting @relation(fields: [jobPostingId], references: [id])
+  name         String
+  email        String?
+  phone        String?
+  source       String? // referral | job portal | walk-in | dst
+  notes        String?
+  // applied -> screening -> interview -> offer -> hired -> rejected
+  stage        String   @default("applied")
+  createdById  Int
+  createdBy    HrUser   @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stageEvents CandidateStageEvent[]
+
+  @@index([jobPostingId, stage])
+}
+
+// Jejak tiap kali kandidat pindah tahap - biar kelihatan riwayat & siapa
+// yang memindahkan, bukan cuma status terakhir.
+model CandidateStageEvent {
+  id          Int      @id @default(autoincrement())
+  candidateId Int
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  stage       String
+  note        String?
+  createdById Int
+  createdBy   HrUser   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+}
