@@ -226,7 +226,7 @@ export default function RekrutmenPage() {
       ) : (
         <>
           {/* Stat cards */}
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+          <div className="min-w-0 grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardContent className="flex items-center gap-3 py-1">
                 <div className="icon-tile-4 flex h-10 w-10 items-center justify-center rounded-lg shrink-0"><Briefcase className="h-5 w-5" /></div>
@@ -266,7 +266,7 @@ export default function RekrutmenPage() {
           </div>
 
           {/* Perlu Ditindaklanjuti + Jadwal Interview + Lowongan Aktif */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="min-w-0 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Card className={needsFollowUp.length > 0 ? "border-destructive/40" : ""}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -332,7 +332,7 @@ export default function RekrutmenPage() {
           </div>
 
           {/* Kanban pipeline */}
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-heading font-semibold">Pipeline Kandidat</h2>
               <p className="text-xs text-muted-foreground md:hidden">Geser untuk lihat semua tahap →</p>
