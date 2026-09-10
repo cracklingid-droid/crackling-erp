@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Upload, FileCheck, X } from "lucide-react";
 import { upload } from "@vercel/blob/client";
+import { guessNameFromFilename } from "@/lib/cv-extract-fields";
 
 type Posting = {
   id: number;
@@ -71,7 +72,15 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
       });
       setCvUrl(blob.url);
       setCvFileName(file.name);
-      toast.success("CV berhasil diupload.");
+
+      const guessedName = guessNameFromFilename(file.name);
+      if (guessedName && !form.name) {
+        setForm((f) => ({ ...f, name: guessedName }));
+        setAutofilled((prev) => [...prev, "Nama"]);
+        toast.success(`CV berhasil diupload. Nama terisi otomatis dari nama file, boleh diedit.`);
+      } else {
+        toast.success("CV berhasil diupload.");
+      }
 
       // Ekstraksi teks & deteksi email/HP jalan terpisah setelah upload
       // selesai, tidak menghalangi form kalau prosesnya lambat/gagal.
@@ -98,7 +107,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
             return next;
           });
           if (filled.length > 0) {
-            setAutofilled(filled);
+            setAutofilled((prev) => [...prev, ...filled]);
             toast.success(`${filled.join(" & ")} terisi otomatis dari CV, boleh diedit.`);
           }
         })
@@ -211,7 +220,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 <p className="text-xs text-muted-foreground">
                   {autofilled.length > 0
                     ? `${autofilled.join(" & ")} di bawah terisi otomatis dari CV - boleh diedit kalau kurang tepat.`
-                    : "Upload CV dulu supaya Email & No. HP bisa terisi otomatis (kalau terdeteksi)."}
+                    : "Upload CV dulu supaya Nama, Email & No. HP bisa terisi otomatis (kalau terdeteksi)."}
                 </p>
               </div>
 
