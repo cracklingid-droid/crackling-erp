@@ -111,6 +111,10 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!cvUrl) {
+      toast.error("Upload CV wajib sebelum mengirim lamaran");
+      return;
+    }
     if (form.birthDate > maxBirthDate()) {
       toast.error(`Pelamar harus berusia minimal ${MIN_AGE} tahun`);
       return;
@@ -170,7 +174,9 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
           <CardContent>
             <form onSubmit={handleSubmit} className="grid gap-4">
               <div className="grid gap-1.5">
-                <Label>Upload CV</Label>
+                <Label>
+                  Upload CV <span className="font-bold text-destructive">*Wajib</span>
+                </Label>
                 {cvFileName ? (
                   <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
                     <span className="flex items-center gap-2 truncate">
@@ -311,6 +317,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 disabled={
                   submitting ||
                   uploadingCv ||
+                  !cvUrl ||
                   (posting.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol)) ||
                   !agreedStartSoon
                 }

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 
 const REQUIRED_FIELDS = [
   "name", "email", "phone", "birthPlace", "birthDate", "gender",
-  "address", "preferredOutlet", "lastEducation", "institution", "expectedSalary", "experience",
+  "address", "preferredOutlet", "lastEducation", "institution", "expectedSalary", "experience", "cvUrl",
 ] as const;
 
 const MIN_AGE = 18;
