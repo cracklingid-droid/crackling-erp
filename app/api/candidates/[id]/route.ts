@@ -96,5 +96,37 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     await deleteCvForRejectedCandidate(candidateId);
   }
 
+  // Begitu kandidat "Diterima", otomatis buat data karyawan (biodata dicopy
+  // dari lamaran) berstatus "onboarding" - HR baru bisa mengaktifkannya
+  // setelah kelengkapan data karyawan (NIK, gaji, rekening, dst) diisi.
+  // upsert dengan update kosong supaya tidak menimpa data yang sudah
+  // dilengkapi HR kalau kandidat sempat keluar-masuk tahap Diterima lagi.
+  // Permintaan Kevin 2026-09-10.
+  if (stageChanged && body.stage === "hired") {
+    const full = await prisma.candidate.findUnique({
+      where: { id: candidateId },
+      include: { jobPosting: { select: { title: true } } },
+    });
+    if (full) {
+      await prisma.employee.upsert({
+        where: { candidateId },
+        update: {},
+        create: {
+          candidateId,
+          name: full.name,
+          email: full.email,
+          phone: full.phone,
+          birthPlace: full.birthPlace,
+          birthDate: full.birthDate,
+          gender: full.gender,
+          address: full.address,
+          position: full.jobPosting.title,
+          outlet: full.preferredOutlet,
+          createdById: user.id,
+        },
+      });
+    }
+  }
+
   return NextResponse.json(candidate);
 }

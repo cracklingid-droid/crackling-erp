@@ -1,0 +1,445 @@
+"use client";
+
+import { useEffect, useRef, useState, use as usePromise } from "react";
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle } from "lucide-react";
+import { upload } from "@vercel/blob/client";
+import { REQUIRED_ONBOARDING_FIELDS, getMissingOnboardingFields } from "@/lib/employee-onboarding";
+
+const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
+const EMPLOYMENT_STATUS_OPTIONS = [
+  { value: "tetap", label: "Karyawan Tetap" },
+  { value: "kontrak", label: "Kontrak" },
+  { value: "pkwt", label: "PKWT" },
+  { value: "magang", label: "Magang" },
+];
+const DOCUMENT_TYPES = [
+  { value: "ktp", label: "KTP" },
+  { value: "ijazah", label: "Ijazah" },
+  { value: "kontrak_kerja", label: "Kontrak Kerja" },
+  { value: "lainnya", label: "Lainnya" },
+];
+const documentTypeLabel = (v: string) => DOCUMENT_TYPES.find((d) => d.value === v)?.label ?? v;
+
+type Document = { id: number; type: string; fileUrl: string; fileName: string | null };
+type Employee = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  birthPlace: string | null;
+  birthDate: string | null;
+  gender: string | null;
+  address: string | null;
+  employeeCode: string | null;
+  position: string | null;
+  outlet: string | null;
+  employmentStatus: string | null;
+  joinDate: string | null;
+  resignDate: string | null;
+  status: string;
+  baseSalary: number | null;
+  allowance: number | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankAccountHolder: string | null;
+  npwp: string | null;
+  bpjsKesehatanNumber: string | null;
+  bpjsKetenagakerjaanNumber: string | null;
+  documents: Document[];
+  candidate: { jobPosting: { title: string } } | null;
+};
+
+function toDateInput(iso: string | null) {
+  return iso ? iso.slice(0, 10) : "";
+}
+
+const emptyForm = {
+  name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
+  employeeCode: "", position: "", outlet: "", employmentStatus: "", joinDate: "", resignDate: "",
+  baseSalary: "", allowance: "", bankName: "", bankAccountNumber: "", bankAccountHolder: "",
+  npwp: "", bpjsKesehatanNumber: "", bpjsKetenagakerjaanNumber: "",
+};
+
+export default function KaryawanDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = usePromise(params);
+  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [docType, setDocType] = useState("ktp");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function load() {
+    setLoading(true);
+    fetch(`/api/employees/${id}`)
+      .then((r) => r.json())
+      .then((e: Employee) => {
+        setEmployee(e);
+        setForm({
+          name: e.name ?? "", email: e.email ?? "", phone: e.phone ?? "",
+          birthPlace: e.birthPlace ?? "", birthDate: toDateInput(e.birthDate), gender: e.gender ?? "", address: e.address ?? "",
+          employeeCode: e.employeeCode ?? "", position: e.position ?? "", outlet: e.outlet ?? "",
+          employmentStatus: e.employmentStatus ?? "", joinDate: toDateInput(e.joinDate), resignDate: toDateInput(e.resignDate),
+          baseSalary: e.baseSalary != null ? String(e.baseSalary) : "", allowance: e.allowance != null ? String(e.allowance) : "",
+          bankName: e.bankName ?? "", bankAccountNumber: e.bankAccountNumber ?? "", bankAccountHolder: e.bankAccountHolder ?? "",
+          npwp: e.npwp ?? "", bpjsKesehatanNumber: e.bpjsKesehatanNumber ?? "", bpjsKetenagakerjaanNumber: e.bpjsKetenagakerjaanNumber ?? "",
+        });
+      })
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(load, [id]);
+
+  function set<K extends keyof typeof emptyForm>(key: K, value: string) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) {
+      toast.error("Nama wajib diisi");
+      return;
+    }
+    setSaving(true);
+    const res = await fetch(`/api/employees/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    setSaving(false);
+    if (res.ok) {
+      toast.success("Data karyawan disimpan.");
+      load();
+    } else {
+      const err = await res.json();
+      toast.error("Gagal: " + err.error);
+    }
+  }
+
+  async function handleStatusChange(status: string) {
+    setChangingStatus(true);
+    const res = await fetch(`/api/employees/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setChangingStatus(false);
+    if (res.ok) {
+      toast.success(`Status diubah ke "${STATUS_LABEL[status]}".`);
+      load();
+    } else {
+      const err = await res.json();
+      toast.error("Gagal: " + err.error);
+    }
+  }
+
+  async function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !employee) return;
+    setUploadingDoc(true);
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/employees/upload-document",
+      });
+      const res = await fetch(`/api/employees/${employee.id}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: docType, fileUrl: blob.url, fileName: file.name }),
+      });
+      if (res.ok) {
+        toast.success("Dokumen diupload.");
+        load();
+      } else {
+        const err = await res.json();
+        toast.error("Gagal simpan dokumen: " + err.error);
+      }
+    } catch (err) {
+      toast.error("Gagal upload dokumen: " + (err instanceof Error ? err.message : "unknown"));
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleDeleteDoc(documentId: number) {
+    const res = await fetch(`/api/employees/${id}/documents`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId }),
+    });
+    if (res.ok) {
+      toast.success("Dokumen dihapus.");
+      load();
+    } else {
+      toast.error("Gagal hapus dokumen.");
+    }
+  }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (!employee) return <p className="text-sm text-muted-foreground">Karyawan tidak ditemukan.</p>;
+
+  const hasKtp = employee.documents.some((d) => d.type === "ktp");
+  const missing = getMissingOnboardingFields(
+    {
+      employeeCode: form.employeeCode || null,
+      position: form.position || null,
+      outlet: form.outlet || null,
+      employmentStatus: form.employmentStatus || null,
+      joinDate: form.joinDate || null,
+      baseSalary: form.baseSalary || null,
+      bankName: form.bankName || null,
+      bankAccountNumber: form.bankAccountNumber || null,
+    },
+    hasKtp
+  );
+
+  return (
+    <div className="max-w-3xl grid gap-6">
+      <div>
+        <Link href="/hr/karyawan" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
+          <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Database Karyawan
+        </Link>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-heading font-semibold tracking-tight">{employee.name}</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {employee.candidate?.jobPosting.title ? `Dari lamaran: ${employee.candidate.jobPosting.title}` : "Ditambahkan manual"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={employee.status === "active" ? "default" : employee.status === "resigned" ? "secondary" : "outline"}>
+              {STATUS_LABEL[employee.status] ?? employee.status}
+            </Badge>
+            <Select value={employee.status} onValueChange={(v) => v && handleStatusChange(v)}>
+              <SelectTrigger className="w-40" disabled={changingStatus}>
+                <SelectValue>{() => "Ubah Status"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="onboarding">Onboarding</SelectItem>
+                <SelectItem value="active">Aktif</SelectItem>
+                <SelectItem value="resigned">Resign</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {employee.status === "onboarding" && (
+        <Card className={missing.length > 0 ? "border-destructive/40" : "border-primary/30"}>
+          <CardHeader>
+            <CardTitle className="text-base">Checklist Onboarding</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-1.5">
+            {REQUIRED_ONBOARDING_FIELDS.map((f) => {
+              const done = !missing.includes(f.label);
+              return (
+                <div key={f.key} className="flex items-center gap-2 text-sm">
+                  {done ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+                  <span className={done ? "" : "text-muted-foreground"}>{f.label}</span>
+                </div>
+              );
+            })}
+            <div className="flex items-center gap-2 text-sm">
+              {hasKtp ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+              <span className={hasKtp ? "" : "text-muted-foreground"}>Upload KTP</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Lengkapi &amp; simpan semua data di bawah, lalu ubah status ke &quot;Aktif&quot; lewat dropdown di atas.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Biodata</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label>Nama Lengkap</Label>
+            <Input value={form.name} onChange={(e) => set("name", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Email</Label>
+            <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>No. HP / WhatsApp</Label>
+            <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Jenis Kelamin</Label>
+            <Select value={form.gender} onValueChange={(v) => v && set("gender", v)}>
+              <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="L">Laki-laki</SelectItem>
+                <SelectItem value="P">Perempuan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Tempat Lahir</Label>
+            <Input value={form.birthPlace} onChange={(e) => set("birthPlace", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Tanggal Lahir</Label>
+            <Input type="date" value={form.birthDate} onChange={(e) => set("birthDate", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5 sm:col-span-2">
+            <Label>Alamat</Label>
+            <Input value={form.address} onChange={(e) => set("address", e.target.value)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Data Kepegawaian</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label>NIK / ID Karyawan</Label>
+            <Input value={form.employeeCode} onChange={(e) => set("employeeCode", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Jabatan</Label>
+            <Input value={form.position} onChange={(e) => set("position", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Outlet / Cabang</Label>
+            <Input value={form.outlet} onChange={(e) => set("outlet", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Status Kepegawaian</Label>
+            <Select value={form.employmentStatus} onValueChange={(v) => v && set("employmentStatus", v)}>
+              <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
+              <SelectContent>
+                {EMPLOYMENT_STATUS_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Tanggal Mulai Kerja</Label>
+            <Input type="date" value={form.joinDate} onChange={(e) => set("joinDate", e.target.value)} />
+          </div>
+          {employee.status === "resigned" && (
+            <div className="grid gap-1.5">
+              <Label>Tanggal Resign</Label>
+              <Input type="date" value={form.resignDate} onChange={(e) => set("resignDate", e.target.value)} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Gaji &amp; Bank</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label>Gaji Pokok (Rp/bulan)</Label>
+            <Input type="number" value={form.baseSalary} onChange={(e) => set("baseSalary", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Tunjangan Tetap (Rp/bulan)</Label>
+            <Input type="number" value={form.allowance} onChange={(e) => set("allowance", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Nama Bank</Label>
+            <Input value={form.bankName} onChange={(e) => set("bankName", e.target.value)} placeholder="mis. BCA" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>No. Rekening</Label>
+            <Input value={form.bankAccountNumber} onChange={(e) => set("bankAccountNumber", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5 sm:col-span-2">
+            <Label>Nama Pemilik Rekening (kalau beda dari nama karyawan)</Label>
+            <Input value={form.bankAccountHolder} onChange={(e) => set("bankAccountHolder", e.target.value)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Legal &amp; Pajak</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label>NPWP</Label>
+            <Input value={form.npwp} onChange={(e) => set("npwp", e.target.value)} />
+          </div>
+          <div className="hidden sm:block" />
+          <div className="grid gap-1.5">
+            <Label>No. BPJS Kesehatan</Label>
+            <Input value={form.bpjsKesehatanNumber} onChange={(e) => set("bpjsKesehatanNumber", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>No. BPJS Ketenagakerjaan</Label>
+            <Input value={form.bpjsKetenagakerjaanNumber} onChange={(e) => set("bpjsKetenagakerjaanNumber", e.target.value)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Dokumen Kepegawaian</CardTitle></CardHeader>
+        <CardContent className="grid gap-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grid gap-1.5">
+              <Label>Jenis Dokumen</Label>
+              <Select value={docType} onValueChange={(v) => v && setDocType(v)}>
+                <SelectTrigger className="w-44"><SelectValue>{() => documentTypeLabel(docType)}</SelectValue></SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_TYPES.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="button" variant="outline" disabled={uploadingDoc} onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-3.5 w-3.5" /> {uploadingDoc ? "Mengupload..." : "Upload File"}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              className="hidden"
+              onChange={handleDocUpload}
+              disabled={uploadingDoc}
+            />
+          </div>
+
+          {employee.documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada dokumen diupload.</p>
+          ) : (
+            <div className="grid gap-2">
+              {employee.documents.map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                  <a
+                    href={d.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-primary hover:underline min-w-0"
+                  >
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{documentTypeLabel(d.type)} - {d.fileName ?? "file"}</span>
+                  </a>
+                  <button type="button" onClick={() => handleDeleteDoc(d.id)} className="text-muted-foreground hover:text-destructive shrink-0">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

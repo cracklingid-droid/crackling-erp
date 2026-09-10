@@ -29,6 +29,7 @@ model HrUser {
   jobPostingsCreated JobPosting[]
   candidatesCreated  Candidate[]
   stageEvents        CandidateStageEvent[]
+  employeesCreated   Employee[]
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -146,8 +147,74 @@ model Candidate {
   stageEvents         CandidateStageEvent[]
   psychTestSubmission PsychTestSubmission?
   interviewSlot       InterviewSlot?
+  employee            Employee?
 
   @@index([jobPostingId, stage])
+}
+
+// Database Karyawan - terpisah dari Candidate karena field-nya beda konteks
+// (kepegawaian/gaji/legal, bukan lamaran) dan siklus hidupnya lebih panjang
+// (karyawan lama yang tidak pernah lewat pipeline rekrutmen juga harus bisa
+// didata di sini). Permintaan Kevin 2026-09-10.
+model Employee {
+  id Int @id @default(autoincrement())
+
+  // Terisi otomatis begitu kandidat dipindah ke tahap "Diterima" di
+  // Rekrutmen (biodata dicopy dari situ) - null kalau karyawan lama/input
+  // manual yang tidak lewat pipeline rekrutmen. Permintaan Kevin
+  // 2026-09-10: "otomatis namun nanti sebelum onboard ada kewajiban
+  // memasukan kelengkapan data" - makanya statusnya mulai dari "onboarding",
+  // bukan langsung "active".
+  candidateId Int?       @unique
+  candidate   Candidate? @relation(fields: [candidateId], references: [id])
+
+  employeeCode String? @unique // NIK/ID Karyawan internal, diisi HR
+  name         String
+  email        String?
+  phone        String?
+  birthPlace   String?
+  birthDate    DateTime?
+  gender       String? // L | P
+  address      String?
+
+  position         String? // jabatan
+  outlet           String? // lokasi/cabang kerja
+  employmentStatus String? // tetap | kontrak | pkwt | magang
+  joinDate         DateTime?
+  resignDate       DateTime?
+  // onboarding (baru masuk, kelengkapan data belum diisi HR) -> active -> resigned
+  status           String    @default("onboarding")
+
+  baseSalary        Int? // gaji pokok bulanan, dalam rupiah
+  allowance         Int? @default(0) // tunjangan tetap bulanan
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountHolder String?
+
+  npwp                      String?
+  bpjsKesehatanNumber       String?
+  bpjsKetenagakerjaanNumber String?
+
+  createdById Int?
+  createdBy   HrUser?  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents EmployeeDocument[]
+}
+
+// Dokumen kepegawaian (KTP, ijazah, kontrak kerja, dst) - dipisah jadi tabel
+// sendiri (bukan 1 kolom per jenis dokumen) supaya jumlah & jenisnya bebas
+// menyesuaikan kebutuhan tiap karyawan, sama pola-nya dengan cvUrl di
+// Candidate tapi mendukung banyak file.
+model EmployeeDocument {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       String // ktp | ijazah | kontrak_kerja | lainnya
+  fileUrl    String
+  fileName   String?
+  uploadedAt DateTime @default(now())
 }
 
 model PsychTestSubmission {
