@@ -43,6 +43,9 @@ model Position {
   // tampilkan checklist syarat & ketentuan khusus dapur (B2, shift 12 jam,
   // pinjol) di form lamaran publik - permintaan Kevin 2026-09-10.
   requiresKitchenTerms Boolean @default(false)
+  // posisi kantor/office (bukan outlet) - lokasi/cabang di form lamaran jadi
+  // teks bebas, bukan dropdown 3 outlet tetap. Permintaan Kevin 2026-09-10.
+  isOfficePosition     Boolean @default(false)
   createdAt    DateTime @default(now())
 
   questions   PsychTestQuestion[]

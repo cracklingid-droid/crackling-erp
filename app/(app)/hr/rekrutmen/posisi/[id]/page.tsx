@@ -12,7 +12,7 @@ import { ArrowLeft, Plus, Trash2, Pencil, X, Check } from "lucide-react";
 
 type Option = { id?: number; label: string; score: number };
 type Question = { id: number; text: string; order: number; options: Option[] };
-type Position = { id: number; name: string; passingScore: number; requiresKitchenTerms: boolean; questions: Question[] };
+type Position = { id: number; name: string; passingScore: number; requiresKitchenTerms: boolean; isOfficePosition: boolean; questions: Question[] };
 
 function OptionEditor({
   options,
@@ -204,6 +204,7 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
   const [passingScore, setPassingScore] = useState("70");
   const [savingScore, setSavingScore] = useState(false);
   const [savingTerms, setSavingTerms] = useState(false);
+  const [savingOffice, setSavingOffice] = useState(false);
 
   function load() {
     setLoading(true);
@@ -244,6 +245,22 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
     setSavingTerms(false);
     if (res.ok) {
       toast.success(checked ? "Checklist S&K dapur diaktifkan." : "Checklist S&K dapur dinonaktifkan.");
+      load();
+    } else {
+      toast.error("Gagal menyimpan.");
+    }
+  }
+
+  async function handleToggleOffice(checked: boolean) {
+    setSavingOffice(true);
+    const res = await fetch(`/api/positions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isOfficePosition: checked }),
+    });
+    setSavingOffice(false);
+    if (res.ok) {
+      toast.success(checked ? "Ditandai sebagai posisi kantor/office." : "Ditandai sebagai posisi outlet.");
       load();
     } else {
       toast.error("Gagal menyimpan.");
@@ -294,6 +311,26 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
               <span className="text-sm font-medium block">Tampilkan Syarat &amp; Ketentuan Dapur di form lamaran</span>
               <span className="text-sm text-muted-foreground block mt-0.5">
                 Pelamar wajib mencentang: bersedia olah/konsumsi B2 (babi), bersedia shift 12 jam, dan tidak sedang punya pinjaman online, sebelum bisa mengirim lamaran untuk posisi ini.
+              </span>
+            </span>
+          </label>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-1 accent-primary"
+              checked={position.isOfficePosition}
+              disabled={savingOffice}
+              onChange={(e) => handleToggleOffice(e.target.checked)}
+            />
+            <span>
+              <span className="text-sm font-medium block">Posisi Kantor / Office</span>
+              <span className="text-sm text-muted-foreground block mt-0.5">
+                Kalau aktif, kolom &quot;Lokasi/Cabang yang Diinginkan&quot; di form lamaran jadi isian bebas. Kalau tidak, pelamar harus pilih dari dropdown: Joglo (Central Kitchen), Gading Serpong, atau Kelapa Gading.
               </span>
             </span>
           </label>

@@ -30,6 +30,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   if (Number.isFinite(body.passingScore)) data.passingScore = Math.max(0, Math.min(100, body.passingScore));
   if (typeof body.requiresKitchenTerms === "boolean") data.requiresKitchenTerms = body.requiresKitchenTerms;
+  if (typeof body.isOfficePosition === "boolean") data.isOfficePosition = body.isOfficePosition;
 
   const position = await prisma.position.update({ where: { id: Number(id) }, data });
   return NextResponse.json(position);

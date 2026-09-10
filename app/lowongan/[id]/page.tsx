@@ -20,9 +20,11 @@ type Posting = {
   employmentType: string | null;
   description: string | null;
   requiresKitchenTerms: boolean;
+  isOfficePosition: boolean;
 };
 
 const EDUCATION_OPTIONS = ["SD", "SMP", "SMA/SMK", "D3", "S1", "S2"];
+const OUTLET_OPTIONS = ["Joglo (Central Kitchen)", "Gading Serpong", "Kelapa Gading"];
 
 export default function LowonganDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
@@ -145,7 +147,16 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <div className="grid gap-1.5">
                 <Label>Lokasi/Cabang yang Diinginkan</Label>
-                <Input required value={form.preferredOutlet} onChange={(e) => set("preferredOutlet")(e.target.value)} placeholder="mis. Joglo, Gading Serpong" />
+                {posting.isOfficePosition ? (
+                  <Input required value={form.preferredOutlet} onChange={(e) => set("preferredOutlet")(e.target.value)} placeholder="mis. Kantor Pusat" />
+                ) : (
+                  <Select value={form.preferredOutlet} onValueChange={(v) => v && set("preferredOutlet")(v)}>
+                    <SelectTrigger><SelectValue placeholder="Pilih cabang..." /></SelectTrigger>
+                    <SelectContent>
+                      {OUTLET_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
