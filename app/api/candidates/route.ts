@@ -8,9 +8,13 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim() : "";
   const jobPostingId = Number(body.jobPostingId);
   if (!name || !jobPostingId) {
     return NextResponse.json({ error: "Nama kandidat dan lowongan wajib diisi" }, { status: 400 });
+  }
+  if (!email) {
+    return NextResponse.json({ error: "Email kandidat wajib diisi supaya bisa menerima hasil psikotest & undangan interview" }, { status: 400 });
   }
 
   const candidate = await prisma.$transaction(async (tx) => {
@@ -18,7 +22,7 @@ export async function POST(req: Request) {
       data: {
         jobPostingId,
         name,
-        email: body.email || null,
+        email,
         phone: body.phone || null,
         source: body.source || null,
         notes: body.notes || null,

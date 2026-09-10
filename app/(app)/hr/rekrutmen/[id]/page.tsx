@@ -79,6 +79,10 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
       toast.error("Nama kandidat wajib diisi");
       return;
     }
+    if (!email.trim()) {
+      toast.error("Email kandidat wajib diisi supaya bisa menerima hasil psikotest & undangan interview");
+      return;
+    }
     setSaving(true);
     const res = await fetch("/api/candidates", {
       method: "POST",
@@ -204,7 +208,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
                   <Label>Email</Label>
-                  <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+                  <Input required value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
                 </div>
                 <div className="grid gap-1.5">
                   <Label>No. HP</Label>
