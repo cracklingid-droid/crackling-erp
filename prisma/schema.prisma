@@ -123,6 +123,9 @@ model Candidate {
   agreedB2         Boolean @default(false)
   agreedLongShift  Boolean @default(false)
   agreedNoPinjol   Boolean @default(false)
+  // kesediaan mulai psikotest dalam 30 menit - wajib untuk semua pelamar,
+  // permintaan Kevin 2026-09-10.
+  agreedStartSoon  Boolean @default(false)
 
   // applied -> screening (lolos psikotest) -> interview -> offer -> hired -> rejected
   stage        String   @default("applied")

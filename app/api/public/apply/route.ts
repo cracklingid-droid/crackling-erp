@@ -29,6 +29,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Semua Syarat & Ketentuan wajib dicentang" }, { status: 400 });
     }
   }
+  if (!body.agreedStartSoon) {
+    return NextResponse.json({ error: "Kesediaan mengisi psikotest dalam 30 menit wajib dicentang" }, { status: 400 });
+  }
 
   const expectedSalary = Number(body.expectedSalary);
   if (!Number.isFinite(expectedSalary) || expectedSalary <= 0) {
@@ -67,6 +70,7 @@ export async function POST(req: Request) {
       agreedB2: posting.position.requiresKitchenTerms ? true : false,
       agreedLongShift: posting.position.requiresKitchenTerms ? true : false,
       agreedNoPinjol: posting.position.requiresKitchenTerms ? true : false,
+      agreedStartSoon: true,
       stage: "applied",
     },
   });

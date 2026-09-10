@@ -1,72 +1,34 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendMail } from "@/lib/mail";
+import { getPsychTestDeadline } from "@/lib/psychtest-deadline";
+import type { Prisma } from "@prisma/client";
 
-export async function GET(req: Request, ctx: { params: Promise<{ token: string }> }) {
-  const { token } = await ctx.params;
-  const candidate = await prisma.candidate.findUnique({
-    where: { publicToken: token },
-    include: {
-      jobPosting: { include: { position: { include: { questions: { orderBy: { order: "asc" }, include: { options: { orderBy: { order: "asc" } } } } } } } },
-      psychTestSubmission: true,
-    },
-  });
-  if (!candidate) return NextResponse.json({ error: "Tautan tidak valid" }, { status: 404 });
+type CandidateWithQuestions = Prisma.CandidateGetPayload<{
+  include: {
+    jobPosting: { include: { position: { include: { questions: { include: { options: true } } } } } };
+  };
+}>;
 
-  if (candidate.psychTestSubmission) {
-    return NextResponse.json({
-      status: "submitted",
-      passed: candidate.psychTestSubmission.passed,
-      percentage: candidate.psychTestSubmission.percentage,
-    });
-  }
-
-  return NextResponse.json({
-    status: "pending",
-    candidateName: candidate.name,
-    positionName: candidate.jobPosting.position.name,
-    questions: candidate.jobPosting.position.questions.map((q) => ({
-      id: q.id,
-      text: q.text,
-      options: q.options.map((o) => ({ id: o.id, label: o.label })),
-    })),
-  });
-}
-
-export async function POST(req: Request, ctx: { params: Promise<{ token: string }> }) {
-  const { token } = await ctx.params;
-  const candidate = await prisma.candidate.findUnique({
-    where: { publicToken: token },
-    include: {
-      jobPosting: { include: { position: { include: { questions: { include: { options: true } } } } } },
-      psychTestSubmission: true,
-    },
-  });
-  if (!candidate) return NextResponse.json({ error: "Tautan tidak valid" }, { status: 404 });
-  if (candidate.psychTestSubmission) {
-    return NextResponse.json({ error: "Psikotest sudah pernah disubmit" }, { status: 400 });
-  }
-
-  const body = await req.json();
-  const answers = Array.isArray(body.answers) ? body.answers : [];
+async function finalizeSubmission(
+  candidate: CandidateWithQuestions,
+  answers: { questionId: number; optionId: number }[],
+  origin: string
+) {
   const questions = candidate.jobPosting.position.questions;
-
-  if (answers.length !== questions.length) {
-    return NextResponse.json({ error: "Semua pertanyaan wajib dijawab" }, { status: 400 });
-  }
 
   let totalScore = 0;
   let maxScore = 0;
   const answerRows: { questionId: number; optionId: number; score: number }[] = [];
 
   for (const q of questions) {
-    const ans = answers.find((a: { questionId: number }) => a.questionId === q.id);
-    if (!ans) return NextResponse.json({ error: "Semua pertanyaan wajib dijawab" }, { status: 400 });
-    const opt = q.options.find((o) => o.id === ans.optionId);
-    if (!opt) return NextResponse.json({ error: "Jawaban tidak valid" }, { status: 400 });
-    totalScore += opt.score;
+    const ans = answers.find((a) => a.questionId === q.id);
+    const opt = ans ? q.options.find((o) => o.id === ans.optionId) : null;
     maxScore += Math.max(0, ...q.options.map((o) => o.score));
-    answerRows.push({ questionId: q.id, optionId: opt.id, score: opt.score });
+    if (opt) {
+      totalScore += opt.score;
+      answerRows.push({ questionId: q.id, optionId: opt.id, score: opt.score });
+    }
   }
 
   const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
@@ -91,12 +53,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
       data: {
         candidateId: candidate.id,
         stage: passed ? "screening" : "rejected",
-        note: `Otomatis - hasil psikotest ${percentage}% (ambang lulus ${candidate.jobPosting.position.passingScore}%)`,
+        note:
+          answerRows.length < questions.length
+            ? `Otomatis - waktu psikotest habis, ${answerRows.length}/${questions.length} soal terjawab, hasil ${percentage}% (ambang lulus ${candidate.jobPosting.position.passingScore}%)`
+            : `Otomatis - hasil psikotest ${percentage}% (ambang lulus ${candidate.jobPosting.position.passingScore}%)`,
       },
     });
   });
-
-  const origin = new URL(req.url).origin;
 
   try {
     if (passed) {
@@ -128,5 +91,79 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
     console.error("Gagal kirim email hasil psikotest:", e);
   }
 
-  return NextResponse.json({ passed, percentage });
+  return { passed, percentage };
+}
+
+export async function GET(req: Request, ctx: { params: Promise<{ token: string }> }) {
+  const { token } = await ctx.params;
+  const candidate = await prisma.candidate.findUnique({
+    where: { publicToken: token },
+    include: {
+      jobPosting: { include: { position: { include: { questions: { orderBy: { order: "asc" }, include: { options: { orderBy: { order: "asc" } } } } } } } },
+      psychTestSubmission: true,
+    },
+  });
+  if (!candidate) return NextResponse.json({ error: "Tautan tidak valid" }, { status: 404 });
+
+  if (candidate.psychTestSubmission) {
+    return NextResponse.json({
+      status: "submitted",
+      passed: candidate.psychTestSubmission.passed,
+      percentage: candidate.psychTestSubmission.percentage,
+    });
+  }
+
+  const deadline = getPsychTestDeadline(candidate.createdAt);
+  if (new Date() > deadline) {
+    const origin = new URL(req.url).origin;
+    const result = await finalizeSubmission(candidate, [], origin);
+    return NextResponse.json({ status: "submitted", ...result });
+  }
+
+  return NextResponse.json({
+    status: "pending",
+    candidateName: candidate.name,
+    positionName: candidate.jobPosting.position.name,
+    deadline: deadline.toISOString(),
+    questions: candidate.jobPosting.position.questions.map((q) => ({
+      id: q.id,
+      text: q.text,
+      options: q.options.map((o) => ({ id: o.id, label: o.label })),
+    })),
+  });
+}
+
+export async function POST(req: Request, ctx: { params: Promise<{ token: string }> }) {
+  const { token } = await ctx.params;
+  const candidate = await prisma.candidate.findUnique({
+    where: { publicToken: token },
+    include: {
+      jobPosting: { include: { position: { include: { questions: { include: { options: true } } } } } },
+      psychTestSubmission: true,
+    },
+  });
+  if (!candidate) return NextResponse.json({ error: "Tautan tidak valid" }, { status: 404 });
+  if (candidate.psychTestSubmission) {
+    return NextResponse.json({ error: "Psikotest sudah pernah disubmit" }, { status: 400 });
+  }
+
+  const body = await req.json();
+  const answers = Array.isArray(body.answers) ? body.answers : [];
+  const isAutoSubmit = body.autoSubmit === true;
+  const questions = candidate.jobPosting.position.questions;
+
+  if (!isAutoSubmit && answers.length !== questions.length) {
+    return NextResponse.json({ error: "Semua pertanyaan wajib dijawab" }, { status: 400 });
+  }
+
+  for (const a of answers) {
+    const q = questions.find((qq) => qq.id === a.questionId);
+    if (!q || !q.options.some((o) => o.id === a.optionId)) {
+      return NextResponse.json({ error: "Jawaban tidak valid" }, { status: 400 });
+    }
+  }
+
+  const origin = new URL(req.url).origin;
+  const result = await finalizeSubmission(candidate, answers, origin);
+  return NextResponse.json(result);
 }

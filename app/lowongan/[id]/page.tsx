@@ -51,6 +51,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
   const [agreedB2, setAgreedB2] = useState(false);
   const [agreedLongShift, setAgreedLongShift] = useState(false);
   const [agreedNoPinjol, setAgreedNoPinjol] = useState(false);
+  const [agreedStartSoon, setAgreedStartSoon] = useState(false);
 
   const [cvUrl, setCvUrl] = useState("");
   const [cvFileName, setCvFileName] = useState("");
@@ -96,11 +97,15 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
       toast.error("Semua Syarat & Ketentuan wajib dicentang");
       return;
     }
+    if (!agreedStartSoon) {
+      toast.error("Kesediaan mengisi psikotest dalam 30 menit wajib dicentang");
+      return;
+    }
     setSubmitting(true);
     const res = await fetch("/api/public/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobPostingId: Number(id), ...form, cvUrl, agreedB2, agreedLongShift, agreedNoPinjol }),
+      body: JSON.stringify({ jobPostingId: Number(id), ...form, cvUrl, agreedB2, agreedLongShift, agreedNoPinjol, agreedStartSoon }),
     });
     setSubmitting(false);
     if (res.ok) {
@@ -265,9 +270,22 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               )}
 
+              <div className="rounded-md border p-4 grid gap-3 bg-muted/30">
+                <p className="text-sm font-medium">Kesiapan Psikotest</p>
+                <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+                  <input type="checkbox" className="mt-0.5 accent-primary" checked={agreedStartSoon} onChange={(e) => setAgreedStartSoon(e.target.checked)} />
+                  Saya siap dan bersedia mengisi psikotest dalam 30 menit ke depan setelah lamaran ini dikirim.
+                </label>
+              </div>
+
               <Button
                 type="submit"
-                disabled={submitting || uploadingCv || (posting.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol))}
+                disabled={
+                  submitting ||
+                  uploadingCv ||
+                  (posting.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol)) ||
+                  !agreedStartSoon
+                }
                 className="mt-2"
               >
                 {submitting ? "Mengirim..." : "Kirim Lamaran & Lanjut Psikotest"}
