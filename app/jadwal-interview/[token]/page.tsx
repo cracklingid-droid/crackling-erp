@@ -5,14 +5,21 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, MessageCircle } from "lucide-react";
+
+const HR_WHATSAPP_NUMBER = "6282320910422";
 
 type SlotState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "pending"; candidateName: string; jobTitle: string; slots: string[] }
   | { status: "booked"; candidateName: string; jobTitle: string; scheduledAt: string }
-  | { status: "confirmed"; tanggal: string; jam: string };
+  | { status: "confirmed"; candidateName: string; jobTitle: string; tanggal: string; jam: string };
+
+function buildWhatsappLink(candidateName: string, jobTitle: string, tanggal: string, jam: string) {
+  const message = `Selamat siang, saya ${candidateName}, melamar untuk posisi ${jobTitle}. Saya mendapatkan jadwal interview pada ${tanggal} pukul ${jam}. Mohon konfirmasinya, terima kasih.`;
+  return `https://wa.me/${HR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
 
 function groupByDate(slots: string[]) {
   const map = new Map<string, string[]>();
@@ -68,7 +75,8 @@ export default function JadwalInterviewPage({ params }: { params: Promise<{ toke
     const data = await res.json();
     setBooking(false);
     if (res.ok) {
-      setState({ status: "confirmed", tanggal: data.tanggal, jam: data.jam });
+      const { candidateName, jobTitle } = state.status === "pending" ? state : { candidateName: "", jobTitle: "" };
+      setState({ status: "confirmed", candidateName, jobTitle, tanggal: data.tanggal, jam: data.jam });
     } else {
       toast.error(data.error ?? "Gagal booking jadwal");
       load();
@@ -91,18 +99,35 @@ export default function JadwalInterviewPage({ params }: { params: Promise<{ toke
   if (state.status === "booked" || state.status === "confirmed") {
     const tanggal = state.status === "confirmed" ? state.tanggal : formatDateLabel(new Date(state.scheduledAt).toISOString().slice(0, 10));
     const jam = state.status === "confirmed" ? state.jam : formatTimeLabel(state.scheduledAt) + " WIB";
+    const candidateName = state.candidateName;
+    const jobTitle = state.jobTitle;
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <Card className="max-w-md w-full">
-          <CardContent className="pt-8 pb-8 text-center grid gap-3">
-            <CalendarCheck className="h-10 w-10 text-primary mx-auto" />
-            <h1 className="font-heading font-semibold text-xl">Jadwal Interview Terkonfirmasi</h1>
-            <p className="text-sm text-muted-foreground">
-              {tanggal}<br />Pukul {jam}
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Detail sudah dikirim ke email Anda dan tim HR. Sampai jumpa di sesi interview!
-            </p>
+          <CardContent className="pt-8 pb-8 text-center grid gap-4">
+            <div className="grid gap-3">
+              <CalendarCheck className="h-10 w-10 text-primary mx-auto" />
+              <h1 className="font-heading font-semibold text-xl">Jadwal Interview Terkonfirmasi</h1>
+              <p className="text-sm text-muted-foreground">
+                {tanggal}<br />Pukul {jam}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Jadwal interview Anda telah berhasil tercatat dalam sistem kami. Konfirmasi resmi turut dikirimkan
+                melalui email kepada Anda dan tim HR Crackling.
+              </p>
+            </div>
+            {candidateName && jobTitle && (
+              <div className="grid gap-2">
+                <p className="text-sm text-muted-foreground">
+                  Untuk memastikan kehadiran Anda, mohon konfirmasi langsung kepada tim HR kami melalui WhatsApp.
+                </p>
+                <a href={buildWhatsappLink(candidateName, jobTitle, tanggal, jam)} target="_blank" rel="noopener noreferrer">
+                  <Button className="w-full" size="lg">
+                    <MessageCircle className="h-4 w-4" /> Konfirmasi via WhatsApp
+                  </Button>
+                </a>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
