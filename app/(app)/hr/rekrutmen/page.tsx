@@ -193,18 +193,18 @@ export default function RekrutmenPage() {
 
   return (
     <div className="max-w-7xl grid gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Rekrutmen</h1>
           <p className="text-muted-foreground text-sm">Pusat kendali proses rekrutmen - dari lamaran sampai onboarding.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/hr/rekrutmen/posisi">
-            <Button variant="outline">
+          <Link href="/hr/rekrutmen/posisi" className="flex-1 sm:flex-none">
+            <Button variant="outline" className="w-full sm:w-auto">
               <ListChecks className="h-4 w-4" /> Posisi &amp; Soal
             </Button>
           </Link>
-          <Button onClick={() => setShowForm((v) => !v)}>
+          <Button onClick={() => setShowForm((v) => !v)} className="flex-1 sm:flex-none">
             <Plus className="h-4 w-4" /> Lowongan Baru
           </Button>
         </div>
@@ -215,7 +215,7 @@ export default function RekrutmenPage() {
       ) : (
         <>
           {/* Stat cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardContent className="flex items-center gap-3 py-1">
                 <div className="icon-tile-4 flex h-10 w-10 items-center justify-center rounded-lg shrink-0"><Briefcase className="h-5 w-5" /></div>
@@ -255,7 +255,7 @@ export default function RekrutmenPage() {
           </div>
 
           {/* Perlu Ditindaklanjuti + Jadwal Interview + Lowongan Aktif */}
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Card className={needsFollowUp.length > 0 ? "border-destructive/40" : ""}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -322,12 +322,15 @@ export default function RekrutmenPage() {
 
           {/* Kanban pipeline */}
           <div>
-            <h2 className="font-heading font-semibold mb-3">Pipeline Kandidat</h2>
-            <div className="flex gap-4 overflow-x-auto pb-2">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-heading font-semibold">Pipeline Kandidat</h2>
+              <p className="text-xs text-muted-foreground md:hidden">Geser untuk lihat semua tahap →</p>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0">
               {columns.map((col) => {
                 const Icon = col.icon;
                 return (
-                  <div key={col.value} className="w-64 shrink-0 grid gap-3">
+                  <div key={col.value} className="w-[85vw] sm:w-64 shrink-0 grid gap-3 snap-start">
                     <div className="flex items-center gap-2">
                       <div className={`${col.tile} flex h-7 w-7 items-center justify-center rounded-md shrink-0`}>
                         <Icon className="h-3.5 w-3.5" />
