@@ -12,7 +12,7 @@ import { ArrowLeft, Plus, Trash2, Pencil, X, Check } from "lucide-react";
 
 type Option = { id?: number; label: string; score: number };
 type Question = { id: number; text: string; order: number; options: Option[] };
-type Position = { id: number; name: string; passingScore: number; questions: Question[] };
+type Position = { id: number; name: string; passingScore: number; requiresKitchenTerms: boolean; questions: Question[] };
 
 function OptionEditor({
   options,
@@ -203,6 +203,7 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [passingScore, setPassingScore] = useState("70");
   const [savingScore, setSavingScore] = useState(false);
+  const [savingTerms, setSavingTerms] = useState(false);
 
   function load() {
     setLoading(true);
@@ -227,6 +228,22 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
     setSavingScore(false);
     if (res.ok) {
       toast.success("Ambang lulus diperbarui.");
+      load();
+    } else {
+      toast.error("Gagal menyimpan.");
+    }
+  }
+
+  async function handleToggleKitchenTerms(checked: boolean) {
+    setSavingTerms(true);
+    const res = await fetch(`/api/positions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requiresKitchenTerms: checked }),
+    });
+    setSavingTerms(false);
+    if (res.ok) {
+      toast.success(checked ? "Checklist S&K dapur diaktifkan." : "Checklist S&K dapur dinonaktifkan.");
       load();
     } else {
       toast.error("Gagal menyimpan.");
@@ -260,6 +277,26 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
             <Input type="number" min={0} max={100} value={passingScore} onChange={(e) => setPassingScore(e.target.value)} />
           </div>
           <Button onClick={handleSaveScore} disabled={savingScore}>{savingScore ? "Menyimpan..." : "Simpan"}</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-1 accent-primary"
+              checked={position.requiresKitchenTerms}
+              disabled={savingTerms}
+              onChange={(e) => handleToggleKitchenTerms(e.target.checked)}
+            />
+            <span>
+              <span className="text-sm font-medium block">Tampilkan Syarat &amp; Ketentuan Dapur di form lamaran</span>
+              <span className="text-sm text-muted-foreground block mt-0.5">
+                Pelamar wajib mencentang: bersedia olah/konsumsi B2 (babi), bersedia shift 12 jam, dan tidak sedang punya pinjaman online, sebelum bisa mengirim lamaran untuk posisi ini.
+              </span>
+            </span>
+          </label>
         </CardContent>
       </Card>
 

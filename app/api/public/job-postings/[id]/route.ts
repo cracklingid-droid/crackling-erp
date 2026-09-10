@@ -14,10 +14,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       employmentType: true,
       description: true,
       status: true,
+      position: { select: { requiresKitchenTerms: true } },
     },
   });
   if (!posting || posting.status !== "open") {
     return NextResponse.json({ error: "Lowongan tidak ditemukan atau sudah ditutup" }, { status: 404 });
   }
-  return NextResponse.json(posting);
+  return NextResponse.json({
+    id: posting.id,
+    title: posting.title,
+    department: posting.department,
+    location: posting.location,
+    employmentType: posting.employmentType,
+    description: posting.description,
+    requiresKitchenTerms: posting.position.requiresKitchenTerms,
+  });
 }

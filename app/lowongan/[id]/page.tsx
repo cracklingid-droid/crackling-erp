@@ -19,6 +19,7 @@ type Posting = {
   location: string | null;
   employmentType: string | null;
   description: string | null;
+  requiresKitchenTerms: boolean;
 };
 
 const EDUCATION_OPTIONS = ["SD", "SMP", "SMA/SMK", "D3", "S1", "S2"];
@@ -38,6 +39,10 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
   });
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const [agreedB2, setAgreedB2] = useState(false);
+  const [agreedLongShift, setAgreedLongShift] = useState(false);
+  const [agreedNoPinjol, setAgreedNoPinjol] = useState(false);
+
   useEffect(() => {
     fetch(`/api/public/job-postings/${id}`)
       .then((r) => {
@@ -50,11 +55,15 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (posting?.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol)) {
+      toast.error("Semua Syarat & Ketentuan wajib dicentang");
+      return;
+    }
     setSubmitting(true);
     const res = await fetch("/api/public/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobPostingId: Number(id), ...form }),
+      body: JSON.stringify({ jobPostingId: Number(id), ...form, agreedB2, agreedLongShift, agreedNoPinjol }),
     });
     setSubmitting(false);
     if (res.ok) {
@@ -161,7 +170,30 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 <Label>Ekspektasi Gaji (Rp)</Label>
                 <Input required type="number" min={0} value={form.expectedSalary} onChange={(e) => set("expectedSalary")(e.target.value)} />
               </div>
-              <Button type="submit" disabled={submitting} className="mt-2">
+
+              {posting.requiresKitchenTerms && (
+                <div className="rounded-md border p-4 grid gap-3 bg-muted/30">
+                  <p className="text-sm font-medium">Syarat &amp; Ketentuan</p>
+                  <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+                    <input type="checkbox" className="mt-0.5 accent-primary" checked={agreedB2} onChange={(e) => setAgreedB2(e.target.checked)} />
+                    Saya menyatakan tidak keberatan mengolah dan/atau mengonsumsi bahan makanan B2 (daging babi) sesuai kebutuhan operasional dapur.
+                  </label>
+                  <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+                    <input type="checkbox" className="mt-0.5 accent-primary" checked={agreedLongShift} onChange={(e) => setAgreedLongShift(e.target.checked)} />
+                    Saya memahami dan bersedia bekerja dengan sistem shift panjang (long shift) selama 12 jam per hari sesuai jadwal yang ditentukan.
+                  </label>
+                  <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+                    <input type="checkbox" className="mt-0.5 accent-primary" checked={agreedNoPinjol} onChange={(e) => setAgreedNoPinjol(e.target.checked)} />
+                    Saya menyatakan saat ini tidak sedang memiliki pinjaman pada aplikasi pinjaman online (pinjol).
+                  </label>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={submitting || (posting.requiresKitchenTerms && (!agreedB2 || !agreedLongShift || !agreedNoPinjol))}
+                className="mt-2"
+              >
                 {submitting ? "Mengirim..." : "Kirim Lamaran & Lanjut Psikotest"}
               </Button>
             </form>

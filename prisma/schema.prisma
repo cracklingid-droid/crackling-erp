@@ -40,6 +40,9 @@ model Position {
   name         String   @unique
   // ambang lulus psikotest dalam persen (0-100) dari skor maksimum posisi ini
   passingScore Int      @default(70)
+  // tampilkan checklist syarat & ketentuan khusus dapur (B2, shift 12 jam,
+  // pinjol) di form lamaran publik - permintaan Kevin 2026-09-10.
+  requiresKitchenTerms Boolean @default(false)
   createdAt    DateTime @default(now())
 
   questions   PsychTestQuestion[]
@@ -110,6 +113,12 @@ model Candidate {
   institution      String? // nama sekolah/kampus & jurusan
   experience       String? // pengalaman kerja, free text
   expectedSalary   Int?    // ekspektasi gaji dalam rupiah
+
+  // persetujuan syarat & ketentuan khusus dapur (hanya diisi kalau posisi
+  // lowongannya requiresKitchenTerms) - permintaan Kevin 2026-09-10.
+  agreedB2         Boolean @default(false)
+  agreedLongShift  Boolean @default(false)
+  agreedNoPinjol   Boolean @default(false)
 
   // applied -> screening (lolos psikotest) -> interview -> offer -> hired -> rejected
   stage        String   @default("applied")
