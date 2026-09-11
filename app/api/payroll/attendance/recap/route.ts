@@ -22,14 +22,15 @@ export async function GET(req: Request) {
 
   const employees = await prisma.employee.findMany({
     where: { status: "active" },
-    select: { id: true, name: true, position: true, outlet: true },
+    select: { id: true, name: true, position: true, outlet: true, workSchedule: true },
     orderBy: { name: "asc" },
   });
-  const summaries = await computeAttendanceSummaries(employees.map((e) => e.id), start, end);
+  const schedules = new Map(employees.map((e) => [e.id, e.workSchedule]));
+  const summaries = await computeAttendanceSummaries(employees.map((e) => e.id), start, end, schedules);
 
   const result = employees.map((e) => ({
     ...e,
-    ...(summaries.get(e.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0 }),
+    ...(summaries.get(e.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 }),
   }));
 
   return NextResponse.json(result);

@@ -129,6 +129,8 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [downloading, setDownloading] = useState(false);
 
   function load() {
     setLoading(true);
@@ -188,6 +190,49 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
   const totalNetPay = items.reduce((sum, it) => sum + netPay(it, editableFields), 0);
 
+  function toggleSelect(itemId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.size === items.length ? new Set() : new Set(items.map((it) => it.id))));
+  }
+
+  async function downloadSlips(itemIds?: number[]) {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/payroll/periods/${periodId}/slips-zip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error("Gagal download slip: " + err.error);
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("content-disposition") ?? "";
+      const match = cd.match(/filename\*=UTF-8''([^;]+)/);
+      const filename = match ? decodeURIComponent(match[1]) : "slip-gaji.zip";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
   if (!period) return <p className="text-sm text-muted-foreground">Periode tidak ditemukan.</p>;
 
@@ -219,11 +264,35 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
       </div>
 
       <Card>
+        <CardContent className="pt-6 flex flex-wrap items-center gap-2 pb-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadSlips(selectedIds.size > 0 ? Array.from(selectedIds) : undefined)}
+            disabled={downloading || items.length === 0}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            {downloading ? "Menyiapkan ZIP..." : selectedIds.size > 0 ? `Download Terpilih (${selectedIds.size})` : "Download Semua Slip"}
+          </Button>
+          {selectedIds.size > 0 && (
+            <button type="button" onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:underline">
+              Batalkan pilihan
+            </button>
+          )}
+        </CardContent>
         <div className="thin-scrollbar overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky left-0 bg-card">Karyawan</TableHead>
+                <TableHead className="sticky left-0 bg-card w-10">
+                  <input
+                    type="checkbox"
+                    checked={items.length > 0 && selectedIds.size === items.length}
+                    onChange={toggleSelectAll}
+                    aria-label="Pilih semua"
+                  />
+                </TableHead>
+                <TableHead className="sticky left-10 bg-card">Karyawan</TableHead>
                 <TableHead>Hadir</TableHead>
                 <TableHead>Lembur</TableHead>
                 {infoFields.map((f) => (
@@ -239,14 +308,22 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             <TableBody>
               {items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5 + infoFields.length + editableFields.length} className="text-muted-foreground">
+                  <TableCell colSpan={6 + infoFields.length + editableFields.length} className="text-muted-foreground">
                     Tidak ada karyawan aktif di kategori ini.
                   </TableCell>
                 </TableRow>
               )}
               {items.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="sticky left-0 bg-card font-medium whitespace-nowrap">
+                  <TableCell className="sticky left-0 bg-card">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelect(item.id)}
+                      aria-label={`Pilih ${item.employee.name}`}
+                    />
+                  </TableCell>
+                  <TableCell className="sticky left-10 bg-card font-medium whitespace-nowrap">
                     <Link href={`/hr/karyawan/${item.employeeId}`} className="hover:underline">{item.employee.name}</Link>
                     <p className="text-xs text-muted-foreground font-normal">{item.employee.position || "-"}</p>
                   </TableCell>

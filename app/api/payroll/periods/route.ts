@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     });
 
     for (const emp of inCategory) {
-      const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0 };
+      const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 };
       const baseSalary = emp.baseSalary ?? 0;
 
       if (category === "outlet") {

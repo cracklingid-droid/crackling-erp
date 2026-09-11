@@ -5,10 +5,17 @@ import { AuthProvider, useAuthContext } from "../components/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Home } from "lucide-react";
+
+// Role yang aksesnya lebih dari 1 modul (HR + Warehouse, dst) - butuh jalan
+// pintas balik ke halaman pilih modul. Role HR biasa (hr_manager/hr_staff)
+// cuma pernah pakai modul HR jadi tidak perlu tombol ini. Permintaan Kevin
+// 2026-09-11.
+const MULTI_MODULE_ROLES = ["owner", "developer"];
 
 function TopBar() {
   const { user, logout } = useAuthContext();
+  const showHomeButton = !!user && MULTI_MODULE_ROLES.includes(user.role);
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 md:px-6">
       <Link href="/hr" className="flex items-center gap-2">
@@ -17,6 +24,11 @@ function TopBar() {
         </div>
         <span className="font-heading font-semibold text-sm tracking-wide hidden sm:inline">Crackling ERP · HR</span>
       </Link>
+      {showHomeButton && (
+        <Button variant="ghost" size="sm" className="gap-1.5" render={<a href="/" />}>
+          <Home className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Pilih Modul</span>
+        </Button>
+      )}
       <div className="ml-auto">
         <DropdownMenu>
           <DropdownMenuTrigger

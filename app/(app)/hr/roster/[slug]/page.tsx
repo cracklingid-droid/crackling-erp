@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use as usePromise } from "react";
+import { useEffect, useRef, useState, use as usePromise } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { slugToOutlet, addWeeks, dateKey, formatDayLabel } from "@/lib/roster";
 type RosterData = {
   outlet: string;
   days: string[];
-  employees: { id: number; name: string }[];
+  employees: { id: number; name: string; defaultOffDays: number[] }[];
   entries: { employeeId: number; date: string; isWorking: boolean }[];
 };
 
@@ -41,6 +41,30 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
   }
 
   useEffect(load, [outlet, anchor.getTime()]);
+
+  // Otomatis isi Masuk/Libur tiap buka minggu baru, sesuai pola "Hari Libur
+  // Rutin" yang diatur per karyawan di Database Karyawan - cuma isi sel yang
+  // masih kosong (kosong -> belum diatur), tidak pernah menimpa yang sudah
+  // eksplisit diisi HR. Karyawan tanpa pola (defaultOffDays kosong) tetap
+  // kosong seperti biasa. Permintaan Kevin 2026-09-11.
+  const backfilledWeekRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const weekKey = `${data.outlet}-${data.days[0]}`;
+    if (backfilledWeekRef.current === weekKey) return;
+    backfilledWeekRef.current = weekKey;
+
+    for (const emp of data.employees) {
+      if (!emp.defaultOffDays || emp.defaultOffDays.length === 0) continue;
+      for (const d of data.days) {
+        const hasEntry = data.entries.some((e) => e.employeeId === emp.id && e.date === d);
+        if (hasEntry) continue;
+        const dayOfWeek = new Date(d).getDay();
+        setCell(emp.id, d, !emp.defaultOffDays.includes(dayOfWeek));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   async function setCell(employeeId: number, date: string, next: boolean | null) {
     // update optimis di UI

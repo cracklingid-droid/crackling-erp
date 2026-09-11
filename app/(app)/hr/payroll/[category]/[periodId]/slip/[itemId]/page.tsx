@@ -3,7 +3,7 @@
 import { useEffect, useState, use as usePromise } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Printer, Download } from "lucide-react";
 import { DEDUCTION_FIELD_KEYS, fieldsForCategory, computeNetPay } from "@/lib/payroll-fields";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
@@ -85,9 +85,14 @@ export default function PayrollSlipPage({ params }: { params: Promise<{ category
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Periode Gaji
         </Link>
-        <Button size="sm" onClick={() => window.print()}>
-          <Printer className="h-3.5 w-3.5" /> Download PDF
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-3.5 w-3.5" /> Print
+          </Button>
+          <Button size="sm" render={<a href={`/api/payroll/periods/${periodId}/items/${itemId}/slip-pdf`} />}>
+            <Download className="h-3.5 w-3.5" /> Download PDF
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-2xl border bg-card p-8 print:border-0 print:rounded-none print:p-0">

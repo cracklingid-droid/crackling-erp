@@ -18,7 +18,7 @@ export async function GET(req: Request) {
 
   const employees = await prisma.employee.findMany({
     where: { outlet, status: "active" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, defaultOffDays: true },
     orderBy: { name: "asc" },
   });
 

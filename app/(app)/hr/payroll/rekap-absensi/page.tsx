@@ -18,6 +18,8 @@ type RecapRow = {
   daysPresent: number;
   overtimeMinutes: number;
   totalMinutes: number;
+  lateCount: number;
+  workSchedule: string | null;
 };
 
 function formatHours(minutes: number): string {
@@ -52,8 +54,9 @@ export default function RekapAbsensiPage() {
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Rekap Absensi</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Ringkasan hari hadir & jam kerja per karyawan dalam satu rentang tanggal. Default siklus 21 s.d. 20 bulan
-          berikutnya (gajian tanggal 25) - rentang tetap bisa diubah bebas kalau perlu penyesuaian sementara.
+          Ringkasan hari hadir, keterlambatan & jam kerja per karyawan dalam satu rentang tanggal. Default siklus 21 s.d.
+          20 bulan berikutnya (gajian tanggal 25) - rentang tetap bisa diubah bebas kalau perlu penyesuaian sementara.
+          Kolom Terlambat cuma terisi utk karyawan yang sudah diisi "Jadwal Kerja" di Database Karyawan.
         </p>
       </div>
 
@@ -79,13 +82,14 @@ export default function RekapAbsensiPage() {
                 <TableHead>Nama</TableHead>
                 <TableHead>Jabatan / Outlet</TableHead>
                 <TableHead>Hari Hadir</TableHead>
+                <TableHead>Terlambat</TableHead>
                 <TableHead>Total Jam Kerja</TableHead>
                 <TableHead>Jam Lembur</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows?.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-muted-foreground">Tidak ada karyawan aktif.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-muted-foreground">Tidak ada karyawan aktif.</TableCell></TableRow>
               )}
               {rows?.map((r) => (
                 <TableRow key={r.id}>
@@ -97,6 +101,9 @@ export default function RekapAbsensiPage() {
                   </TableCell>
                   <TableCell className={`tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
                     {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
+                  </TableCell>
+                  <TableCell className={`tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                    {r.workSchedule ? `${r.lateCount} kali` : "-"}
                   </TableCell>
                   <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
                   <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.overtimeMinutes)}</TableCell>

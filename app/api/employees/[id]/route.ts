@@ -6,7 +6,7 @@ import { getMissingOnboardingFields } from "@/lib/employee-onboarding";
 const VALID_STATUS = ["onboarding", "active", "resigned"];
 const STRING_FIELDS = [
   "employeeCode", "ktpNumber", "name", "email", "phone", "birthPlace", "gender", "address",
-  "position", "outlet", "employmentStatus",
+  "position", "outlet", "employmentStatus", "workSchedule",
   "bankName", "bankAccountNumber", "bankAccountHolder",
   "npwp", "bpjsKesehatanNumber", "bpjsKetenagakerjaanNumber",
 ];
@@ -71,6 +71,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     data.dailyBaseRate = body.dailyBaseRate === "" || body.dailyBaseRate === null ? null : Number(body.dailyBaseRate);
   if ("depositInstallmentsPaid" in body) data.depositInstallmentsPaid = Number(body.depositInstallmentsPaid) || 0;
   if ("depositBalance" in body) data.depositBalance = Number(body.depositBalance) || 0;
+  if ("defaultOffDays" in body) data.defaultOffDays = Array.isArray(body.defaultOffDays) ? body.defaultOffDays.map(Number) : [];
 
   const current = await prisma.employee.findUnique({
     where: { id: employeeId },

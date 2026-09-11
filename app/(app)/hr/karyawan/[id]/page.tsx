@@ -21,6 +21,15 @@ const EMPLOYMENT_STATUS_OPTIONS = [
   { value: "pkwt", label: "PKWT" },
   { value: "magang", label: "Magang" },
 ];
+const WEEKDAY_OPTIONS = [
+  { value: 1, label: "Sen" },
+  { value: 2, label: "Sel" },
+  { value: 3, label: "Rab" },
+  { value: 4, label: "Kam" },
+  { value: 5, label: "Jum" },
+  { value: 6, label: "Sab" },
+  { value: 0, label: "Min" },
+];
 const DOCUMENT_TYPES = [
   { value: "ktp", label: "KTP" },
   { value: "ijazah", label: "Ijazah" },
@@ -74,6 +83,8 @@ type Employee = {
   position: string | null;
   outlet: string | null;
   employmentStatus: string | null;
+  workSchedule: string | null;
+  defaultOffDays: number[];
   joinDate: string | null;
   resignDate: string | null;
   status: string;
@@ -106,7 +117,7 @@ function todayInput() {
 
 const emptyForm = {
   name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
-  employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", joinDate: "", resignDate: "",
+  employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", workSchedule: "", joinDate: "", resignDate: "",
   baseSalary: "", allowance: "", dailyTransportRate: "", dailyMealRate: "", standardWorkDays: "", dailyBaseRate: "",
   depositInstallmentsPaid: "", depositBalance: "",
   bankName: "", bankAccountNumber: "", bankAccountHolder: "",
@@ -118,6 +129,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
+  const [offDays, setOffDays] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [historyEffectiveDate, setHistoryEffectiveDate] = useState(todayInput());
   const [historyNote, setHistoryNote] = useState("");
@@ -132,11 +144,13 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
       .then((r) => r.json())
       .then((e: Employee) => {
         setEmployee(e);
+        setOffDays(e.defaultOffDays ?? []);
         setForm({
           name: e.name ?? "", email: e.email ?? "", phone: e.phone ?? "",
           birthPlace: e.birthPlace ?? "", birthDate: toDateInput(e.birthDate), gender: e.gender ?? "", address: e.address ?? "",
           employeeCode: e.employeeCode ?? "", ktpNumber: e.ktpNumber ?? "", position: e.position ?? "", outlet: e.outlet ?? "",
-          employmentStatus: e.employmentStatus ?? "", joinDate: toDateInput(e.joinDate), resignDate: toDateInput(e.resignDate),
+          employmentStatus: e.employmentStatus ?? "", workSchedule: e.workSchedule ?? "",
+          joinDate: toDateInput(e.joinDate), resignDate: toDateInput(e.resignDate),
           baseSalary: e.baseSalary != null ? String(e.baseSalary) : "", allowance: e.allowance != null ? String(e.allowance) : "",
           dailyTransportRate: e.dailyTransportRate != null ? String(e.dailyTransportRate) : "",
           dailyMealRate: e.dailyMealRate != null ? String(e.dailyMealRate) : "",
@@ -165,7 +179,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     const res = await fetch(`/api/employees/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, historyEffectiveDate, historyNote }),
+      body: JSON.stringify({ ...form, defaultOffDays: offDays, historyEffectiveDate, historyNote }),
     });
     setSaving(false);
     if (res.ok) {
@@ -395,6 +409,35 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Jadwal Kerja</Label>
+            <Input value={form.workSchedule} onChange={(e) => set("workSchedule", e.target.value)} placeholder="mis. 08:00-20:00" />
+            <p className="text-xs text-muted-foreground">Ditampilkan di halaman Rincian Perhitungan gaji sbg pembanding jam masuk/pulang aktual.</p>
+          </div>
+          <div className="grid gap-1.5 sm:col-span-2">
+            <Label>Hari Libur Rutin (Default)</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {WEEKDAY_OPTIONS.map((d) => {
+                const active = offDays.includes(d.value);
+                return (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() => setOffDays((prev) => (active ? prev.filter((v) => v !== d.value) : [...prev, d.value]))}
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      active ? "border-primary/40 bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Roster outlet karyawan ini otomatis terisi Masuk/Libur tiap buka minggu baru sesuai pola ini. Kosongkan kalau
+              jadwalnya tidak tetap.
+            </p>
           </div>
           <div className="grid gap-1.5">
             <Label>Tanggal Mulai Kerja</Label>

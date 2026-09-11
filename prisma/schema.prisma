@@ -33,6 +33,7 @@ model HrUser {
   payrollPeriodsCreated  PayrollPeriod[]
   employeeHistoryEntries EmployeeHistoryEntry[]
   rosterEntriesCreated   RosterEntry[]
+  payrollEventNotesCreated PayrollEventNote[]
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -219,6 +220,14 @@ model Employee {
   depositInstallmentsPaid Int @default(0) // sudah dipotong berapa kali otomatis (maks 2)
   depositBalance          Int @default(0) // saldo deposit kontrak yang masih ditahan, dalam rupiah
 
+  workSchedule String? // jadwal jam kerja standar, mis. "08:00-20:00" - dipakai di Rincian Perhitungan
+
+  // Hari libur rutin mingguan (0=Minggu..6=Sabtu, ikut JS Date.getDay()) -
+  // dipakai Roster utk otomatis isi Masuk/Libur tiap buka minggu baru, biar
+  // HR tidak perlu klik satu-satu tiap minggu. Kosong = tidak ada pola,
+  // roster tetap kosong seperti biasa. Permintaan Kevin 2026-09-11.
+  defaultOffDays Int[] @default([])
+
   npwp                      String?
   bpjsKesehatanNumber       String?
   bpjsKetenagakerjaanNumber String?
@@ -233,6 +242,7 @@ model Employee {
   payrollItems      PayrollItem[]
   historyEntries    EmployeeHistoryEntry[]
   rosterEntries     RosterEntry[]
+  payrollEventNotes PayrollEventNote[]
 }
 
 // Riwayat perubahan jabatan/outlet/status kepegawaian/gaji - dicatat
@@ -379,9 +389,34 @@ model PayrollPeriod {
   createdBy   HrUser?  @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
-  items PayrollItem[]
+  items      PayrollItem[]
+  eventNotes PayrollEventNote[]
 
   @@index([category, startDate])
+}
+
+// Catatan kejadian/telat/SP per tanggal per karyawan dalam 1 periode gaji -
+// mis. "03 Agu - Pengurangan Dari Kejadian Rp15.000 - Hekeng Rusak". Tiap
+// catatan otomatis menambah field potongan terkait di PayrollItem (lihat
+// route notes), supaya HR tetap bisa lihat angka total di tabel periode
+// SEKALIGUS rincian tanggal & alasannya di halaman Rincian Perhitungan -
+// dipelajari dari sheet "Hitungan" Kevin. Permintaan Kevin 2026-09-11.
+model PayrollEventNote {
+  id         Int           @id @default(autoincrement())
+  periodId   Int
+  period     PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee      @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  category   String // kejadian | sp | keterlambatan
+  amount     Int
+  note       String?
+
+  createdById Int?
+  createdBy   HrUser?  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([periodId, employeeId])
 }
 
 // Rincian gaji 1 karyawan dalam 1 periode. Field yang bisa dihitung
