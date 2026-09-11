@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { ArrowLeft, Lock, Unlock } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, FileText } from "lucide-react";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
 
@@ -233,12 +233,13 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                   <TableHead key={f.key as string} className="whitespace-nowrap">{f.label}</TableHead>
                 ))}
                 <TableHead className="whitespace-nowrap">Gaji Bersih</TableHead>
+                <TableHead className="whitespace-nowrap">Slip</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4 + infoFields.length + editableFields.length} className="text-muted-foreground">
+                  <TableCell colSpan={5 + infoFields.length + editableFields.length} className="text-muted-foreground">
                     Tidak ada karyawan aktif di kategori ini.
                   </TableCell>
                 </TableRow>
@@ -279,6 +280,15 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                     </TableCell>
                   ))}
                   <TableCell className="font-medium tabular-nums whitespace-nowrap">Rp {formatRupiah(netPay(item, editableFields))}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Link
+                      href={`/hr/payroll/${category}/${periodId}/slip/${item.id}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      <FileText className="h-3.5 w-3.5" /> Slip
+                    </Link>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
