@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendMail } from "@/lib/mail";
 import { generateCandidateSlots, formatSlotWIB } from "@/lib/interview-slots";
+import { buildInterviewICS } from "@/lib/ics";
 
 const HR_RECIPIENTS = ["hr@cracklingid.com", "recruitment@cracklingid.com"];
 
@@ -90,6 +91,20 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
   const { tanggal, jam } = formatSlotWIB(scheduledAt);
 
   try {
+    const organizerEmail = process.env.GMAIL_USER ?? HR_RECIPIENTS[0];
+    const attendees = [
+      ...HR_RECIPIENTS.filter((e) => e !== organizerEmail).map((email) => ({ email })),
+      ...(candidate.email ? [{ email: candidate.email, name: candidate.name }] : []),
+    ];
+    const ics = buildInterviewICS({
+      uid: `interview-${candidate.id}@cracklingid.com`,
+      start: scheduledAt,
+      summary: `Interview - ${candidate.name} (${candidate.jobPosting.title})`,
+      description: `Interview kandidat ${candidate.name} untuk posisi ${candidate.jobPosting.title} di Crackling. Kontak: ${candidate.email ?? "-"} / ${candidate.phone ?? "-"}`,
+      organizerEmail,
+      attendees,
+    });
+
     await sendMail({
       to: [...HR_RECIPIENTS, candidate.email!].filter(Boolean) as string[],
       subject: `Jadwal Interview - ${candidate.name} (${candidate.jobPosting.title})`,
@@ -102,8 +117,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
           <li><b>Jam:</b> ${jam}</li>
           <li><b>Kontak:</b> ${candidate.email ?? "-"} / ${candidate.phone ?? "-"}</li>
         </ul>
+        <p>Undangan kalender terlampir - tinggal klik "Tambah ke Kalender" pada email ini.</p>
         <p>Terima kasih,<br/>Tim HR Crackling</p>
       `,
+      icalEvent: { filename: "interview.ics", method: "REQUEST", content: ics },
     });
   } catch (e) {
     console.error("Gagal kirim email konfirmasi interview:", e);

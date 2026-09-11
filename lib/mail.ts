@@ -16,7 +16,14 @@ function getTransporter() {
   return transporter;
 }
 
-export async function sendMail(opts: { to: string | string[]; subject: string; html: string }) {
+export async function sendMail(opts: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  // Lampiran undangan kalender (.ics) - Gmail/Google Calendar/Outlook
+  // otomatis menampilkannya sbg undangan meeting dgn tombol RSVP.
+  icalEvent?: { filename?: string; method?: "REQUEST" | "CANCEL"; content: string };
+}) {
   const from = process.env.GMAIL_USER;
   const t = getTransporter();
   await t.sendMail({
@@ -24,5 +31,6 @@ export async function sendMail(opts: { to: string | string[]; subject: string; h
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
+    icalEvent: opts.icalEvent,
   });
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { deleteCvForRejectedCandidate } from "@/lib/delete-cv";
 import { isStageTransitionAllowed, STAGE_ROLLBACK_ERROR } from "@/lib/candidate-stages";
+import { sendMail } from "@/lib/mail";
 
 const VALID_STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 
@@ -42,6 +43,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (typeof body.offerWhatsappSent === "boolean") data.offerWhatsappSent = body.offerWhatsappSent;
 
   let stageChanged = false;
+  let previousStage: string | null = null;
   if (typeof body.stage === "string") {
     if (!VALID_STAGES.includes(body.stage)) {
       return NextResponse.json({ error: "Tahap tidak valid" }, { status: 400 });
@@ -52,6 +54,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       select: { stage: true, offerDocumentReady: true, offerWhatsappSent: true },
     });
     if (!current) return NextResponse.json({ error: "Kandidat tidak ditemukan" }, { status: 404 });
+    previousStage = current.stage;
 
     if (!isStageTransitionAllowed(current.stage, body.stage)) {
       return NextResponse.json({ error: STAGE_ROLLBACK_ERROR }, { status: 400 });
@@ -92,6 +95,49 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (stageChanged && body.stage === "rejected") {
     await deleteCvForRejectedCandidate(candidateId);
+  }
+
+  // Update email otomatis ke kandidat kalau HR mengubah tahap manual lewat
+  // kanban (di luar alur psikotest/pilih-jadwal-sendiri yang sudah kirim
+  // emailnya sendiri) - permintaan Kevin 2026-09-11. Hanya kirim kalau
+  // tahapnya benar-benar berubah (bukan sekadar re-save tahap yang sama).
+  if (stageChanged && previousStage !== null && previousStage !== body.stage) {
+    const full = await prisma.candidate.findUnique({
+      where: { id: candidateId },
+      include: { jobPosting: { select: { title: true } }, interviewSlot: true },
+    });
+    if (full?.email) {
+      const origin = new URL(req.url).origin;
+      try {
+        if ((body.stage === "screening" || body.stage === "interview") && !full.interviewSlot) {
+          await sendMail({
+            to: full.email,
+            subject: `Selamat, Anda lolos ke tahap berikutnya - ${full.jobPosting.title}`,
+            html: `
+              <p>Halo ${full.name},</p>
+              <p>Selamat! Lamaran Anda untuk posisi <b>${full.jobPosting.title}</b> di Crackling lolos ke tahap berikutnya.</p>
+              <p>Silakan pilih jadwal interview Anda melalui tautan berikut:</p>
+              <p><a href="${origin}/jadwal-interview/${full.publicToken}">${origin}/jadwal-interview/${full.publicToken}</a></p>
+              <p>Terima kasih,<br/>Tim HR Crackling</p>
+            `,
+          });
+        } else if (body.stage === "rejected") {
+          await sendMail({
+            to: full.email,
+            subject: `Update lamaran Anda - ${full.jobPosting.title}`,
+            html: `
+              <p>Halo ${full.name},</p>
+              <p>Terima kasih telah mengikuti proses seleksi untuk posisi <b>${full.jobPosting.title}</b> di Crackling.</p>
+              <p>Kami mohon maaf belum dapat melanjutkan lamaran Anda ke tahap berikutnya kali ini.</p>
+              <p>Kami menyimpan data Anda dan akan menghubungi kembali apabila ada kesempatan yang sesuai di kemudian hari.</p>
+              <p>Terima kasih,<br/>Tim HR Crackling</p>
+            `,
+          });
+        }
+      } catch (e) {
+        console.error("Gagal kirim email update tahap kandidat:", e);
+      }
+    }
   }
 
   // Begitu kandidat "Diterima", otomatis buat data karyawan (biodata dicopy
