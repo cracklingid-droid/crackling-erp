@@ -39,6 +39,7 @@ type Employee = {
   gender: string | null;
   address: string | null;
   employeeCode: string | null;
+  ktpNumber: string | null;
   position: string | null;
   outlet: string | null;
   employmentStatus: string | null;
@@ -63,7 +64,7 @@ function toDateInput(iso: string | null) {
 
 const emptyForm = {
   name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
-  employeeCode: "", position: "", outlet: "", employmentStatus: "", joinDate: "", resignDate: "",
+  employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", joinDate: "", resignDate: "",
   baseSalary: "", allowance: "", bankName: "", bankAccountNumber: "", bankAccountHolder: "",
   npwp: "", bpjsKesehatanNumber: "", bpjsKetenagakerjaanNumber: "",
 };
@@ -88,7 +89,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         setForm({
           name: e.name ?? "", email: e.email ?? "", phone: e.phone ?? "",
           birthPlace: e.birthPlace ?? "", birthDate: toDateInput(e.birthDate), gender: e.gender ?? "", address: e.address ?? "",
-          employeeCode: e.employeeCode ?? "", position: e.position ?? "", outlet: e.outlet ?? "",
+          employeeCode: e.employeeCode ?? "", ktpNumber: e.ktpNumber ?? "", position: e.position ?? "", outlet: e.outlet ?? "",
           employmentStatus: e.employmentStatus ?? "", joinDate: toDateInput(e.joinDate), resignDate: toDateInput(e.resignDate),
           baseSalary: e.baseSalary != null ? String(e.baseSalary) : "", allowance: e.allowance != null ? String(e.allowance) : "",
           bankName: e.bankName ?? "", bankAccountNumber: e.bankAccountNumber ?? "", bankAccountHolder: e.bankAccountHolder ?? "",
@@ -191,7 +192,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   const hasKtp = employee.documents.some((d) => d.type === "ktp");
   const missing = getMissingOnboardingFields(
     {
-      employeeCode: form.employeeCode || null,
+      ktpNumber: form.ktpNumber || null,
       position: form.position || null,
       outlet: form.outlet || null,
       employmentStatus: form.employmentStatus || null,
@@ -304,7 +305,11 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         <CardHeader><CardTitle className="text-base">Data Kepegawaian</CardTitle></CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-1.5">
-            <Label>NIK / ID Karyawan</Label>
+            <Label>No. KTP</Label>
+            <Input value={form.ktpNumber} onChange={(e) => set("ktpNumber", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>ID Karyawan (opsional)</Label>
             <Input value={form.employeeCode} onChange={(e) => set("employeeCode", e.target.value)} />
           </div>
           <div className="grid gap-1.5">

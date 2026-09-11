@@ -168,7 +168,8 @@ model Employee {
   candidateId Int?       @unique
   candidate   Candidate? @relation(fields: [candidateId], references: [id])
 
-  employeeCode String? @unique // NIK/ID Karyawan internal, diisi HR
+  employeeCode String? @unique // ID/kode karyawan internal (opsional), diisi HR
+  ktpNumber    String? // No. KTP/NIK kependudukan (16 digit) - beda dari employeeCode
   name         String
   email        String?
   phone        String?

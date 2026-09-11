@@ -4,7 +4,7 @@
 // dulu sebelum resmi onboard. NPWP & BPJS sengaja tidak wajib karena di
 // praktiknya sering baru terbit beberapa hari setelah karyawan mulai kerja.
 export const REQUIRED_ONBOARDING_FIELDS: { key: string; label: string }[] = [
-  { key: "employeeCode", label: "NIK/ID Karyawan" },
+  { key: "ktpNumber", label: "No. KTP" },
   { key: "position", label: "Jabatan" },
   { key: "outlet", label: "Outlet/Cabang" },
   { key: "employmentStatus", label: "Status Kepegawaian" },

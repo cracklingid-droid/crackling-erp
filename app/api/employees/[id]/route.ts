@@ -5,7 +5,7 @@ import { getMissingOnboardingFields } from "@/lib/employee-onboarding";
 
 const VALID_STATUS = ["onboarding", "active", "resigned"];
 const STRING_FIELDS = [
-  "employeeCode", "name", "email", "phone", "birthPlace", "gender", "address",
+  "employeeCode", "ktpNumber", "name", "email", "phone", "birthPlace", "gender", "address",
   "position", "outlet", "employmentStatus",
   "bankName", "bankAccountNumber", "bankAccountHolder",
   "npwp", "bpjsKesehatanNumber", "bpjsKetenagakerjaanNumber",
