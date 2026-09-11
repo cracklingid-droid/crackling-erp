@@ -28,6 +28,14 @@ type Item = {
   pph21Deduction: number;
   loanDeduction: number;
   otherAdjustment: number;
+  lateCount: number;
+  lateDeduction: number;
+  incidentDeduction: number;
+  warningLetterDeduction: number;
+  depositDeduction: number;
+  depositRefund: number;
+  serviceCharge: number;
+  bonus: number;
 };
 type Period = {
   id: number;
@@ -39,7 +47,7 @@ type Period = {
   items: Item[];
 };
 
-const EDITABLE_FIELDS: { key: keyof Item; label: string }[] = [
+const BASE_FIELDS: { key: keyof Item; label: string }[] = [
   { key: "baseSalary", label: "Gaji Pokok" },
   { key: "mealAllowance", label: "Uang Makan" },
   { key: "transportReimbursement", label: "Reimb. Transport" },
@@ -49,8 +57,26 @@ const EDITABLE_FIELDS: { key: keyof Item; label: string }[] = [
   { key: "bpjsKetenagakerjaanDeduction", label: "BPJS Ketenagakerjaan" },
   { key: "pph21Deduction", label: "PPh21" },
   { key: "loanDeduction", label: "Kasbon" },
-  { key: "otherAdjustment", label: "Penyesuaian Lain" },
 ];
+
+// Kategori tambahan khusus Payroll Outlet, ikut logika spreadsheet gaji
+// outlet Crackling (permintaan Kevin 2026-09-11) - tidak tampil di Kantor.
+const OUTLET_FIELDS: { key: keyof Item; label: string }[] = [
+  { key: "lateDeduction", label: "Potongan Telat" },
+  { key: "incidentDeduction", label: "Potongan Kejadian" },
+  { key: "warningLetterDeduction", label: "Potongan SP" },
+  { key: "depositDeduction", label: "Bayar Deposit" },
+  { key: "depositRefund", label: "Kembali Deposit" },
+  { key: "serviceCharge", label: "Service Charge" },
+  { key: "bonus", label: "Bonus" },
+];
+
+const TAIL_FIELDS: { key: keyof Item; label: string }[] = [{ key: "otherAdjustment", label: "Penyesuaian Lain" }];
+
+// Field bukan uang - jumlah kejadian telat, sekadar catatan HR (dasar
+// hitung manual "Potongan Telat" di atas, tidak otomatis dihitung ulang
+// karena rate lembur/telat sumbernya dari Database Karyawan per orang).
+const INFO_FIELDS: { key: keyof Item; label: string }[] = [{ key: "lateCount", label: "Jml Telat" }];
 
 const DEDUCTION_FIELDS = new Set<keyof Item>([
   "attendanceDeduction",
@@ -58,11 +84,15 @@ const DEDUCTION_FIELDS = new Set<keyof Item>([
   "bpjsKetenagakerjaanDeduction",
   "pph21Deduction",
   "loanDeduction",
+  "lateDeduction",
+  "incidentDeduction",
+  "warningLetterDeduction",
+  "depositDeduction",
 ]);
 
-function netPay(item: Item): number {
+function netPay(item: Item, editableFields: { key: keyof Item; label: string }[]): number {
   let total = 0;
-  for (const f of EDITABLE_FIELDS) {
+  for (const f of editableFields) {
     const v = item[f.key] as number;
     total += DEDUCTION_FIELDS.has(f.key) ? -v : v;
   }
@@ -104,6 +134,8 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   useEffect(load, [periodId]);
 
   const isFinal = period?.status === "final";
+  const editableFields = category === "outlet" ? [...BASE_FIELDS, ...OUTLET_FIELDS, ...TAIL_FIELDS] : [...BASE_FIELDS, ...TAIL_FIELDS];
+  const infoFields = category === "outlet" ? INFO_FIELDS : [];
 
   function updateLocal(itemId: number, field: keyof Item, value: number) {
     setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, [field]: value } : it)));
@@ -113,7 +145,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
     const item = items.find((it) => it.id === itemId);
     if (!item) return;
     const body: Record<string, number> = {};
-    for (const f of EDITABLE_FIELDS) body[f.key as string] = item[f.key] as number;
+    for (const f of [...editableFields, ...infoFields]) body[f.key as string] = item[f.key] as number;
     const res = await fetch(`/api/payroll/periods/${periodId}/items/${itemId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -144,7 +176,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   }
 
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
-  const totalNetPay = items.reduce((sum, it) => sum + netPay(it), 0);
+  const totalNetPay = items.reduce((sum, it) => sum + netPay(it, editableFields), 0);
 
   if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
   if (!period) return <p className="text-sm text-muted-foreground">Periode tidak ditemukan.</p>;
@@ -184,7 +216,10 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                 <TableHead className="sticky left-0 bg-card">Karyawan</TableHead>
                 <TableHead>Hadir</TableHead>
                 <TableHead>Lembur</TableHead>
-                {EDITABLE_FIELDS.map((f) => (
+                {infoFields.map((f) => (
+                  <TableHead key={f.key as string} className="whitespace-nowrap">{f.label}</TableHead>
+                ))}
+                {editableFields.map((f) => (
                   <TableHead key={f.key as string} className="whitespace-nowrap">{f.label}</TableHead>
                 ))}
                 <TableHead className="whitespace-nowrap">Gaji Bersih</TableHead>
@@ -193,7 +228,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             <TableBody>
               {items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4 + EDITABLE_FIELDS.length} className="text-muted-foreground">
+                  <TableCell colSpan={4 + infoFields.length + editableFields.length} className="text-muted-foreground">
                     Tidak ada karyawan aktif di kategori ini.
                   </TableCell>
                 </TableRow>
@@ -208,7 +243,19 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                   <TableCell className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
                     {formatMinutes(item.overtimeMinutes)}
                   </TableCell>
-                  {EDITABLE_FIELDS.map((f) => (
+                  {infoFields.map((f) => (
+                    <TableCell key={f.key as string}>
+                      <Input
+                        type="number"
+                        className="w-20 tabular-nums"
+                        value={item[f.key] as number}
+                        disabled={isFinal}
+                        onChange={(e) => updateLocal(item.id, f.key, Number(e.target.value) || 0)}
+                        onBlur={() => saveItem(item.id)}
+                      />
+                    </TableCell>
+                  ))}
+                  {editableFields.map((f) => (
                     <TableCell key={f.key as string}>
                       <Input
                         type="number"
@@ -220,7 +267,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       />
                     </TableCell>
                   ))}
-                  <TableCell className="font-medium tabular-nums whitespace-nowrap">Rp {formatRupiah(netPay(item))}</TableCell>
+                  <TableCell className="font-medium tabular-nums whitespace-nowrap">Rp {formatRupiah(netPay(item, editableFields))}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -35,11 +35,16 @@ const HISTORY_FIELD_LABEL: Record<string, string> = {
   employmentStatus: "Status Kepegawaian",
   baseSalary: "Gaji Pokok",
   allowance: "Tunjangan Tetap",
+  dailyTransportRate: "Uang Transport/Hari",
+  dailyMealRate: "Uang Makan/Hari",
+  standardWorkDays: "Hari Kerja Standar",
 };
+
+const RUPIAH_HISTORY_FIELDS = new Set(["baseSalary", "allowance", "dailyTransportRate", "dailyMealRate"]);
 
 function formatHistoryValue(field: string, value: string | null) {
   if (value == null) return "-";
-  if (field === "baseSalary" || field === "allowance") return `Rp${Number(value).toLocaleString("id-ID")}`;
+  if (RUPIAH_HISTORY_FIELDS.has(field)) return `Rp${Number(value).toLocaleString("id-ID")}`;
   if (field === "employmentStatus") return EMPLOYMENT_STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value;
   return value;
 }
@@ -73,6 +78,9 @@ type Employee = {
   status: string;
   baseSalary: number | null;
   allowance: number | null;
+  dailyTransportRate: number | null;
+  dailyMealRate: number | null;
+  standardWorkDays: number | null;
   bankName: string | null;
   bankAccountNumber: string | null;
   bankAccountHolder: string | null;
@@ -95,7 +103,8 @@ function todayInput() {
 const emptyForm = {
   name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
   employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", joinDate: "", resignDate: "",
-  baseSalary: "", allowance: "", bankName: "", bankAccountNumber: "", bankAccountHolder: "",
+  baseSalary: "", allowance: "", dailyTransportRate: "", dailyMealRate: "", standardWorkDays: "",
+  bankName: "", bankAccountNumber: "", bankAccountHolder: "",
   npwp: "", bpjsKesehatanNumber: "", bpjsKetenagakerjaanNumber: "",
 };
 
@@ -124,6 +133,9 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           employeeCode: e.employeeCode ?? "", ktpNumber: e.ktpNumber ?? "", position: e.position ?? "", outlet: e.outlet ?? "",
           employmentStatus: e.employmentStatus ?? "", joinDate: toDateInput(e.joinDate), resignDate: toDateInput(e.resignDate),
           baseSalary: e.baseSalary != null ? String(e.baseSalary) : "", allowance: e.allowance != null ? String(e.allowance) : "",
+          dailyTransportRate: e.dailyTransportRate != null ? String(e.dailyTransportRate) : "",
+          dailyMealRate: e.dailyMealRate != null ? String(e.dailyMealRate) : "",
+          standardWorkDays: e.standardWorkDays != null ? String(e.standardWorkDays) : "",
           bankName: e.bankName ?? "", bankAccountNumber: e.bankAccountNumber ?? "", bankAccountHolder: e.bankAccountHolder ?? "",
           npwp: e.npwp ?? "", bpjsKesehatanNumber: e.bpjsKesehatanNumber ?? "", bpjsKetenagakerjaanNumber: e.bpjsKetenagakerjaanNumber ?? "",
         });
@@ -400,6 +412,26 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           <div className="grid gap-1.5">
             <Label>Tunjangan Tetap (Rp/bulan)</Label>
             <Input type="number" value={form.allowance} onChange={(e) => set("allowance", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Uang Transport (Rp/hari hadir)</Label>
+            <Input type="number" value={form.dailyTransportRate} onChange={(e) => set("dailyTransportRate", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Uang Makan (Rp/hari hadir)</Label>
+            <Input type="number" value={form.dailyMealRate} onChange={(e) => set("dailyMealRate", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Hari Kerja Standar/Bulan</Label>
+            <Input
+              type="number"
+              value={form.standardWorkDays}
+              onChange={(e) => set("standardWorkDays", e.target.value)}
+              placeholder="mis. 25 atau 27"
+            />
+            <p className="text-xs text-muted-foreground">
+              Dipakai Payroll Outlet untuk hitung rate lembur (Uang Makan/hari &divide; 3) &amp; potongan telat.
+            </p>
           </div>
           <div className="grid gap-1.5">
             <Label>Nama Bank</Label>

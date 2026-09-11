@@ -14,7 +14,16 @@ const STRING_FIELDS = [
 // Field yang perubahannya dicatat otomatis ke EmployeeHistoryEntry - jabatan,
 // outlet, status kepegawaian, dan gaji. Field biodata lain (kontak, alamat,
 // dst) tidak perlu riwayat. Permintaan Kevin 2026-09-11.
-const TRACKED_HISTORY_FIELDS = ["position", "outlet", "employmentStatus", "baseSalary", "allowance"] as const;
+const TRACKED_HISTORY_FIELDS = [
+  "position",
+  "outlet",
+  "employmentStatus",
+  "baseSalary",
+  "allowance",
+  "dailyTransportRate",
+  "dailyMealRate",
+  "standardWorkDays",
+] as const;
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -51,6 +60,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if ("resignDate" in body) data.resignDate = body.resignDate ? new Date(body.resignDate) : null;
   if ("baseSalary" in body) data.baseSalary = body.baseSalary === "" || body.baseSalary === null ? null : Number(body.baseSalary);
   if ("allowance" in body) data.allowance = body.allowance === "" || body.allowance === null ? null : Number(body.allowance);
+  if ("dailyTransportRate" in body)
+    data.dailyTransportRate = body.dailyTransportRate === "" || body.dailyTransportRate === null ? null : Number(body.dailyTransportRate);
+  if ("dailyMealRate" in body)
+    data.dailyMealRate = body.dailyMealRate === "" || body.dailyMealRate === null ? null : Number(body.dailyMealRate);
+  if ("standardWorkDays" in body)
+    data.standardWorkDays = body.standardWorkDays === "" || body.standardWorkDays === null ? null : Number(body.standardWorkDays);
 
   const current = await prisma.employee.findUnique({
     where: { id: employeeId },

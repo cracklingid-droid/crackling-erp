@@ -51,6 +51,34 @@ export function calcBpjsKetenagakerjaan(baseSalary: number): number {
   return jht + jp;
 }
 
+// Formula gaji outlet Crackling yang sebenarnya (dipelajari dari spreadsheet
+// gaji outlet existing, dikonfirmasi Kevin 2026-09-11 - BUKAN formula umum,
+// ini kebijakan Crackling yang disengaja):
+// - Gaji Pokok dibayar penuh, TIDAK diprorata berdasarkan kehadiran.
+// - Uang Transport & Uang Makan dihitung per HARI BENAR-BENAR HADIR x rate
+//   harian masing-masing karyawan (rate beda-beda per karyawan/outlet).
+// - Rate Lembur (per jam) = Uang Makan harian / 3.
+// - Rate potongan Keterlambatan (per kejadian) = SAMA dengan rate Lembur.
+export function calcOutletOvertimeRate(dailyMealRate: number): number {
+  return dailyMealRate / 3;
+}
+
+export function calcOutletLateRate(dailyMealRate: number): number {
+  return calcOutletOvertimeRate(dailyMealRate);
+}
+
+export function calcOutletOvertimePay(dailyMealRate: number, overtimeMinutes: number): number {
+  return Math.round(calcOutletOvertimeRate(dailyMealRate) * (overtimeMinutes / 60));
+}
+
+export function calcOutletMealAllowance(dailyMealRate: number, daysPresent: number): number {
+  return dailyMealRate * daysPresent;
+}
+
+export function calcOutletTransportAllowance(dailyTransportRate: number, daysPresent: number): number {
+  return dailyTransportRate * daysPresent;
+}
+
 // 3 outlet tetap yang dipakai di seluruh sistem (form lamaran, Database
 // Karyawan) - karyawan dgn outlet salah satu dari ini masuk kalkulator
 // Payroll "outlet", selain itu (kosong/"Kantor"/dll) masuk "kantor".

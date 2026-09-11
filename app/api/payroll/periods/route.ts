@@ -6,6 +6,9 @@ import {
   calcOvertimePay,
   calcBpjsKesehatan,
   calcBpjsKetenagakerjaan,
+  calcOutletOvertimePay,
+  calcOutletMealAllowance,
+  calcOutletTransportAllowance,
   DEFAULT_DAILY_MEAL_ALLOWANCE,
 } from "@/lib/payroll-config";
 import { computeAttendanceSummaries } from "@/lib/attendance-summary";
@@ -52,19 +55,41 @@ export async function POST(req: Request) {
     for (const emp of inCategory) {
       const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0 };
       const baseSalary = emp.baseSalary ?? 0;
-      await tx.payrollItem.create({
-        data: {
-          periodId: created.id,
-          employeeId: emp.id,
-          daysPresent,
-          overtimeMinutes,
-          baseSalary,
-          mealAllowance: daysPresent * DEFAULT_DAILY_MEAL_ALLOWANCE,
-          overtimePay: calcOvertimePay(baseSalary, overtimeMinutes),
-          bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
-          bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
-        },
-      });
+
+      if (category === "outlet") {
+        // Ikut logika spreadsheet gaji outlet Crackling (permintaan Kevin
+        // 2026-09-11) - lihat komentar di lib/payroll-config.ts.
+        const dailyMealRate = emp.dailyMealRate ?? 0;
+        const dailyTransportRate = emp.dailyTransportRate ?? 0;
+        await tx.payrollItem.create({
+          data: {
+            periodId: created.id,
+            employeeId: emp.id,
+            daysPresent,
+            overtimeMinutes,
+            baseSalary,
+            mealAllowance: calcOutletMealAllowance(dailyMealRate, daysPresent),
+            transportReimbursement: calcOutletTransportAllowance(dailyTransportRate, daysPresent),
+            overtimePay: calcOutletOvertimePay(dailyMealRate, overtimeMinutes),
+            bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
+            bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
+          },
+        });
+      } else {
+        await tx.payrollItem.create({
+          data: {
+            periodId: created.id,
+            employeeId: emp.id,
+            daysPresent,
+            overtimeMinutes,
+            baseSalary,
+            mealAllowance: daysPresent * DEFAULT_DAILY_MEAL_ALLOWANCE,
+            overtimePay: calcOvertimePay(baseSalary, overtimeMinutes),
+            bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
+            bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
+          },
+        });
+      }
     }
 
     return created;

@@ -195,6 +195,15 @@ model Employee {
   bankAccountNumber String?
   bankAccountHolder String?
 
+  // Khusus kalkulator Payroll Outlet (permintaan Kevin 2026-09-11, ikut
+  // logika spreadsheet gaji outlet yang sudah berjalan): Uang Transport &
+  // Uang Makan dihitung per hari BENAR-BENAR hadir (bukan gaji pokok, yang
+  // dibayar penuh apapun kehadirannya), dan "hari kerja standar" beda-beda
+  // per karyawan (dipakai basis hitung rate lembur/telat).
+  dailyTransportRate Int? // Uang Transport per hari hadir, dalam rupiah
+  dailyMealRate      Int? // Uang Makan per hari hadir, dalam rupiah
+  standardWorkDays   Int? // "Day Work" - jumlah hari kerja standar per bulan
+
   npwp                      String?
   bpjsKesehatanNumber       String?
   bpjsKetenagakerjaanNumber String?
@@ -389,6 +398,19 @@ model PayrollItem {
   loanDeduction                Int     @default(0) // kasbon/potongan pinjaman
   otherAdjustment              Int     @default(0) // penyesuaian manual lain (boleh minus)
   note                         String?
+
+  // Kategori tambahan khusus Payroll Outlet, ikut logika spreadsheet gaji
+  // outlet yang sudah berjalan (permintaan Kevin 2026-09-11) - tidak
+  // otomatis terisi (tidak ada sumber datanya di sistem), HR isi manual
+  // per periode.
+  lateCount              Int @default(0) // jumlah kejadian terlambat (bukan rupiah, referensi HR)
+  lateDeduction          Int @default(0) // potongan telat = lateCount x rate keterlambatan
+  incidentDeduction      Int @default(0) // Pengurangan Dari Kejadian (nominal per insiden, mis. alat rusak)
+  warningLetterDeduction Int @default(0) // Pemotongan SP (surat peringatan)
+  depositDeduction       Int @default(0) // Pembayaran Deposit (cicilan deposit karyawan)
+  depositRefund          Int @default(0) // Pengembalian Deposit (refund, penambah)
+  serviceCharge          Int @default(0) // Service Charge (bagi hasil tip, penambah)
+  bonus                  Int @default(0)
 
   @@unique([periodId, employeeId])
 }

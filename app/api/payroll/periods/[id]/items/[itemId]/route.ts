@@ -13,6 +13,14 @@ const NUMBER_FIELDS = [
   "pph21Deduction",
   "loanDeduction",
   "otherAdjustment",
+  "lateCount",
+  "lateDeduction",
+  "incidentDeduction",
+  "warningLetterDeduction",
+  "depositDeduction",
+  "depositRefund",
+  "serviceCharge",
+  "bonus",
 ];
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; itemId: string }> }) {
