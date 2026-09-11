@@ -8,6 +8,7 @@ import {
   calcBpjsKetenagakerjaan,
   DEFAULT_DAILY_MEAL_ALLOWANCE,
 } from "@/lib/payroll-config";
+import { computeAttendanceSummaries } from "@/lib/attendance-summary";
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
 
   const employees = await prisma.employee.findMany({ where: { status: "active" } });
   const inCategory = employees.filter((e) => employeeCategory(e.outlet) === category);
+  const summaries = await computeAttendanceSummaries(inCategory.map((e) => e.id), startDate, endDate);
 
   const period = await prisma.$transaction(async (tx) => {
     const created = await tx.payrollPeriod.create({
@@ -48,17 +50,7 @@ export async function POST(req: Request) {
     });
 
     for (const emp of inCategory) {
-      const attendance = await tx.attendanceRecord.findMany({
-        where: { employeeId: emp.id, date: { gte: startDate, lte: endDate } },
-      });
-      const daysPresent = attendance.length;
-      let overtimeMinutes = 0;
-      for (const a of attendance) {
-        if (!a.clockIn || !a.clockOut) continue;
-        const workedMinutes = (a.clockOut.getTime() - a.clockIn.getTime()) / 60000;
-        overtimeMinutes += Math.max(0, Math.round(workedMinutes - 8 * 60));
-      }
-
+      const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0 };
       const baseSalary = emp.baseSalary ?? 0;
       await tx.payrollItem.create({
         data: {

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
+import { getDefaultPeriodRange, toDateInputValue } from "@/lib/payroll-period-cycle";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
 
@@ -25,17 +26,11 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function defaultPeriodLabel(category: string) {
-  const now = new Date();
-  const monthLabel = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+// Label default pakai bulan tanggal akhir siklus (mis. siklus 21 Agu - 20
+// Sep dilabeli "September") karena itu bulan gajiannya (tanggal 25).
+function defaultPeriodLabel(category: string, end: Date) {
+  const monthLabel = end.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
   return `Gaji ${CATEGORY_LABEL[category] ?? category} ${monthLabel}`;
-}
-
-function firstAndLastDayOfMonth() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return { first: first.toISOString().slice(0, 10), last: last.toISOString().slice(0, 10) };
 }
 
 export default function PayrollCategoryPage({ params }: { params: Promise<{ category: string }> }) {
@@ -64,10 +59,10 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
 
   function openForm() {
     if (!showForm) {
-      const { first, last } = firstAndLastDayOfMonth();
-      setLabel(defaultPeriodLabel(category));
-      setStartDate(first);
-      setEndDate(last);
+      const { start, end } = getDefaultPeriodRange();
+      setLabel(defaultPeriodLabel(category, end));
+      setStartDate(toDateInputValue(start));
+      setEndDate(toDateInputValue(end));
     }
     setShowForm((v) => !v);
   }
@@ -125,9 +120,10 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground mb-3">
-              Sistem otomatis membuat baris gaji untuk semua karyawan aktif kategori {categoryLabel.toLowerCase()}, dengan
-              saran awal dari gaji pokok & data absensi pada rentang tanggal ini - tetap bisa diedit satu-satu di halaman
-              berikutnya.
+              Default rentang tanggal 21 s.d. 20 bulan berikutnya (siklus gajian tanggal 25) - boleh diubah bebas kalau
+              perlu penyesuaian sementara. Sistem otomatis membuat baris gaji untuk semua karyawan aktif kategori{" "}
+              {categoryLabel.toLowerCase()}, dengan saran awal dari gaji pokok & data absensi pada rentang tanggal ini -
+              tetap bisa diedit satu-satu di halaman berikutnya.
             </p>
             <form onSubmit={handleSubmit} className="grid gap-4">
               <div className="grid gap-1.5">

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
+import { toLocalDateString } from "./date-utils";
 
 // Baca file absensi (xlsx/csv) jadi array baris (tiap baris = array string per
 // kolom, sudah termasuk baris header). Dipakai baik utk preview kolom
@@ -27,7 +28,20 @@ export async function parseAttendanceFile(buffer: Buffer, filename: string): Pro
 
 function cellToString(v: ExcelJS.CellValue): string {
   if (v === null || v === undefined) return "";
-  if (v instanceof Date) return v.toISOString();
+  if (v instanceof Date) {
+    // exceljs menyimpan "jam dinding" sel tanggal Excel di komponen UTC
+    // Date-nya (dokumentasi resmi exceljs), bukan di komponen lokal. Format
+    // manual tanpa akhiran "Z" spy nanti di-parse ulang sbg waktu lokal apa
+    // adanya (mis. 08:00 di Excel tetap jadi jam 08:00, bukan digeser+7 jam
+    // gara-gara dikira UTC).
+    const y = v.getUTCFullYear();
+    const mo = String(v.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(v.getUTCDate()).padStart(2, "0");
+    const h = String(v.getUTCHours()).padStart(2, "0");
+    const mi = String(v.getUTCMinutes()).padStart(2, "0");
+    const s = String(v.getUTCSeconds()).padStart(2, "0");
+    return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+  }
   if (typeof v === "object") {
     if ("text" in v && v.text != null) return String(v.text);
     if ("result" in v && (v as { result?: unknown }).result != null) return String((v as { result: unknown }).result);
@@ -115,7 +129,7 @@ export function buildAttendanceGroups(
       continue;
     }
 
-    const dateKey = found[0].toISOString().slice(0, 10);
+    const dateKey = toLocalDateString(found[0]);
     const key = `${name}|${dateKey}`;
     const existing = perKey.get(key);
     if (existing) {
