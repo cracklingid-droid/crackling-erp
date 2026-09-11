@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { REQUIRED_ONBOARDING_FIELDS, getMissingOnboardingFields } from "@/lib/employee-onboarding";
+import { toWaNumber } from "@/lib/whatsapp";
 
 const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
 const EMPLOYMENT_STATUS_OPTIONS = [
@@ -273,7 +274,19 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
             <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
           </div>
           <div className="grid gap-1.5">
-            <Label>No. HP / WhatsApp</Label>
+            <div className="flex items-center justify-between">
+              <Label>No. HP / WhatsApp</Label>
+              {employee.phone && (
+                <button
+                  type="button"
+                  onClick={() => window.open(`https://wa.me/${toWaNumber(employee.phone!)}`, "_blank")}
+                  title="Chat WhatsApp"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> Chat WA
+                </button>
+              )}
+            </div>
             <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
           </div>
           <div className="grid gap-1.5">

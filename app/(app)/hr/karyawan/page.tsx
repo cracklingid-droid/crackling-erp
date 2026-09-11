@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, ArrowLeft } from "lucide-react";
+import { Plus, ArrowLeft, MessageCircle } from "lucide-react";
+import { toWaNumber } from "@/lib/whatsapp";
 
 type Employee = {
   id: number;
@@ -141,11 +142,12 @@ export default function KaryawanPage() {
                 <TableHead>Outlet</TableHead>
                 <TableHead>Status Kepegawaian</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>WA</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!loading && employees.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-muted-foreground">Belum ada karyawan.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-muted-foreground">Belum ada karyawan.</TableCell></TableRow>
               )}
               {employees.map((e) => (
                 <TableRow key={e.id}>
@@ -160,6 +162,20 @@ export default function KaryawanPage() {
                     <Badge variant={STATUS_VARIANT[e.status] ?? "outline"} className="font-normal">
                       {STATUS_LABEL[e.status] ?? e.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {e.phone ? (
+                      <button
+                        type="button"
+                        title="Chat WhatsApp"
+                        onClick={() => window.open(`https://wa.me/${toWaNumber(e.phone!)}`, "_blank")}
+                        className="inline-flex items-center justify-center text-primary hover:text-primary/70 transition-colors"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
