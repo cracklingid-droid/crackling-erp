@@ -9,7 +9,10 @@ import {
   calcOutletOvertimePay,
   calcOutletMealAllowance,
   calcOutletTransportAllowance,
+  calcOutletBaseSalary,
   DEFAULT_DAILY_MEAL_ALLOWANCE,
+  CONTRACT_DEPOSIT_INSTALLMENT,
+  CONTRACT_DEPOSIT_INSTALLMENT_COUNT,
 } from "@/lib/payroll-config";
 import { computeAttendanceSummaries } from "@/lib/attendance-summary";
 
@@ -65,21 +68,41 @@ export async function POST(req: Request) {
         // pokok bulanan - gajinya cuma rate harian x hari hadir, terpisah
         // dari baseSalary. Permintaan Kevin 2026-09-11.
         const partTimePay = emp.dailyBaseRate != null ? emp.dailyBaseRate * daysPresent : 0;
+        // Gaji pokok diprorata kalau hari hadir < 24 hari (permintaan Kevin
+        // 2026-09-11) - lihat calcOutletBaseSalary di lib/payroll-config.ts.
+        const proratedBaseSalary = calcOutletBaseSalary(baseSalary, daysPresent);
+
+        // Deposit wajib karyawan kontrak - Rp250rb otomatis di 2 periode
+        // pertama, berhenti sendiri setelahnya. Permintaan Kevin 2026-09-11.
+        const isContractDepositDue = emp.employmentStatus === "kontrak" && emp.depositInstallmentsPaid < CONTRACT_DEPOSIT_INSTALLMENT_COUNT;
+        const depositDeduction = isContractDepositDue ? CONTRACT_DEPOSIT_INSTALLMENT : 0;
+
         await tx.payrollItem.create({
           data: {
             periodId: created.id,
             employeeId: emp.id,
             daysPresent,
             overtimeMinutes,
-            baseSalary,
+            baseSalary: proratedBaseSalary,
             partTimePay,
             mealAllowance: calcOutletMealAllowance(dailyMealRate, daysPresent),
             transportReimbursement: calcOutletTransportAllowance(dailyTransportRate, daysPresent),
             overtimePay: calcOutletOvertimePay(dailyMealRate, overtimeMinutes),
             bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
             bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
+            depositDeduction,
           },
         });
+
+        if (isContractDepositDue) {
+          await tx.employee.update({
+            where: { id: emp.id },
+            data: {
+              depositInstallmentsPaid: { increment: 1 },
+              depositBalance: { increment: CONTRACT_DEPOSIT_INSTALLMENT },
+            },
+          });
+        }
       } else {
         await tx.payrollItem.create({
           data: {

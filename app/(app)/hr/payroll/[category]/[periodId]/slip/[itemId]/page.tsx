@@ -133,13 +133,13 @@ export default function PayrollSlipPage({ params }: { params: Promise<{ category
                 {nonZeroEarnings.map((f) => (
                   <div key={f.key} className="flex justify-between">
                     <span className="text-muted-foreground">{f.label}</span>
-                    <span className="tabular-nums">{formatRupiah(item[f.key] as number)}</span>
+                    <span className="tabular-nums text-emerald-600 dark:text-emerald-400">{formatRupiah(item[f.key] as number)}</span>
                   </div>
                 ))}
                 {otherAdjustment > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Penyesuaian Lain</span>
-                    <span className="tabular-nums">{formatRupiah(otherAdjustment)}</span>
+                    <span className="tabular-nums text-emerald-600 dark:text-emerald-400">{formatRupiah(otherAdjustment)}</span>
                   </div>
                 )}
               </div>
@@ -154,13 +154,13 @@ export default function PayrollSlipPage({ params }: { params: Promise<{ category
                 {nonZeroDeductions.map((f) => (
                   <div key={f.key} className="flex justify-between">
                     <span className="text-muted-foreground">{f.label}</span>
-                    <span className="tabular-nums">{formatRupiah(item[f.key] as number)}</span>
+                    <span className="tabular-nums text-red-600 dark:text-red-400">{formatRupiah(item[f.key] as number)}</span>
                   </div>
                 ))}
                 {otherAdjustment < 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Penyesuaian Lain</span>
-                    <span className="tabular-nums">{formatRupiah(-otherAdjustment)}</span>
+                    <span className="tabular-nums text-red-600 dark:text-red-400">{formatRupiah(-otherAdjustment)}</span>
                   </div>
                 )}
               </div>

@@ -210,6 +210,15 @@ model Employee {
   // 2026-09-11.
   dailyBaseRate Int? // gaji harian (part time), dalam rupiah
 
+  // Deposit wajib karyawan kontrak: Rp250rb dipotong otomatis di 2 periode
+  // gaji Outlet pertama sejak join (tanggal 10), berhenti sendiri setelah
+  // 2x. Saldo naik/turun otomatis mengikuti field "Bayar Deposit"/"Kembali
+  // Deposit" per PayrollItem, jadi selalu mencerminkan deposit yang masih
+  // ditahan - dasar keputusan HR saat karyawan resign. Permintaan Kevin
+  // 2026-09-11.
+  depositInstallmentsPaid Int @default(0) // sudah dipotong berapa kali otomatis (maks 2)
+  depositBalance          Int @default(0) // saldo deposit kontrak yang masih ditahan, dalam rupiah
+
   npwp                      String?
   bpjsKesehatanNumber       String?
   bpjsKetenagakerjaanNumber String?

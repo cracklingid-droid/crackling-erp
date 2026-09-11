@@ -83,6 +83,8 @@ type Employee = {
   dailyMealRate: number | null;
   standardWorkDays: number | null;
   dailyBaseRate: number | null;
+  depositInstallmentsPaid: number;
+  depositBalance: number;
   bankName: string | null;
   bankAccountNumber: string | null;
   bankAccountHolder: string | null;
@@ -106,6 +108,7 @@ const emptyForm = {
   name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
   employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", joinDate: "", resignDate: "",
   baseSalary: "", allowance: "", dailyTransportRate: "", dailyMealRate: "", standardWorkDays: "", dailyBaseRate: "",
+  depositInstallmentsPaid: "", depositBalance: "",
   bankName: "", bankAccountNumber: "", bankAccountHolder: "",
   npwp: "", bpjsKesehatanNumber: "", bpjsKetenagakerjaanNumber: "",
 };
@@ -139,6 +142,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           dailyMealRate: e.dailyMealRate != null ? String(e.dailyMealRate) : "",
           standardWorkDays: e.standardWorkDays != null ? String(e.standardWorkDays) : "",
           dailyBaseRate: e.dailyBaseRate != null ? String(e.dailyBaseRate) : "",
+          depositInstallmentsPaid: String(e.depositInstallmentsPaid ?? 0), depositBalance: String(e.depositBalance ?? 0),
           bankName: e.bankName ?? "", bankAccountNumber: e.bankAccountNumber ?? "", bankAccountHolder: e.bankAccountHolder ?? "",
           npwp: e.npwp ?? "", bpjsKesehatanNumber: e.bpjsKesehatanNumber ?? "", bpjsKetenagakerjaanNumber: e.bpjsKetenagakerjaanNumber ?? "",
         });
@@ -442,6 +446,30 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
               Dipakai Payroll Outlet untuk hitung rate lembur (Uang Makan/hari &divide; 3) &amp; potongan telat.
             </p>
           </div>
+          {form.employmentStatus === "kontrak" && (
+            <>
+              <div className="grid gap-1.5">
+                <Label>Cicilan Deposit Terpotong</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={2}
+                  value={form.depositInstallmentsPaid}
+                  onChange={(e) => set("depositInstallmentsPaid", e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Dari 2x potongan otomatis Rp250.000 di tanggal 10. Ubah manual kalau perlu koreksi (mis. migrasi data lama).
+                </p>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Saldo Deposit Ditahan (Rp)</Label>
+                <Input type="number" value={form.depositBalance} onChange={(e) => set("depositBalance", e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Otomatis mengikuti "Bayar Deposit"/"Kembali Deposit" di Payroll Outlet. Jadi acuan HR saat karyawan resign.
+                </p>
+              </div>
+            </>
+          )}
           <div className="grid gap-1.5">
             <Label>Nama Bank</Label>
             <Input value={form.bankName} onChange={(e) => set("bankName", e.target.value)} placeholder="mis. BCA" />

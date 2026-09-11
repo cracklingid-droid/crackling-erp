@@ -266,19 +266,36 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       />
                     </TableCell>
                   ))}
-                  {editableFields.map((f) => (
-                    <TableCell key={f.key as string}>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        className="w-32 tabular-nums text-right"
-                        value={formatRupiah(item[f.key] as number)}
-                        disabled={isFinal}
-                        onChange={(e) => updateLocal(item.id, f.key, parseRupiahInput(e.target.value))}
-                        onBlur={() => saveItem(item.id)}
-                      />
-                    </TableCell>
-                  ))}
+                  {editableFields.map((f) => {
+                    const isDeduction = DEDUCTION_FIELDS.has(f.key);
+                    const isTail = TAIL_FIELDS.some((t) => t.key === f.key);
+                    const value = item[f.key] as number;
+                    // Komponen penambah gaji hijau, pengurang merah - "Penyesuaian
+                    // Lain" bisa dua arah jadi warnanya ikut tanda nilainya.
+                    // Permintaan Kevin 2026-09-11.
+                    const colorClass = isTail
+                      ? value > 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : value < 0
+                          ? "text-red-600 dark:text-red-400"
+                          : ""
+                      : isDeduction
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-emerald-600 dark:text-emerald-400";
+                    return (
+                      <TableCell key={f.key as string}>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          className={`w-32 tabular-nums text-right ${colorClass}`}
+                          value={formatRupiah(value)}
+                          disabled={isFinal}
+                          onChange={(e) => updateLocal(item.id, f.key, parseRupiahInput(e.target.value))}
+                          onBlur={() => saveItem(item.id)}
+                        />
+                      </TableCell>
+                    );
+                  })}
                   <TableCell className="font-medium tabular-nums whitespace-nowrap">Rp {formatRupiah(netPay(item, editableFields))}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     <Link

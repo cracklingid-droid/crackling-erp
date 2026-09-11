@@ -69,6 +69,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     data.standardWorkDays = body.standardWorkDays === "" || body.standardWorkDays === null ? null : Number(body.standardWorkDays);
   if ("dailyBaseRate" in body)
     data.dailyBaseRate = body.dailyBaseRate === "" || body.dailyBaseRate === null ? null : Number(body.dailyBaseRate);
+  if ("depositInstallmentsPaid" in body) data.depositInstallmentsPaid = Number(body.depositInstallmentsPaid) || 0;
+  if ("depositBalance" in body) data.depositBalance = Number(body.depositBalance) || 0;
 
   const current = await prisma.employee.findUnique({
     where: { id: employeeId },

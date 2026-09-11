@@ -54,11 +54,20 @@ export function calcBpjsKetenagakerjaan(baseSalary: number): number {
 // Formula gaji outlet Crackling yang sebenarnya (dipelajari dari spreadsheet
 // gaji outlet existing, dikonfirmasi Kevin 2026-09-11 - BUKAN formula umum,
 // ini kebijakan Crackling yang disengaja):
-// - Gaji Pokok dibayar penuh, TIDAK diprorata berdasarkan kehadiran.
+// - Gaji Pokok dibayar penuh kalau hari hadir >= standar (24 hari), kalau
+//   kurang dari itu diprorata: Gaji Pokok x (hari hadir / 24). Diprorata
+//   TIDAK PERNAH melebihi gaji pokok penuh. Permintaan Kevin 2026-09-11.
 // - Uang Transport & Uang Makan dihitung per HARI BENAR-BENAR HADIR x rate
 //   harian masing-masing karyawan (rate beda-beda per karyawan/outlet).
 // - Rate Lembur (per jam) = Uang Makan harian / 3.
 // - Rate potongan Keterlambatan (per kejadian) = SAMA dengan rate Lembur.
+export const OUTLET_PRORATE_STANDARD_DAYS = 24;
+
+export function calcOutletBaseSalary(baseSalary: number, daysPresent: number): number {
+  if (daysPresent >= OUTLET_PRORATE_STANDARD_DAYS) return baseSalary;
+  return Math.round((daysPresent / OUTLET_PRORATE_STANDARD_DAYS) * baseSalary);
+}
+
 export function calcOutletOvertimeRate(dailyMealRate: number): number {
   return dailyMealRate / 3;
 }
@@ -74,6 +83,13 @@ export function calcOutletOvertimePay(dailyMealRate: number, overtimeMinutes: nu
 export function calcOutletMealAllowance(dailyMealRate: number, daysPresent: number): number {
   return dailyMealRate * daysPresent;
 }
+
+// Deposit wajib karyawan kontrak (employmentStatus === "kontrak") di Payroll
+// Outlet: Rp250rb dipotong otomatis di 2 periode gaji pertama (tanggal 10),
+// lalu berhenti sendiri. Dikembalikan manual oleh HR lewat field "Kembali
+// Deposit" kalau resign sesuai ketentuan. Permintaan Kevin 2026-09-11.
+export const CONTRACT_DEPOSIT_INSTALLMENT = 250_000;
+export const CONTRACT_DEPOSIT_INSTALLMENT_COUNT = 2;
 
 export function calcOutletTransportAllowance(dailyTransportRate: number, daysPresent: number): number {
   return dailyTransportRate * daysPresent;
