@@ -204,6 +204,12 @@ model Employee {
   dailyMealRate      Int? // Uang Makan per hari hadir, dalam rupiah
   standardWorkDays   Int? // "Day Work" - jumlah hari kerja standar per bulan
 
+  // Karyawan part time digaji per hari (bukan gaji pokok bulanan) - dipisah
+  // dari baseSalary supaya jelas beda skema, mis. Ridho/Wise yang gajinya
+  // Rp150.000/hari, bukan gaji bulanan diprorata. Permintaan Kevin
+  // 2026-09-11.
+  dailyBaseRate Int? // gaji harian (part time), dalam rupiah
+
   npwp                      String?
   bpjsKesehatanNumber       String?
   bpjsKetenagakerjaanNumber String?
@@ -387,7 +393,8 @@ model PayrollItem {
   daysPresent     Int @default(0)
   overtimeMinutes Int @default(0)
 
-  baseSalary                   Int     @default(0)
+  baseSalary                   Int     @default(0) // gaji pokok bulanan (karyawan tetap)
+  partTimePay                  Int     @default(0) // gaji harian x hari hadir (karyawan part time) - terpisah dari gaji pokok
   mealAllowance                Int     @default(0) // uang makan
   transportReimbursement       Int     @default(0) // reimbursement transport (kantor)
   overtimePay                  Int     @default(0) // lembur

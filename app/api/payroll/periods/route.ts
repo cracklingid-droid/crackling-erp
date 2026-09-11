@@ -61,6 +61,10 @@ export async function POST(req: Request) {
         // 2026-09-11) - lihat komentar di lib/payroll-config.ts.
         const dailyMealRate = emp.dailyMealRate ?? 0;
         const dailyTransportRate = emp.dailyTransportRate ?? 0;
+        // Karyawan part time (gaji harian, mis. Ridho/Wise) tidak punya gaji
+        // pokok bulanan - gajinya cuma rate harian x hari hadir, terpisah
+        // dari baseSalary. Permintaan Kevin 2026-09-11.
+        const partTimePay = emp.dailyBaseRate != null ? emp.dailyBaseRate * daysPresent : 0;
         await tx.payrollItem.create({
           data: {
             periodId: created.id,
@@ -68,6 +72,7 @@ export async function POST(req: Request) {
             daysPresent,
             overtimeMinutes,
             baseSalary,
+            partTimePay,
             mealAllowance: calcOutletMealAllowance(dailyMealRate, daysPresent),
             transportReimbursement: calcOutletTransportAllowance(dailyTransportRate, daysPresent),
             overtimePay: calcOutletOvertimePay(dailyMealRate, overtimeMinutes),

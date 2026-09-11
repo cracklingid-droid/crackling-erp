@@ -38,9 +38,10 @@ const HISTORY_FIELD_LABEL: Record<string, string> = {
   dailyTransportRate: "Uang Transport/Hari",
   dailyMealRate: "Uang Makan/Hari",
   standardWorkDays: "Hari Kerja Standar",
+  dailyBaseRate: "Gaji Harian (Part Time)",
 };
 
-const RUPIAH_HISTORY_FIELDS = new Set(["baseSalary", "allowance", "dailyTransportRate", "dailyMealRate"]);
+const RUPIAH_HISTORY_FIELDS = new Set(["baseSalary", "allowance", "dailyTransportRate", "dailyMealRate", "dailyBaseRate"]);
 
 function formatHistoryValue(field: string, value: string | null) {
   if (value == null) return "-";
@@ -81,6 +82,7 @@ type Employee = {
   dailyTransportRate: number | null;
   dailyMealRate: number | null;
   standardWorkDays: number | null;
+  dailyBaseRate: number | null;
   bankName: string | null;
   bankAccountNumber: string | null;
   bankAccountHolder: string | null;
@@ -103,7 +105,7 @@ function todayInput() {
 const emptyForm = {
   name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
   employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", joinDate: "", resignDate: "",
-  baseSalary: "", allowance: "", dailyTransportRate: "", dailyMealRate: "", standardWorkDays: "",
+  baseSalary: "", allowance: "", dailyTransportRate: "", dailyMealRate: "", standardWorkDays: "", dailyBaseRate: "",
   bankName: "", bankAccountNumber: "", bankAccountHolder: "",
   npwp: "", bpjsKesehatanNumber: "", bpjsKetenagakerjaanNumber: "",
 };
@@ -136,6 +138,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           dailyTransportRate: e.dailyTransportRate != null ? String(e.dailyTransportRate) : "",
           dailyMealRate: e.dailyMealRate != null ? String(e.dailyMealRate) : "",
           standardWorkDays: e.standardWorkDays != null ? String(e.standardWorkDays) : "",
+          dailyBaseRate: e.dailyBaseRate != null ? String(e.dailyBaseRate) : "",
           bankName: e.bankName ?? "", bankAccountNumber: e.bankAccountNumber ?? "", bankAccountHolder: e.bankAccountHolder ?? "",
           npwp: e.npwp ?? "", bpjsKesehatanNumber: e.bpjsKesehatanNumber ?? "", bpjsKetenagakerjaanNumber: e.bpjsKetenagakerjaanNumber ?? "",
         });
@@ -408,6 +411,12 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           <div className="grid gap-1.5">
             <Label>Gaji Pokok (Rp/bulan)</Label>
             <Input type="number" value={form.baseSalary} onChange={(e) => set("baseSalary", e.target.value)} />
+            <p className="text-xs text-muted-foreground">Untuk karyawan tetap/bulanan. Kosongkan kalau karyawan part time.</p>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Gaji Harian - Part Time (Rp/hari)</Label>
+            <Input type="number" value={form.dailyBaseRate} onChange={(e) => set("dailyBaseRate", e.target.value)} />
+            <p className="text-xs text-muted-foreground">Untuk karyawan part time (mis. Rp150.000/hari). Kosongkan kalau bulanan.</p>
           </div>
           <div className="grid gap-1.5">
             <Label>Tunjangan Tetap (Rp/bulan)</Label>

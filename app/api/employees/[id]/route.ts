@@ -23,6 +23,7 @@ const TRACKED_HISTORY_FIELDS = [
   "dailyTransportRate",
   "dailyMealRate",
   "standardWorkDays",
+  "dailyBaseRate",
 ] as const;
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -66,6 +67,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     data.dailyMealRate = body.dailyMealRate === "" || body.dailyMealRate === null ? null : Number(body.dailyMealRate);
   if ("standardWorkDays" in body)
     data.standardWorkDays = body.standardWorkDays === "" || body.standardWorkDays === null ? null : Number(body.standardWorkDays);
+  if ("dailyBaseRate" in body)
+    data.dailyBaseRate = body.dailyBaseRate === "" || body.dailyBaseRate === null ? null : Number(body.dailyBaseRate);
 
   const current = await prisma.employee.findUnique({
     where: { id: employeeId },

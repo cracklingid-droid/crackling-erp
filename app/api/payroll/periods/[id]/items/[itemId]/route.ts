@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/current-user";
 
 const NUMBER_FIELDS = [
   "baseSalary",
+  "partTimePay",
   "mealAllowance",
   "transportReimbursement",
   "overtimePay",

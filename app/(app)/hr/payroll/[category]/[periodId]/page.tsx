@@ -19,6 +19,7 @@ type Item = {
   daysPresent: number;
   overtimeMinutes: number;
   baseSalary: number;
+  partTimePay: number;
   mealAllowance: number;
   transportReimbursement: number;
   overtimePay: number;
@@ -49,6 +50,7 @@ type Period = {
 
 const BASE_FIELDS: { key: keyof Item; label: string }[] = [
   { key: "baseSalary", label: "Gaji Pokok" },
+  { key: "partTimePay", label: "Gaji Part Time" },
   { key: "mealAllowance", label: "Uang Makan" },
   { key: "transportReimbursement", label: "Reimb. Transport" },
   { key: "overtimePay", label: "Lembur (Rp)" },
