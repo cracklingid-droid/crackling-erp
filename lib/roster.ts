@@ -8,6 +8,7 @@ export const OUTLET_SLUGS: Record<string, string> = {
   "Joglo (Central Kitchen)": "joglo",
   "Gading Serpong": "gading-serpong",
   "Kelapa Gading": "kelapa-gading",
+  Fatgai: "fatgai",
 };
 
 export function outletToSlug(outlet: string): string | null {

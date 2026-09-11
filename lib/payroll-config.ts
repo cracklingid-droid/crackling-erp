@@ -79,10 +79,11 @@ export function calcOutletTransportAllowance(dailyTransportRate: number, daysPre
   return dailyTransportRate * daysPresent;
 }
 
-// 3 outlet tetap yang dipakai di seluruh sistem (form lamaran, Database
+// Outlet tetap yang dipakai di seluruh sistem (form lamaran, Database
 // Karyawan) - karyawan dgn outlet salah satu dari ini masuk kalkulator
-// Payroll "outlet", selain itu (kosong/"Kantor"/dll) masuk "kantor".
-export const OUTLET_NAMES = ["Joglo (Central Kitchen)", "Gading Serpong", "Kelapa Gading"];
+// Payroll "outlet", selain itu (kosong/"Kantor"/dll) masuk "kantor". Fatgai
+// ditambahkan 2026-09-11 (permintaan Kevin, outlet ke-4 aktif).
+export const OUTLET_NAMES = ["Joglo (Central Kitchen)", "Gading Serpong", "Kelapa Gading", "Fatgai"];
 
 export function employeeCategory(outlet: string | null): "outlet" | "kantor" {
   return outlet && OUTLET_NAMES.includes(outlet) ? "outlet" : "kantor";
