@@ -25,6 +25,15 @@ function formatDateID(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Jam masuk/pulang disimpan sbg "jam dinding" di komponen UTC (konvensi yang
+// sama dipakai di seluruh sistem, lihat lib/attendance-parse.ts) - makanya
+// ambil jam/menitnya langsung dari string ISO, BUKAN toLocaleTimeString()
+// yang ikut zona waktu browser (bisa salah geser kalau server & browser
+// beda zona waktu).
+function formatTimeUTC(iso: string) {
+  return iso.slice(11, 16);
+}
+
 export default function UploadAbsensiPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
@@ -248,6 +257,37 @@ export default function UploadAbsensiPage() {
                 ))}
               </div>
             </div>
+
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">
+                Detail data yang akan diimport (cek dulu tanggal &amp; jamnya sebelum klik Import):
+              </p>
+              <div className="max-h-80 overflow-y-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Jam Masuk</TableHead>
+                      <TableHead>Jam Pulang</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...machineReport.groups]
+                      .sort((a, b) => a.employeeName.localeCompare(b.employeeName) || a.date.localeCompare(b.date))
+                      .map((g, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="whitespace-nowrap">{g.employeeName}</TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateID(g.date)}</TableCell>
+                          <TableCell className="tabular-nums">{formatTimeUTC(g.clockIn)}</TableCell>
+                          <TableCell className="tabular-nums">{formatTimeUTC(g.clockOut)}</TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
             <div>
               <Button onClick={handleImportMachineReport} disabled={importing}>
                 {importing ? "Mengimpor..." : "Import Absensi"}
