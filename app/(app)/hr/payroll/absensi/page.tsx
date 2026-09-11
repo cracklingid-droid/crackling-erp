@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Upload, AlertTriangle, CheckCircle2, Sparkles } from "lucide-react";
 
 type ImportResult = {
   totalRows: number;
@@ -32,10 +32,42 @@ export default function UploadAbsensiPage() {
   const [clockInCol, setClockInCol] = useState("");
   const [clockOutCol, setClockOutCol] = useState("");
   const [datetimeCol, setDatetimeCol] = useState("");
+  const [headerRowIndex, setHeaderRowIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detectNote, setDetectNote] = useState<{ text: string; confidence: string } | null>(null);
 
-  const headers = rows?.[0] ?? [];
-  const preview = rows?.slice(1, 6) ?? [];
+  const headers = rows?.[headerRowIndex] ?? [];
+  const preview = rows?.slice(headerRowIndex + 1, headerRowIndex + 6) ?? [];
+
+  async function detectMapping(fileRows: string[][]) {
+    setDetecting(true);
+    setDetectNote(null);
+    try {
+      const res = await fetch("/api/payroll/attendance/suggest-mapping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: fileRows }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Deteksi otomatis gagal (mis. API key belum diset) - HR tetap bisa pilih kolom manual seperti biasa.
+        return;
+      }
+      setHeaderRowIndex(data.headerRowIndex ?? 0);
+      setMode(data.mode === "combined" ? "combined" : "separate");
+      if (data.nameColIndex != null) setNameCol(String(data.nameColIndex));
+      if (data.dateColIndex != null) setDateCol(String(data.dateColIndex));
+      if (data.clockInColIndex != null) setClockInCol(String(data.clockInColIndex));
+      if (data.clockOutColIndex != null) setClockOutCol(String(data.clockOutColIndex));
+      if (data.datetimeColIndex != null) setDatetimeCol(String(data.datetimeColIndex));
+      setDetectNote({ text: data.note || "Kolom terdeteksi otomatis - silakan cek ulang sebelum import.", confidence: data.confidence });
+    } catch {
+      // diam-diam gagal, HR isi manual
+    } finally {
+      setDetecting(false);
+    }
+  }
 
   async function processFile(file: File) {
     setFileName(file.name);
@@ -53,11 +85,14 @@ export default function UploadAbsensiPage() {
       }
       setRows(data.rows);
       // reset mapping tiap ganti file
+      setHeaderRowIndex(0);
       setNameCol("");
       setDateCol("");
       setClockInCol("");
       setClockOutCol("");
       setDatetimeCol("");
+      setDetectNote(null);
+      detectMapping(data.rows);
     } catch (err) {
       toast.error("Gagal baca file: " + (err instanceof Error ? err.message : "unknown"));
     } finally {
@@ -98,7 +133,7 @@ export default function UploadAbsensiPage() {
     const res = await fetch("/api/payroll/attendance/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows, headerRowIndex: 0, mapping }),
+      body: JSON.stringify({ rows, headerRowIndex, mapping }),
     });
     setImporting(false);
     const data = await res.json();
@@ -182,6 +217,17 @@ export default function UploadAbsensiPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">3. Cocokkan Kolom</CardTitle>
+              {detecting && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 animate-pulse" /> Mendeteksi struktur kolom otomatis...
+                </p>
+              )}
+              {!detecting && detectNote && (
+                <p className="text-xs text-primary flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" /> {detectNote.text} (keyakinan: {detectNote.confidence}) - tetap cek
+                  ulang sebelum import.
+                </p>
+              )}
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="grid gap-1.5">
