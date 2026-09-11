@@ -279,6 +279,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
               Batalkan pilihan
             </button>
           )}
+          <Link
+            href={`/hr/payroll/${category}/${periodId}/rincian`}
+            className="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            Rincian Perhitungan (per tanggal)
+          </Link>
         </CardContent>
         <div className="thin-scrollbar overflow-x-auto">
           <Table>
