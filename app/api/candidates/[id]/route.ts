@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { deleteCvForRejectedCandidate } from "@/lib/delete-cv";
-import { STAGE_ORDER, STAGE_ROLLBACK_ERROR } from "@/lib/candidate-stages";
+import { isStageTransitionAllowed, STAGE_ROLLBACK_ERROR } from "@/lib/candidate-stages";
 
 const VALID_STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 
@@ -53,9 +53,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     });
     if (!current) return NextResponse.json({ error: "Kandidat tidak ditemukan" }, { status: 404 });
 
-    const currentIdx = STAGE_ORDER.indexOf(current.stage as (typeof STAGE_ORDER)[number]);
-    const interviewIdx = STAGE_ORDER.indexOf("interview");
-    if (currentIdx >= interviewIdx && (body.stage === "applied" || body.stage === "screening")) {
+    if (!isStageTransitionAllowed(current.stage, body.stage)) {
       return NextResponse.json({ error: STAGE_ROLLBACK_ERROR }, { status: 400 });
     }
 

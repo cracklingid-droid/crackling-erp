@@ -18,19 +18,26 @@ export function stageLabel(v: string): string {
   return STAGES.find((s) => s.value === v)?.label ?? v;
 }
 
-// Kandidat yang sudah sampai tahap Interview tidak boleh dikembalikan ke
-// Melamar/Lolos Test - permintaan Kevin 2026-09-10, supaya pipeline
-// mengalir maju dan tidak ada kandidat "mundur" tanpa sengaja.
+// Pipeline cuma boleh maju - kandidat tidak boleh dikembalikan ke tahap
+// manapun yang sudah dilewati, di titik manapun dia berada sekarang
+// (bukan cuma dari Interview ke atas) - permintaan Kevin 2026-09-11,
+// setelah kandidat di tahap "Lolos Test" ternyata masih bisa dipindah
+// balik ke "Melamar". "Ditolak" selalu boleh jadi tujuan (jalur keluar
+// kapan saja), dan dari "Ditolak" boleh dibuka lagi ke tahap manapun
+// (siapa tahu HR salah tolak / mau pertimbangkan ulang).
+export function isStageTransitionAllowed(currentStage: string, targetStage: string): boolean {
+  if (targetStage === "rejected") return true;
+  const currentIdx = STAGE_ORDER.indexOf(currentStage as ForwardStage);
+  if (currentIdx === -1) return true; // dari "rejected", boleh dibuka lagi ke tahap manapun
+  const targetIdx = STAGE_ORDER.indexOf(targetStage as ForwardStage);
+  if (targetIdx === -1) return true;
+  return targetIdx >= currentIdx;
+}
+
 export function allowedNextStages(currentStage: string): StageValue[] {
-  const idx = STAGE_ORDER.indexOf(currentStage as ForwardStage);
-  const interviewIdx = STAGE_ORDER.indexOf("interview");
-  const all = STAGES.map((s) => s.value);
-  if (idx >= interviewIdx) {
-    return all.filter((v) => v !== "applied" && v !== "screening");
-  }
-  return all;
+  return STAGES.map((s) => s.value).filter((v) => isStageTransitionAllowed(currentStage, v));
 }
 
 // Pesan error dipakai backend & bisa ditampilkan langsung di toast frontend.
 export const STAGE_ROLLBACK_ERROR =
-  "Kandidat yang sudah sampai tahap Interview tidak bisa dikembalikan ke Melamar atau Lolos Test. Opsi yang tersedia hanya Penawaran atau Ditolak.";
+  "Kandidat tidak bisa dikembalikan ke tahap sebelumnya. Pilihan yang tersedia hanya tahap saat ini, tahap berikutnya, atau Ditolak.";
