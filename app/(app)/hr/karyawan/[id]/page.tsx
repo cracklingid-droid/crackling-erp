@@ -29,7 +29,31 @@ const DOCUMENT_TYPES = [
 ];
 const documentTypeLabel = (v: string) => DOCUMENT_TYPES.find((d) => d.value === v)?.label ?? v;
 
+const HISTORY_FIELD_LABEL: Record<string, string> = {
+  position: "Jabatan",
+  outlet: "Outlet/Cabang",
+  employmentStatus: "Status Kepegawaian",
+  baseSalary: "Gaji Pokok",
+  allowance: "Tunjangan Tetap",
+};
+
+function formatHistoryValue(field: string, value: string | null) {
+  if (value == null) return "-";
+  if (field === "baseSalary" || field === "allowance") return `Rp${Number(value).toLocaleString("id-ID")}`;
+  if (field === "employmentStatus") return EMPLOYMENT_STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value;
+  return value;
+}
+
 type Document = { id: number; type: string; fileUrl: string; fileName: string | null };
+type HistoryEntry = {
+  id: number;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  effectiveDate: string;
+  note: string | null;
+  createdBy: { name: string } | null;
+};
 type Employee = {
   id: number;
   name: string;
@@ -57,10 +81,15 @@ type Employee = {
   bpjsKetenagakerjaanNumber: string | null;
   documents: Document[];
   candidate: { jobPosting: { title: string } } | null;
+  historyEntries: HistoryEntry[];
 };
 
 function toDateInput(iso: string | null) {
   return iso ? iso.slice(0, 10) : "";
+}
+
+function todayInput() {
+  return toDateInput(new Date().toISOString());
 }
 
 const emptyForm = {
@@ -76,6 +105,8 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [historyEffectiveDate, setHistoryEffectiveDate] = useState(todayInput());
+  const [historyNote, setHistoryNote] = useState("");
   const [changingStatus, setChangingStatus] = useState(false);
   const [docType, setDocType] = useState("ktp");
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -115,11 +146,13 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     const res = await fetch(`/api/employees/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, historyEffectiveDate, historyNote }),
     });
     setSaving(false);
     if (res.ok) {
       toast.success("Data karyawan disimpan.");
+      setHistoryNote("");
+      setHistoryEffectiveDate(todayInput());
       load();
     } else {
       const err = await res.json();
@@ -399,6 +432,56 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
             <Label>No. BPJS Ketenagakerjaan</Label>
             <Input value={form.bpjsKetenagakerjaanNumber} onChange={(e) => set("bpjsKetenagakerjaanNumber", e.target.value)} />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Riwayat Jabatan &amp; Gaji</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <p className="text-xs text-muted-foreground -mt-1">
+            Kalau Anda mengubah Jabatan, Outlet/Cabang, Status Kepegawaian, Gaji Pokok, atau Tunjangan Tetap di atas,
+            perubahannya otomatis tersimpan sebagai riwayat begitu Anda klik &quot;Simpan Perubahan&quot; - isi dulu tanggal
+            efektif &amp; keterangannya di sini.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label>Tanggal Efektif Perubahan</Label>
+              <Input type="date" value={historyEffectiveDate} onChange={(e) => setHistoryEffectiveDate(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Keterangan (opsional)</Label>
+              <Input
+                value={historyNote}
+                onChange={(e) => setHistoryNote(e.target.value)}
+                placeholder="mis. promosi ke Supervisor"
+              />
+            </div>
+          </div>
+
+          {employee.historyEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada riwayat perubahan.</p>
+          ) : (
+            <div className="grid gap-2">
+              {employee.historyEntries.map((h) => (
+                <div key={h.id} className="rounded-md border px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                    <p>
+                      <span className="font-medium">{HISTORY_FIELD_LABEL[h.field] ?? h.field}</span>
+                      {": "}
+                      {formatHistoryValue(h.field, h.oldValue)} &rarr; {formatHistoryValue(h.field, h.newValue)}
+                    </p>
+                    <p className="text-xs text-muted-foreground shrink-0">
+                      Efektif {new Date(h.effectiveDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                  </div>
+                  {h.note && <p className="text-xs text-muted-foreground mt-0.5">{h.note}</p>}
+                  {h.createdBy && <p className="text-xs text-muted-foreground mt-0.5">Dicatat oleh {h.createdBy.name}</p>}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

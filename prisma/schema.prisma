@@ -26,11 +26,12 @@ model HrUser {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  jobPostingsCreated    JobPosting[]
-  candidatesCreated     Candidate[]
-  stageEvents           CandidateStageEvent[]
-  employeesCreated      Employee[]
-  payrollPeriodsCreated PayrollPeriod[]
+  jobPostingsCreated     JobPosting[]
+  candidatesCreated      Candidate[]
+  stageEvents            CandidateStageEvent[]
+  employeesCreated       Employee[]
+  payrollPeriodsCreated  PayrollPeriod[]
+  employeeHistoryEntries EmployeeHistoryEntry[]
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -205,6 +206,32 @@ model Employee {
   documents         EmployeeDocument[]
   attendanceRecords AttendanceRecord[]
   payrollItems      PayrollItem[]
+  historyEntries    EmployeeHistoryEntry[]
+}
+
+// Riwayat perubahan jabatan/outlet/status kepegawaian/gaji - dicatat
+// otomatis tiap kali HR mengubah salah satu field ini lewat form edit
+// karyawan (bukan fitur tambah-manual terpisah), tapi HR tetap isi tanggal
+// efektif & keterangan saat itu juga. Satu baris = satu field yang berubah
+// dalam 1x simpan (kalau jabatan & gaji berubah bersamaan jadi 2 baris,
+// masing-masing dgn note yang sama) - permintaan Kevin 2026-09-11.
+model EmployeeHistoryEntry {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  field    String // position | outlet | employmentStatus | baseSalary | allowance
+  oldValue String?
+  newValue String?
+
+  effectiveDate DateTime // kapan perubahan ini berlaku (bisa beda dari createdAt kalau dicatat belakangan)
+  note          String? // mis. "promosi ke Supervisor", "kenaikan gaji tahunan"
+
+  createdById Int?
+  createdBy   HrUser?  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([employeeId, effectiveDate])
 }
 
 // Dokumen kepegawaian (KTP, ijazah, kontrak kerja, dst) - dipisah jadi tabel
