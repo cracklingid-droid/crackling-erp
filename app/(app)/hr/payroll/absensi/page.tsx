@@ -18,6 +18,13 @@ type ImportResult = {
   unmatchedNames: string[];
 };
 
+type AttendanceGroup = { employeeName: string; date: string; clockIn: string; clockOut: string };
+type MachineReportData = { groups: AttendanceGroup[]; employeeNames: string[]; periodStart: string | null; periodEnd: string | null };
+
+function formatDateID(iso: string) {
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export default function UploadAbsensiPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
@@ -36,6 +43,7 @@ export default function UploadAbsensiPage() {
   const [dragActive, setDragActive] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detectNote, setDetectNote] = useState<{ text: string; confidence: string } | null>(null);
+  const [machineReport, setMachineReport] = useState<MachineReportData | null>(null);
 
   const headers = rows?.[headerRowIndex] ?? [];
   const preview = rows?.slice(headerRowIndex + 1, headerRowIndex + 6) ?? [];
@@ -73,6 +81,7 @@ export default function UploadAbsensiPage() {
     setFileName(file.name);
     setResult(null);
     setRows(null);
+    setMachineReport(null);
     setParsing(true);
     try {
       const form = new FormData();
@@ -81,6 +90,13 @@ export default function UploadAbsensiPage() {
       const data = await res.json();
       if (!res.ok) {
         toast.error("Gagal baca file: " + data.error);
+        return;
+      }
+      if (data.machineReport) {
+        // Laporan langsung dari mesin fingerprint/absensi - sudah diparse
+        // penuh di server, HR tinggal cek preview lalu import, tidak perlu
+        // pilih kolom manual. Permintaan Kevin 2026-09-11.
+        setMachineReport(data);
         return;
       }
       setRows(data.rows);
@@ -98,6 +114,24 @@ export default function UploadAbsensiPage() {
     } finally {
       setParsing(false);
     }
+  }
+
+  async function handleImportMachineReport() {
+    if (!machineReport) return;
+    setImporting(true);
+    const res = await fetch("/api/payroll/attendance/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groups: machineReport.groups }),
+    });
+    setImporting(false);
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error("Gagal import: " + data.error);
+      return;
+    }
+    setResult(data);
+    toast.success(`${data.imported} rekap absensi berhasil disimpan.`);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -183,6 +217,45 @@ export default function UploadAbsensiPage() {
           </div>
         </CardContent>
       </Card>
+
+      {machineReport && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" /> 2. Laporan Mesin Absensi Terdeteksi
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Format laporan langsung dari mesin fingerprint - kolomnya sudah otomatis terbaca, tidak perlu dicocokkan manual.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="text-sm grid gap-1">
+              {machineReport.periodStart && machineReport.periodEnd && (
+                <p>
+                  Periode: <span className="font-medium">{formatDateID(machineReport.periodStart)} - {formatDateID(machineReport.periodEnd)}</span>
+                </p>
+              )}
+              <p>
+                <span className="font-medium">{machineReport.employeeNames.length}</span> karyawan,{" "}
+                <span className="font-medium">{machineReport.groups.length}</span> rekap harian ditemukan.
+              </p>
+            </div>
+            <div className="text-sm">
+              <p className="text-muted-foreground mb-1">Nama karyawan yang terbaca (cek dulu sama persis dengan Database Karyawan):</p>
+              <div className="flex flex-wrap gap-1.5">
+                {machineReport.employeeNames.map((n) => (
+                  <span key={n} className="rounded-full border px-2 py-0.5 text-xs">{n}</span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Button onClick={handleImportMachineReport} disabled={importing}>
+                {importing ? "Mengimpor..." : "Import Absensi"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {rows && (
         <>
