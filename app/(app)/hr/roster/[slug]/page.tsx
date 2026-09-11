@@ -4,6 +4,7 @@ import { useEffect, useState, use as usePromise } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronLeft, ChevronRight, Copy } from "lucide-react";
 import { slugToOutlet, addWeeks, dateKey, formatDayLabel } from "@/lib/roster";
@@ -15,10 +16,12 @@ type RosterData = {
   entries: { employeeId: number; date: string; isWorking: boolean }[];
 };
 
-function cycle(current: boolean | undefined): boolean | null {
-  if (current === undefined) return true;
-  if (current === true) return false;
-  return null; // false -> hapus (belum diatur)
+function valueToOption(v: boolean | undefined): string {
+  return v === true ? "masuk" : v === false ? "libur" : "kosong";
+}
+
+function optionToValue(o: string): boolean | null {
+  return o === "masuk" ? true : o === "libur" ? false : null;
 }
 
 export default function RosterOutletPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -39,8 +42,7 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
 
   useEffect(load, [outlet, anchor.getTime()]);
 
-  async function toggle(employeeId: number, date: string, current: boolean | undefined) {
-    const next = cycle(current);
+  async function setCell(employeeId: number, date: string, next: boolean | null) {
     // update optimis di UI
     setData((d) => {
       if (!d) return d;
@@ -69,9 +71,7 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Roster Kerja
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Roster - {outlet}</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Klik sel untuk ubah status: kosong &rarr; Masuk &rarr; Libur &rarr; kosong lagi.
-        </p>
+        <p className="text-muted-foreground text-sm mt-0.5">Pilih status Masuk/Libur tiap karyawan lewat dropdown di bawah.</p>
       </div>
 
       <Card>
@@ -130,19 +130,24 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
                       const val = entry?.isWorking;
                       return (
                         <td key={d} className="px-2 py-1.5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => toggle(emp.id, d, val)}
-                            className={`w-20 rounded-md border px-2 py-1 text-xs transition-colors ${
-                              val === true
-                                ? "border-primary/40 bg-primary/10 text-primary"
-                                : val === false
-                                  ? "border-muted-foreground/30 bg-muted text-muted-foreground"
-                                  : "border-dashed text-muted-foreground/50 hover:bg-muted/50"
-                            }`}
-                          >
-                            {val === true ? "Masuk" : val === false ? "Libur" : "-"}
-                          </button>
+                          <Select value={valueToOption(val)} onValueChange={(o) => o && setCell(emp.id, d, optionToValue(o))}>
+                            <SelectTrigger
+                              className={`w-24 mx-auto text-xs ${
+                                val === true
+                                  ? "border-primary/40 bg-primary/10 text-primary"
+                                  : val === false
+                                    ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                    : "border-dashed text-muted-foreground/50"
+                              }`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="kosong">- (belum diatur)</SelectItem>
+                              <SelectItem value="masuk">Masuk</SelectItem>
+                              <SelectItem value="libur">Libur</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
                       );
                     })}
