@@ -78,10 +78,10 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
   }
 
   return (
-    <Card className="shadow-none">
-      <CardContent className="p-3 grid gap-2">
-        <div>
-          <Link href={`/hr/rekrutmen/kandidat/${c.id}`} className="font-medium text-sm hover:underline">
+    <Card className="shadow-none min-w-0">
+      <CardContent className="p-3 grid gap-2 min-w-0">
+        <div className="min-w-0">
+          <Link href={`/hr/rekrutmen/kandidat/${c.id}`} className="block truncate font-medium text-sm hover:underline">
             {c.name}
           </Link>
           <p className="text-xs text-muted-foreground truncate">{c.jobPosting.title}</p>
@@ -103,8 +103,8 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
           {c.stage === "offer" && <OfferChecklistDialog candidate={c} onChanged={onChanged} />}
         </div>
         <Select value={c.stage} onValueChange={(v) => v && handleStageChange(v)}>
-          <SelectTrigger className="h-7 text-xs w-full">
-            <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
+          <SelectTrigger className="h-7 min-w-0 w-full text-xs">
+            <SelectValue className="truncate">{() => stageLabel(c.stage)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {STAGES.filter((s) => allowedNextStages(c.stage).includes(s.value)).map((s) => (
