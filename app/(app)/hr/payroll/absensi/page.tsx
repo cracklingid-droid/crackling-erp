@@ -32,13 +32,12 @@ export default function UploadAbsensiPage() {
   const [clockInCol, setClockInCol] = useState("");
   const [clockOutCol, setClockOutCol] = useState("");
   const [datetimeCol, setDatetimeCol] = useState("");
+  const [dragActive, setDragActive] = useState(false);
 
   const headers = rows?.[0] ?? [];
   const preview = rows?.slice(1, 6) ?? [];
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function processFile(file: File) {
     setFileName(file.name);
     setResult(null);
     setRows(null);
@@ -63,8 +62,20 @@ export default function UploadAbsensiPage() {
       toast.error("Gagal baca file: " + (err instanceof Error ? err.message : "unknown"));
     } finally {
       setParsing(false);
-      e.target.value = "";
     }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+    e.target.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   }
 
   const canImport =
@@ -116,13 +127,24 @@ export default function UploadAbsensiPage() {
         <CardHeader>
           <CardTitle className="text-base">1. Pilih File</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3">
-          <div className="flex items-center gap-2">
+        <CardContent>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleDrop}
+            className={`grid justify-items-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
+              dragActive ? "border-primary bg-primary/5" : "border-border/70"
+            }`}
+          >
             <Button type="button" variant="outline" disabled={parsing} onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-3.5 w-3.5" /> {parsing ? "Membaca file..." : "Pilih File"}
             </Button>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
-            {fileName && <span className="text-sm text-muted-foreground">{fileName}</span>}
+            <p className="text-sm text-muted-foreground">atau seret &amp; lepas file .xlsx/.csv ke sini</p>
+            {fileName && <span className="text-sm font-medium">{fileName}</span>}
           </div>
         </CardContent>
       </Card>
