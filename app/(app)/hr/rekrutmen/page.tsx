@@ -335,15 +335,14 @@ export default function RekrutmenPage() {
           <div className="min-w-0">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-heading font-semibold">Pipeline Kandidat</h2>
-              <p className="text-xs text-muted-foreground md:hidden">Geser untuk lihat semua tahap →</p>
             </div>
-            <div className="thin-scrollbar flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               {columns.map((col) => {
                 const Icon = col.icon;
                 return (
                   <div
                     key={col.value}
-                    className="w-[85vw] sm:w-64 shrink-0 snap-start grid gap-3 content-start rounded-xl border border-border/60 bg-muted/20 p-3"
+                    className="grid gap-3 content-start rounded-xl border border-border/60 bg-muted/20 p-3"
                   >
                     <div className="flex items-center gap-2">
                       <div className={`${col.tile} flex h-7 w-7 items-center justify-center rounded-md shrink-0`}>
