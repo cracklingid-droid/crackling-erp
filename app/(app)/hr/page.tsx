@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UserPlus, ArrowRight, Users } from "lucide-react";
+import { UserPlus, ArrowRight, Users, Wallet } from "lucide-react";
 
 export default function HrHomePage() {
   return (
@@ -28,6 +28,18 @@ export default function HrHomePage() {
             </div>
             <h2 className="text-base font-heading font-semibold mt-2.5">Database Karyawan</h2>
             <p className="text-muted-foreground text-sm mt-1">Biodata, kepegawaian, gaji & dokumen karyawan.</p>
+            <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
+              Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+            </div>
+          </div>
+        </Link>
+        <Link href="/hr/payroll" className="group">
+          <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-5 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
+              <Wallet className="h-5 w-5" />
+            </div>
+            <h2 className="text-base font-heading font-semibold mt-2.5">Payroll</h2>
+            <p className="text-muted-foreground text-sm mt-1">Absensi & perhitungan gaji outlet/kantor.</p>
             <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
               Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
             </div>

@@ -26,10 +26,11 @@ model HrUser {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  jobPostingsCreated JobPosting[]
-  candidatesCreated  Candidate[]
-  stageEvents        CandidateStageEvent[]
-  employeesCreated   Employee[]
+  jobPostingsCreated    JobPosting[]
+  candidatesCreated     Candidate[]
+  stageEvents           CandidateStageEvent[]
+  employeesCreated      Employee[]
+  payrollPeriodsCreated PayrollPeriod[]
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -37,17 +38,17 @@ model HrUser {
 // Kevin 2026-09-10), sementara bank soal psikotest & nilai ambang batasnya
 // mau tetap sama tiap kali posisi itu dibuka lagi, tidak usah diketik ulang.
 model Position {
-  id           Int      @id @default(autoincrement())
-  name         String   @unique
+  id                   Int      @id @default(autoincrement())
+  name                 String   @unique
   // ambang lulus psikotest dalam persen (0-100) dari skor maksimum posisi ini
-  passingScore Int      @default(70)
+  passingScore         Int      @default(70)
   // tampilkan checklist syarat & ketentuan khusus dapur (B2, shift 12 jam,
   // pinjol) di form lamaran publik - permintaan Kevin 2026-09-10.
-  requiresKitchenTerms Boolean @default(false)
+  requiresKitchenTerms Boolean  @default(false)
   // posisi kantor/office (bukan outlet) - lokasi/cabang di form lamaran jadi
   // teks bebas, bukan dropdown 3 outlet tetap. Permintaan Kevin 2026-09-10.
-  isOfficePosition     Boolean @default(false)
-  createdAt    DateTime @default(now())
+  isOfficePosition     Boolean  @default(false)
+  createdAt            DateTime @default(now())
 
   questions   PsychTestQuestion[]
   jobPostings JobPosting[]
@@ -66,13 +67,13 @@ model PsychTestQuestion {
 }
 
 model PsychTestOption {
-  id         Int      @id @default(autoincrement())
+  id         Int               @id @default(autoincrement())
   questionId Int
   question   PsychTestQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   label      String
   // poin kontribusi ke skor total kalau opsi ini dipilih pelamar
-  score      Int      @default(0)
-  order      Int      @default(0)
+  score      Int               @default(0)
+  order      Int               @default(0)
 
   answers PsychTestAnswer[]
 }
@@ -95,12 +96,12 @@ model JobPosting {
 }
 
 model Candidate {
-  id           Int      @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   jobPostingId Int
   jobPosting   JobPosting @relation(fields: [jobPostingId], references: [id])
   // token acak buat pelamar akses halaman psikotest & jadwal interview
   // miliknya sendiri tanpa perlu login (pelamar publik, bukan staff).
-  publicToken  String   @unique @default(uuid())
+  publicToken  String     @unique @default(uuid())
   name         String
   email        String?
   phone        String?
@@ -108,26 +109,26 @@ model Candidate {
   notes        String?
 
   // biodata diri lengkap - diisi pelamar sendiri lewat form publik
-  birthPlace       String?
-  birthDate        DateTime?
-  gender           String? // L | P
-  address          String?
-  preferredOutlet  String? // lokasi/cabang yang diinginkan
-  lastEducation    String? // SMA/SMK | D3 | S1 | dst
-  institution      String? // nama sekolah/kampus & jurusan
-  experience       String? // pengalaman kerja terakhir, mis. "Cook - Hotel ABC"
-  expectedSalary   Int?    // ekspektasi gaji dalam rupiah
-  cvUrl            String? // link file CV yang diupload ke Vercel Blob
-  cvTextPreview    String? // teks hasil ekstraksi CV (PDF/DOCX) untuk dibaca HR
+  birthPlace      String?
+  birthDate       DateTime?
+  gender          String? // L | P
+  address         String?
+  preferredOutlet String? // lokasi/cabang yang diinginkan
+  lastEducation   String? // SMA/SMK | D3 | S1 | dst
+  institution     String? // nama sekolah/kampus & jurusan
+  experience      String? // pengalaman kerja terakhir, mis. "Cook - Hotel ABC"
+  expectedSalary  Int? // ekspektasi gaji dalam rupiah
+  cvUrl           String? // link file CV yang diupload ke Vercel Blob
+  cvTextPreview   String? // teks hasil ekstraksi CV (PDF/DOCX) untuk dibaca HR
 
   // persetujuan syarat & ketentuan khusus dapur (hanya diisi kalau posisi
   // lowongannya requiresKitchenTerms) - permintaan Kevin 2026-09-10.
-  agreedB2         Boolean @default(false)
-  agreedLongShift  Boolean @default(false)
-  agreedNoPinjol   Boolean @default(false)
+  agreedB2        Boolean @default(false)
+  agreedLongShift Boolean @default(false)
+  agreedNoPinjol  Boolean @default(false)
   // kesediaan mulai psikotest dalam 30 menit - wajib untuk semua pelamar,
   // permintaan Kevin 2026-09-10.
-  agreedStartSoon  Boolean @default(false)
+  agreedStartSoon Boolean @default(false)
 
   // 2 syarat yang harus HR selesaikan di tahap "offer" sebelum kandidat
   // boleh dipindah ke "hired" - surat penawaran/kontrak sudah dibuat, dan
@@ -136,13 +137,13 @@ model Candidate {
   offerWhatsappSent  Boolean @default(false)
 
   // applied -> screening (lolos psikotest) -> interview -> offer -> hired -> rejected
-  stage        String   @default("applied")
+  stage       String   @default("applied")
   // null kalau pelamar publik daftar sendiri (tanpa login), terisi kalau
   // dibuatkan manual oleh staff HR.
-  createdById  Int?
-  createdBy    HrUser?  @relation(fields: [createdById], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdById Int?
+  createdBy   HrUser?  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   stageEvents         CandidateStageEvent[]
   psychTestSubmission PsychTestSubmission?
@@ -168,7 +169,7 @@ model Employee {
   candidateId Int?       @unique
   candidate   Candidate? @relation(fields: [candidateId], references: [id])
 
-  employeeCode String? @unique // ID/kode karyawan internal (opsional), diisi HR
+  employeeCode String?   @unique // ID/kode karyawan internal (opsional), diisi HR
   ktpNumber    String? // No. KTP/NIK kependudukan (16 digit) - beda dari employeeCode
   name         String
   email        String?
@@ -187,7 +188,7 @@ model Employee {
   status           String    @default("onboarding")
 
   baseSalary        Int? // gaji pokok bulanan, dalam rupiah
-  allowance         Int? @default(0) // tunjangan tetap bulanan
+  allowance         Int?    @default(0) // tunjangan tetap bulanan
   bankName          String?
   bankAccountNumber String?
   bankAccountHolder String?
@@ -201,7 +202,9 @@ model Employee {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  documents EmployeeDocument[]
+  documents         EmployeeDocument[]
+  attendanceRecords AttendanceRecord[]
+  payrollItems      PayrollItem[]
 }
 
 // Dokumen kepegawaian (KTP, ijazah, kontrak kerja, dst) - dipisah jadi tabel
@@ -219,20 +222,20 @@ model EmployeeDocument {
 }
 
 model PsychTestSubmission {
-  id          Int      @id @default(autoincrement())
-  candidateId Int      @unique
+  id          Int       @id @default(autoincrement())
+  candidateId Int       @unique
   candidate   Candidate @relation(fields: [candidateId], references: [id])
   totalScore  Int
   maxScore    Int
   percentage  Int
   passed      Boolean
-  submittedAt DateTime @default(now())
+  submittedAt DateTime  @default(now())
 
   answers PsychTestAnswer[]
 }
 
 model PsychTestAnswer {
-  id           Int      @id @default(autoincrement())
+  id           Int                 @id @default(autoincrement())
   submissionId Int
   submission   PsychTestSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   questionId   Int
@@ -246,17 +249,17 @@ model PsychTestAnswer {
 // dihitung on-the-fly di kode, tabel ini cuma nyimpen slot yang SUDAH
 // dipilih pelamar (permintaan Kevin 2026-09-10).
 model InterviewSlot {
-  id          Int      @id @default(autoincrement())
-  candidateId Int      @unique
+  id          Int       @id @default(autoincrement())
+  candidateId Int       @unique
   candidate   Candidate @relation(fields: [candidateId], references: [id])
-  scheduledAt DateTime @unique
-  createdAt   DateTime @default(now())
+  scheduledAt DateTime  @unique
+  createdAt   DateTime  @default(now())
 }
 
 // Jejak tiap kali kandidat pindah tahap - biar kelihatan riwayat & siapa
 // yang memindahkan, bukan cuma status terakhir.
 model CandidateStageEvent {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   candidateId Int
   candidate   Candidate @relation(fields: [candidateId], references: [id])
   stage       String
@@ -265,6 +268,78 @@ model CandidateStageEvent {
   // psikotest dinilai sistem, atau interview dijadwalkan sendiri oleh
   // pelamar) - tidak ada staff HR yang melakukannya secara manual.
   createdById Int?
+  createdBy   HrUser?   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+// Rekap absensi harian per karyawan, hasil import dari file export mesin
+// fingerprint/absensi digital - permintaan Kevin 2026-09-11 utk fitur
+// Payroll (dasar hitung uang makan, lembur, & potongan absensi). Satu baris
+// per karyawan per tanggal; kalau file sumbernya berupa log scan mentah
+// (banyak baris per hari), scan pertama & terakhir diambil sbg clockIn/Out
+// saat import (lihat lib/attendance-parse.ts).
+model AttendanceRecord {
+  id         Int       @id @default(autoincrement())
+  employeeId Int
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime // tengah malam (tanpa jam) - tanggal absensi
+  clockIn    DateTime?
+  clockOut   DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([employeeId, date])
+}
+
+// Satu periode/batch perhitungan gaji - dipisah "outlet" vs "kantor" krn
+// komponen & cara hitungnya beda (permintaan Kevin 2026-09-11): outlet
+// berbasis gaji pokok + potongan/tunjangan dari absensi, kantor tambah
+// reimbursement transport. Status "final" menandakan periode itu sudah
+// tidak boleh diubah lagi (sudah dibayarkan).
+model PayrollPeriod {
+  id          Int      @id @default(autoincrement())
+  label       String // mis. "Gaji September 2026"
+  startDate   DateTime
+  endDate     DateTime
+  category    String // outlet | kantor
+  status      String   @default("draft") // draft | final
+  createdById Int?
   createdBy   HrUser?  @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
+
+  items PayrollItem[]
+
+  @@index([category, startDate])
+}
+
+// Rincian gaji 1 karyawan dalam 1 periode. Field yang bisa dihitung
+// otomatis dari absensi (uang makan, lembur) diisi sbg SARAN saat periode
+// dibuat, tapi tetap bisa diedit HR - begitu juga PPh21 & kasbon yang
+// sengaja dibuat manual dulu (perhitungan pajak & kasbon butuh data/aturan
+// yang belum ada di sistem). Nominal gaji bersih dihitung on-the-fly di
+// kode dari field-field ini, tidak disimpan supaya tidak pernah basi.
+model PayrollItem {
+  id         Int           @id @default(autoincrement())
+  periodId   Int
+  period     PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee      @relation(fields: [employeeId], references: [id])
+
+  // ringkasan absensi periode ini - referensi HR, ikut disimpan biar tidak
+  // berubah kalau data absensi mentahnya diedit/diimpor ulang belakangan.
+  daysPresent     Int @default(0)
+  overtimeMinutes Int @default(0)
+
+  baseSalary                   Int     @default(0)
+  mealAllowance                Int     @default(0) // uang makan
+  transportReimbursement       Int     @default(0) // reimbursement transport (kantor)
+  overtimePay                  Int     @default(0) // lembur
+  attendanceDeduction          Int     @default(0) // potongan alpha/telat
+  bpjsKesehatanDeduction       Int     @default(0)
+  bpjsKetenagakerjaanDeduction Int     @default(0)
+  pph21Deduction               Int     @default(0)
+  loanDeduction                Int     @default(0) // kasbon/potongan pinjaman
+  otherAdjustment              Int     @default(0) // penyesuaian manual lain (boleh minus)
+  note                         String?
+
+  @@unique([periodId, employeeId])
 }
