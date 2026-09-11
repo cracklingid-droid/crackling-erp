@@ -103,6 +103,14 @@ function formatRupiah(n: number): string {
   return n.toLocaleString("id-ID");
 }
 
+// Input Rupiah bertampilan format ribuan otomatis (mis. "2.250.000") -
+// disimpan sbg angka polos, cuma tampilannya yang diformat pakai
+// toLocaleString saat mengetik. Permintaan Kevin 2026-09-11.
+function parseRupiahInput(s: string): number {
+  const digits = s.replace(/\D/g, "");
+  return digits ? Number(digits) : 0;
+}
+
 function formatMinutes(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
@@ -258,11 +266,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                   {editableFields.map((f) => (
                     <TableCell key={f.key as string}>
                       <Input
-                        type="number"
-                        className="w-28 tabular-nums"
-                        value={item[f.key] as number}
+                        type="text"
+                        inputMode="numeric"
+                        className="w-32 tabular-nums text-right"
+                        value={formatRupiah(item[f.key] as number)}
                         disabled={isFinal}
-                        onChange={(e) => updateLocal(item.id, f.key, Number(e.target.value) || 0)}
+                        onChange={(e) => updateLocal(item.id, f.key, parseRupiahInput(e.target.value))}
                         onBlur={() => saveItem(item.id)}
                       />
                     </TableCell>
