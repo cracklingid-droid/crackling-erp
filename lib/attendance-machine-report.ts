@@ -14,7 +14,14 @@ import type { AttendanceGroup } from "./attendance-parse";
 const BLOCK_WIDTH = 15;
 const MASUK_COLS = [1, 2, 6, 7, 10, 11]; // offset relatif dari awal blok (Pagi/Siang/Lembur Jam Masuk)
 const KELUAR_COLS = [3, 4, 5, 8, 9, 12, 13]; // offset relatif (Pagi/Siang/Lembur Jam Keluar)
-const DETAIL_SHEET_MARKER = "Catatan Kehadiran Karyawan";
+// Beberapa cabang (mis. Kelapa Gading) pakai mesin absensi yang exportnya
+// berbahasa Inggris ("Employee Attendance Table", format tanggal
+// YYYY-MM-DD) - strukturnya sama persis, cuma labelnya beda. Permintaan
+// Kevin 2026-09-11.
+const DETAIL_SHEET_MARKERS = ["Catatan Kehadiran Karyawan", "Employee Attendance Table"];
+const NAME_LABELS = ["Nama", "Name"];
+const DATE_LABELS = ["Tanggal", "Date"];
+const TITLE_MARKERS = ["Catatan Kehadiran", "Time Card"];
 
 type SheetGrid = unknown[][];
 
@@ -32,11 +39,20 @@ function cellTimeOfDay(v: unknown): { h: number; m: number; s: number } | null {
   return { h: Number(m[1]), m: Number(m[2]), s: Number(m[3] ?? "0") };
 }
 
+// Terima 2 format tanggal - DD-MM-YYYY (laporan berbahasa Indonesia) &
+// YYYY-MM-DD (laporan berbahasa Inggris, mis. Kelapa Gading).
 function parsePeriodStart(text: string): Date | null {
-  const m = text.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
-  if (!m) return null;
-  const [, d, mo, y] = m;
-  return new Date(Number(y), Number(mo) - 1, Number(d));
+  const ymd = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (ymd) {
+    const [, y, mo, d] = ymd;
+    return new Date(Number(y), Number(mo) - 1, Number(d));
+  }
+  const dmy = text.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+  if (dmy) {
+    const [, d, mo, y] = dmy;
+    return new Date(Number(y), Number(mo) - 1, Number(d));
+  }
+  return null;
 }
 
 function sheetToGrid(sheet: XLSX.WorkSheet): SheetGrid {
@@ -44,7 +60,7 @@ function sheetToGrid(sheet: XLSX.WorkSheet): SheetGrid {
 }
 
 function isDetailSheet(grid: SheetGrid): boolean {
-  return grid.slice(0, 5).some((row) => row.some((v) => cellText(v).includes(DETAIL_SHEET_MARKER)));
+  return grid.slice(0, 5).some((row) => row.some((v) => DETAIL_SHEET_MARKERS.some((marker) => cellText(v).includes(marker))));
 }
 
 function findRow(grid: SheetGrid, maxRow: number, predicate: (row: unknown[]) => boolean): number {
@@ -58,16 +74,20 @@ function findRow(grid: SheetGrid, maxRow: number, predicate: (row: unknown[]) =>
 // kolom `base`. Return null kalau blok ini kosong/tidak ditemukan (dipakai
 // utk tahu kapan berhenti nyoba blok berikutnya di sheet yang sama).
 function extractBlock(grid: SheetGrid, base: number): AttendanceGroup[] | null {
-  const infoRow = findRow(grid, 10, (row) => cellText(row[base]) === "Dept" && cellText(row[base + 8]) === "Nama");
+  const infoRow = findRow(
+    grid,
+    10,
+    (row) => cellText(row[base]).startsWith("Dept") && NAME_LABELS.includes(cellText(row[base + 8]))
+  );
   if (infoRow === -1) return null;
   const employeeName = cellText(grid[infoRow][base + 9]);
   if (!employeeName) return null;
 
-  const periodRow = findRow(grid, 10, (row) => cellText(row[base]) === "Tanggal");
+  const periodRow = findRow(grid, 10, (row) => DATE_LABELS.includes(cellText(row[base])));
   const periodStart = periodRow !== -1 ? parsePeriodStart(cellText(grid[periodRow][base + 1])) : null;
   if (!periodStart) return null;
 
-  const titleRow = findRow(grid, 15, (row) => cellText(row[base]).includes("Catatan Kehadiran"));
+  const titleRow = findRow(grid, 15, (row) => TITLE_MARKERS.some((marker) => cellText(row[base]).includes(marker)));
   if (titleRow === -1) return null;
   const dataStart = titleRow + 3; // judul, header sesi (Pagi/Siang/Lembur), header Jam Masuk/Keluar
 
@@ -124,13 +144,16 @@ export function parseAttendanceMachineReport(buffer: Buffer): MachineReportResul
     const grid = sheetToGrid(workbook.Sheets[sheetName]);
     if (!isDetailSheet(grid)) continue;
 
-    const periodTextRow = findRow(grid, 5, (row) => row.some((v) => cellText(v).includes("Tanggal Kehadiran:")));
+    const periodMarkers = ["Tanggal Kehadiran:", "Attendance date:"];
+    const periodTextRow = findRow(grid, 5, (row) => row.some((v) => periodMarkers.some((marker) => cellText(v).includes(marker))));
     if (periodTextRow !== -1) {
-      const text = grid[periodTextRow].map(cellText).find((v) => v.includes("Tanggal Kehadiran:")) ?? "";
-      const m = text.match(/(\d{1,2}-\d{1,2}-\d{4})~(\d{1,2}-\d{1,2}-\d{4})/);
+      const text = grid[periodTextRow].map(cellText).find((v) => periodMarkers.some((marker) => v.includes(marker))) ?? "";
+      const m = text.match(/([\d-]{8,10})~([\d-]{8,10})/);
       if (m) {
-        periodStart ??= toLocalDateString(parsePeriodStart(m[1])!);
-        periodEnd = toLocalDateString(parsePeriodStart(m[2])!);
+        const s = parsePeriodStart(m[1]);
+        const e = parsePeriodStart(m[2]);
+        if (s) periodStart ??= toLocalDateString(s);
+        if (e) periodEnd = toLocalDateString(e);
       }
     }
 
