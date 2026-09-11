@@ -32,6 +32,7 @@ model HrUser {
   employeesCreated       Employee[]
   payrollPeriodsCreated  PayrollPeriod[]
   employeeHistoryEntries EmployeeHistoryEntry[]
+  rosterEntriesCreated   RosterEntry[]
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -207,6 +208,7 @@ model Employee {
   attendanceRecords AttendanceRecord[]
   payrollItems      PayrollItem[]
   historyEntries    EmployeeHistoryEntry[]
+  rosterEntries     RosterEntry[]
 }
 
 // Riwayat perubahan jabatan/outlet/status kepegawaian/gaji - dicatat
@@ -315,6 +317,26 @@ model AttendanceRecord {
   createdAt  DateTime  @default(now())
 
   @@unique([employeeId, date])
+}
+
+// Roster kerja mingguan per outlet - cuma "masuk" atau "libur" per karyawan
+// per tanggal (bukan jam shift), ditampilkan sbg 1 papan bersama per outlet
+// yang bisa dibuka siapa saja lewat link publik tanpa login (permintaan
+// Kevin 2026-09-11: "roster ini bisa dilihat langsung", 1 papan per outlet
+// bukan link personal per karyawan).
+model RosterEntry {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime // tengah malam (tanpa jam)
+  isWorking  Boolean  @default(true) // true = masuk, false = libur
+
+  createdById Int?
+  createdBy   HrUser?  @relation(fields: [createdById], references: [id])
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date])
 }
 
 // Satu periode/batch perhitungan gaji - dipisah "outlet" vs "kantor" krn

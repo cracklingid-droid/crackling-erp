@@ -1,0 +1,158 @@
+"use client";
+
+import { useEffect, useState, use as usePromise } from "react";
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { ArrowLeft, ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import { slugToOutlet, addWeeks, dateKey, formatDayLabel } from "@/lib/roster";
+
+type RosterData = {
+  outlet: string;
+  days: string[];
+  employees: { id: number; name: string }[];
+  entries: { employeeId: number; date: string; isWorking: boolean }[];
+};
+
+function cycle(current: boolean | undefined): boolean | null {
+  if (current === undefined) return true;
+  if (current === true) return false;
+  return null; // false -> hapus (belum diatur)
+}
+
+export default function RosterOutletPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = usePromise(params);
+  const outlet = slugToOutlet(slug);
+  const [anchor, setAnchor] = useState(new Date());
+  const [data, setData] = useState<RosterData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  function load() {
+    if (!outlet) return;
+    setLoading(true);
+    fetch(`/api/roster?outlet=${encodeURIComponent(outlet)}&weekStart=${dateKey(anchor)}`)
+      .then((r) => r.json())
+      .then(setData)
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(load, [outlet, anchor.getTime()]);
+
+  async function toggle(employeeId: number, date: string, current: boolean | undefined) {
+    const next = cycle(current);
+    // update optimis di UI
+    setData((d) => {
+      if (!d) return d;
+      const rest = d.entries.filter((e) => !(e.employeeId === employeeId && e.date === date));
+      return { ...d, entries: next === null ? rest : [...rest, { employeeId, date, isWorking: next }] };
+    });
+    const res = await fetch("/api/roster", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employeeId, date, isWorking: next }),
+    });
+    if (!res.ok) {
+      toast.error("Gagal menyimpan, mencoba muat ulang...");
+      load();
+    }
+  }
+
+  if (!outlet) return <p className="text-sm text-muted-foreground">Outlet tidak ditemukan.</p>;
+
+  const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/roster/${slug}` : `/roster/${slug}`;
+
+  return (
+    <div className="max-w-4xl grid gap-6">
+      <div>
+        <Link href="/hr/roster" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
+          <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Roster Kerja
+        </Link>
+        <h1 className="text-2xl font-heading font-semibold tracking-tight">Roster - {outlet}</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">
+          Klik sel untuk ubah status: kosong &rarr; Masuk &rarr; Libur &rarr; kosong lagi.
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, -1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              {data ? `${formatDayLabel(new Date(data.days[0]))} - ${formatDayLabel(new Date(data.days[6]))}` : "..."}
+            </span>
+            <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(publicUrl);
+              toast.success("Link roster disalin.");
+            }}
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            <Copy className="h-3.5 w-3.5" /> Salin link untuk karyawan
+          </button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Jadwal Seminggu</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {loading || !data ? (
+            <p className="text-sm text-muted-foreground">Memuat...</p>
+          ) : data.employees.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada karyawan aktif di outlet ini.</p>
+          ) : (
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left font-medium px-2 py-2 sticky left-0 bg-card">Karyawan</th>
+                  {data.days.map((d) => (
+                    <th key={d} className="text-center font-medium px-2 py-2 whitespace-nowrap">
+                      {formatDayLabel(new Date(d))}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.employees.map((emp) => (
+                  <tr key={emp.id} className="border-t">
+                    <td className="px-2 py-2 whitespace-nowrap sticky left-0 bg-card">{emp.name}</td>
+                    {data.days.map((d) => {
+                      const entry = data.entries.find((e) => e.employeeId === emp.id && e.date === d);
+                      const val = entry?.isWorking;
+                      return (
+                        <td key={d} className="px-2 py-1.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggle(emp.id, d, val)}
+                            className={`w-20 rounded-md border px-2 py-1 text-xs transition-colors ${
+                              val === true
+                                ? "border-primary/40 bg-primary/10 text-primary"
+                                : val === false
+                                  ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                  : "border-dashed text-muted-foreground/50 hover:bg-muted/50"
+                            }`}
+                          >
+                            {val === true ? "Masuk" : val === false ? "Libur" : "-"}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
