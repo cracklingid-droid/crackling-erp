@@ -153,7 +153,7 @@ export default function UploadAbsensiPage() {
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Upload Data Absen</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Import file export mesin fingerprint/absensi digital (.xlsx atau .csv). Nama karyawan di file harus sama persis
+          Import file export mesin fingerprint/absensi digital (.xlsx, .xls, atau .csv). Nama karyawan di file harus sama persis
           dengan nama di Database Karyawan supaya bisa dicocokkan.
         </p>
       </div>
@@ -178,7 +178,7 @@ export default function UploadAbsensiPage() {
               <Upload className="h-3.5 w-3.5" /> {parsing ? "Membaca file..." : "Pilih File"}
             </Button>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
-            <p className="text-sm text-muted-foreground">atau seret &amp; lepas file .xlsx/.csv ke sini</p>
+            <p className="text-sm text-muted-foreground">atau seret &amp; lepas file .xlsx/.xls/.csv ke sini</p>
             {fileName && <span className="text-sm font-medium">{fileName}</span>}
           </div>
         </CardContent>

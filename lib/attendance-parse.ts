@@ -1,13 +1,23 @@
 import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { Readable } from "stream";
 import { toLocalDateString } from "./date-utils";
 
-// Baca file absensi (xlsx/csv) jadi array baris (tiap baris = array string per
-// kolom, sudah termasuk baris header). Dipakai baik utk preview kolom
-// (HR pilih kolom mana = nama/tanggal/jam) maupun saat commit import.
+// Baca file absensi (xls/xlsx/csv) jadi array baris (tiap baris = array
+// string per kolom, sudah termasuk baris header). Dipakai baik utk preview
+// kolom (HR pilih kolom mana = nama/tanggal/jam) maupun saat commit import.
+// Mesin fingerprint/absensi banyak yang masih export format Excel lama
+// (.xls, beda struktur total dari .xlsx) - exceljs cuma bisa baca .xlsx/csv,
+// makanya .xls dibaca pakai library terpisah (xlsx/SheetJS). Permintaan
+// Kevin 2026-09-11 (upload "Lapora Kehadiran.xls" gagal sebelumnya).
 export async function parseAttendanceFile(buffer: Buffer, filename: string): Promise<string[][]> {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".xls")) {
+    return parseLegacyXls(buffer);
+  }
+
   const workbook = new ExcelJS.Workbook();
-  if (filename.toLowerCase().endsWith(".csv")) {
+  if (lower.endsWith(".csv")) {
     await workbook.csv.read(Readable.from(buffer));
   } else {
     // exceljs's bundled types dan @types/node versi baru punya definisi
@@ -26,7 +36,21 @@ export async function parseAttendanceFile(buffer: Buffer, filename: string): Pro
   return rows;
 }
 
-function cellToString(v: ExcelJS.CellValue): string {
+function parseLegacyXls(buffer: Buffer): string[][] {
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  } catch {
+    throw new Error("File .xls tidak bisa dibaca - kemungkinan rusak atau bukan file Excel yang valid");
+  }
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new Error("File tidak punya sheet/data yang bisa dibaca");
+  const sheet = workbook.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" });
+  return raw.map((row) => row.map(cellToString));
+}
+
+function cellToString(v: unknown): string {
   if (v === null || v === undefined) return "";
   if (v instanceof Date) {
     // exceljs menyimpan "jam dinding" sel tanggal Excel di komponen UTC
