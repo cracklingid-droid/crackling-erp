@@ -128,9 +128,19 @@ export default function KaryawanPage() {
               {employees.length} karyawan · {onboardingCount} perlu dilengkapi datanya · {activeCount} aktif
             </p>
           </div>
-          <Button onClick={() => setShowForm((v) => !v)} className="shrink-0 whitespace-nowrap">
-            <Plus className="h-4 w-4" /> Tambah Karyawan
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="/portal/login"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground whitespace-nowrap hidden sm:inline"
+            >
+              Portal Karyawan &rarr;
+            </a>
+            <Button onClick={() => setShowForm((v) => !v)} className="whitespace-nowrap">
+              <Plus className="h-4 w-4" /> Tambah Karyawan
+            </Button>
+          </div>
         </div>
       </div>
 

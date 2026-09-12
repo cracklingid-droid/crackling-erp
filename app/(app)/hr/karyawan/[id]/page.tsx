@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle, Wand2 } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle, Wand2, Copy, KeyRound } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { REQUIRED_ONBOARDING_FIELDS, getMissingOnboardingFields } from "@/lib/employee-onboarding";
 import { computeCompleteness } from "@/lib/employee-completeness";
+import { derivePortalPassword, canUsePortal } from "@/lib/employee-portal";
 import { prefixForOutlet } from "@/lib/employee-code";
 import { toWaNumber } from "@/lib/whatsapp";
 import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
@@ -402,6 +403,51 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
               Belum lengkap: {completeness.missing.join(", ")}.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-muted-foreground" /> Akun Portal Karyawan
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!canUsePortal(employee) ? (
+            <p className="text-sm text-muted-foreground">
+              Belum bisa dipakai - lengkapi dulu {!employee.employeeCode && "ID Karyawan"}
+              {!employee.employeeCode && !employee.birthDate && " dan "}
+              {!employee.birthDate && "Tanggal Lahir"} di atas.
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-end gap-6">
+              <div>
+                <p className="text-xs text-muted-foreground">ID Karyawan</p>
+                <p className="text-sm font-mono font-medium">{employee.employeeCode}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Password</p>
+                <p className="text-sm font-mono font-medium">{derivePortalPassword(employee.employeeCode!, employee.birthDate!)}</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    `ID: ${employee.employeeCode}\nPassword: ${derivePortalPassword(employee.employeeCode!, employee.birthDate!)}\nLogin di: /portal/login`
+                  );
+                  toast.success("ID & password disalin.");
+                }}
+              >
+                <Copy className="h-3.5 w-3.5" /> Salin
+              </Button>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-2">
+            Password tetap = ID Karyawan + tahun lahir, tidak berubah kecuali ID Karyawan atau Tanggal Lahir diedit. Karyawan
+            login di halaman Portal Karyawan utk lihat profil, roster & riwayat slip gaji sendiri.
+          </p>
         </CardContent>
       </Card>
 
