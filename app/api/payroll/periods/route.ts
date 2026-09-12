@@ -7,12 +7,9 @@ import {
   calcBpjsKesehatan,
   calcBpjsKetenagakerjaan,
   DEFAULT_DAILY_MEAL_ALLOWANCE,
-  CONTRACT_DEPOSIT_INSTALLMENT,
-  CONTRACT_DEPOSIT_INSTALLMENT_COUNT,
 } from "@/lib/payroll-config";
-import { computeOutletPayrollFields } from "@/lib/payroll-outlet-calc";
-import { nextOutletPeriodRange, outletPeriodLabel } from "@/lib/payroll-outlet-schedule";
 import { computeAttendanceSummaries } from "@/lib/attendance-summary";
+import { createNextOutletPeriod } from "@/lib/payroll-outlet-auto";
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -39,43 +36,22 @@ export async function POST(req: Request) {
   const category = body.category === "outlet" || body.category === "kantor" ? body.category : null;
   if (!category) return NextResponse.json({ error: "Kategori wajib diisi" }, { status: 400 });
 
-  let label: string;
-  let startDate: Date;
-  let endDate: Date;
-
+  // Rentang tanggal & label Payroll Outlet TIDAK BISA dikustomisasi lagi -
+  // dihitung sendiri oleh server dari periode outlet terakhir, mengikuti
+  // jadwal tetap yang sudah diumumkan Kevin ke grup (lib/payroll-outlet-
+  // auto.ts, dipakai bersama dgn cron /api/cron/create-outlet-period).
+  // Keputusan Kevin 2026-09-12.
   if (category === "outlet") {
-    // Rentang tanggal & label Payroll Outlet TIDAK BISA dikustomisasi lagi -
-    // dihitung sendiri oleh server dari periode outlet terakhir, mengikuti
-    // jadwal tetap yang sudah diumumkan Kevin ke grup, supaya HR tidak
-    // punya ruang salah input tanggal. Body startDate/endDate/label dari
-    // client diabaikan sepenuhnya (bukan cuma disembunyikan di UI).
-    // Keputusan Kevin 2026-09-12.
-    const lastPeriod = await prisma.payrollPeriod.findFirst({
-      where: { category: "outlet" },
-      orderBy: { endDate: "desc" },
-    });
-    if (!lastPeriod) {
-      return NextResponse.json(
-        { error: "Belum ada periode outlet sebelumnya - hubungi developer utk seed periode pertama." },
-        { status: 400 }
-      );
-    }
-    const range = nextOutletPeriodRange(lastPeriod.endDate);
-    startDate = range.start;
-    endDate = range.end;
-    label = outletPeriodLabel(endDate);
+    const result = await createNextOutletPeriod(user.id);
+    if (!result.created) return NextResponse.json({ error: result.reason }, { status: 400 });
+    return NextResponse.json(result.period, { status: 201 });
+  }
 
-    const dup = await prisma.payrollPeriod.findFirst({ where: { category: "outlet", startDate, endDate } });
-    if (dup) {
-      return NextResponse.json({ error: `Periode "${dup.label}" utk rentang ini sudah ada.` }, { status: 400 });
-    }
-  } else {
-    label = typeof body.label === "string" ? body.label.trim() : "";
-    startDate = body.startDate ? new Date(body.startDate) : (null as never);
-    endDate = body.endDate ? new Date(body.endDate) : (null as never);
-    if (!label || !startDate || !endDate) {
-      return NextResponse.json({ error: "Label, kategori, dan rentang tanggal wajib diisi" }, { status: 400 });
-    }
+  const label = typeof body.label === "string" ? body.label.trim() : "";
+  const startDate = body.startDate ? new Date(body.startDate) : (null as never);
+  const endDate = body.endDate ? new Date(body.endDate) : (null as never);
+  if (!label || !startDate || !endDate) {
+    return NextResponse.json({ error: "Label, kategori, dan rentang tanggal wajib diisi" }, { status: 400 });
   }
 
   const employees = await prisma.employee.findMany({ where: { status: "active" } });
@@ -91,45 +67,19 @@ export async function POST(req: Request) {
       const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 };
       const baseSalary = emp.baseSalary ?? 0;
 
-      if (category === "outlet") {
-        // Deposit wajib karyawan kontrak - Rp250rb otomatis di 2 periode
-        // pertama, berhenti sendiri setelahnya. Permintaan Kevin 2026-09-11.
-        const isContractDepositDue = emp.employmentStatus === "kontrak" && emp.depositInstallmentsPaid < CONTRACT_DEPOSIT_INSTALLMENT_COUNT;
-        const depositDeduction = isContractDepositDue ? CONTRACT_DEPOSIT_INSTALLMENT : 0;
-
-        await tx.payrollItem.create({
-          data: {
-            periodId: created.id,
-            employeeId: emp.id,
-            ...computeOutletPayrollFields(emp, daysPresent, overtimeMinutes),
-            depositDeduction,
-          },
-        });
-
-        if (isContractDepositDue) {
-          await tx.employee.update({
-            where: { id: emp.id },
-            data: {
-              depositInstallmentsPaid: { increment: 1 },
-              depositBalance: { increment: CONTRACT_DEPOSIT_INSTALLMENT },
-            },
-          });
-        }
-      } else {
-        await tx.payrollItem.create({
-          data: {
-            periodId: created.id,
-            employeeId: emp.id,
-            daysPresent,
-            overtimeMinutes,
-            baseSalary,
-            mealAllowance: daysPresent * DEFAULT_DAILY_MEAL_ALLOWANCE,
-            overtimePay: calcOvertimePay(baseSalary, overtimeMinutes),
-            bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
-            bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
-          },
-        });
-      }
+      await tx.payrollItem.create({
+        data: {
+          periodId: created.id,
+          employeeId: emp.id,
+          daysPresent,
+          overtimeMinutes,
+          baseSalary,
+          mealAllowance: daysPresent * DEFAULT_DAILY_MEAL_ALLOWANCE,
+          overtimePay: calcOvertimePay(baseSalary, overtimeMinutes),
+          bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
+          bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
+        },
+      });
     }
 
     return created;
