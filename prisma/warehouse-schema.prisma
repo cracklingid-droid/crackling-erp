@@ -22,6 +22,12 @@ model Outlet {
   isActive Boolean
 }
 
+model Item {
+  id   Int    @id
+  sku  String
+  name String
+}
+
 // qty/totalCost negatif = pemakaian/keluar, positif = masuk - sama definisi
 // "keluar" yg dipakai laporan Pemakaian Harian Warehouse sendiri
 // (lib/fifo.ts getDailyMovementReport: target = qty < 0 ? keluar : masuk).

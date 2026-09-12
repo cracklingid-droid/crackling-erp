@@ -95,6 +95,49 @@ export async function getWarehouseUsageCostByOutletDaily(startDate: Date, endDat
   return result;
 }
 
+export type UsageDetailLine = { outletName: string; itemName: string; type: string; qty: number; totalCost: number };
+
+// Rincian baris-per-baris di balik 1 angka Biaya Pemakaian (1 tanggal,
+// dibatasi ke `outletHrNames` yang sama persis dipakai dashboard - PENTING
+// tetap dikirim daftar outlet penjualan (bukan null utk "semua Warehouse")
+// waktu filter dashboard "Semua Outlet", supaya totalnya cocok dgn angka
+// yang diklik (Joglo/Central Kitchen tidak ikut, sama seperti
+// getWarehouseUsageCostByOutletDaily). Permintaan Kevin 2026-09-12.
+export async function getWarehouseUsageDetailForDate(date: Date, outletHrNames: string[]): Promise<UsageDetailLine[]> {
+  const nextDate = new Date(date);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+
+  const [outlets, movements] = await Promise.all([
+    warehouseDb.outlet.findMany(),
+    warehouseDb.stockMovement.findMany({
+      where: { moveDate: { gte: date, lt: nextDate }, qty: { lt: 0 }, type: { notIn: EXCLUDED_USAGE_TYPES } },
+      select: { outletId: true, itemId: true, type: true, qty: true, totalCost: true },
+    }),
+  ]);
+  const outletNameById = new Map(
+    outlets.filter((o) => WAREHOUSE_OUTLET_TO_HR_NAME[o.code]).map((o) => [o.id, WAREHOUSE_OUTLET_TO_HR_NAME[o.code]])
+  );
+
+  const filtered = movements.filter((m) => {
+    const name = outletNameById.get(m.outletId);
+    return !!name && outletHrNames.includes(name);
+  });
+
+  const itemIds = Array.from(new Set(filtered.map((m) => m.itemId)));
+  const items = itemIds.length > 0 ? await warehouseDb.item.findMany({ where: { id: { in: itemIds } } }) : [];
+  const itemNameById = new Map(items.map((i) => [i.id, i.name]));
+
+  return filtered
+    .map((m) => ({
+      outletName: outletNameById.get(m.outletId)!,
+      itemName: itemNameById.get(m.itemId) ?? `Item #${m.itemId}`,
+      type: m.type,
+      qty: Number(m.qty),
+      totalCost: Math.abs(Number(m.totalCost)),
+    }))
+    .sort((a, b) => b.totalCost - a.totalCost);
+}
+
 export type CentralKitchenTransfer = { hrOutletName: string; count: number; value: number };
 
 // Info transparansi (BUKAN komponen Total Biaya - keputusan Kevin
