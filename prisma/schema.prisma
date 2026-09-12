@@ -481,3 +481,20 @@ model PayrollItem {
 
   @@unique([periodId, employeeId])
 }
+
+// Omzet harian per outlet, disinkronkan MANUAL (tombol "Sync Sekarang") dari
+// sheet rekap penjualan POS ("Sales Recapitulation Detail Report") yang
+// dibagikan Kevin - dipakai Cost Center hitung Gross Profit. "Omzet" =
+// kolom "Total" di sheet (Subtotal + Service Charge 5%), BUKAN Nett
+// Sales/Subtotal saja - keputusan Kevin 2026-09-12. outletName dicocokkan
+// ke nama outlet HR (lib/payroll-config.ts OUTLET_NAMES) lewat mapping di
+// lib/sales-sheet.ts, bukan dari kolom "Branch" mentah di sheet.
+model DailySales {
+  id         Int      @id @default(autoincrement())
+  outletName String
+  date       DateTime
+  totalOmzet Int
+  syncedAt   DateTime @default(now())
+
+  @@unique([outletName, date])
+}
