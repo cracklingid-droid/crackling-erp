@@ -7,16 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, Lock, Unlock, FileText, RefreshCw } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, FileText, RefreshCw, FileSpreadsheet, Printer } from "lucide-react";
 import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
+import { EmployeeRincianCard, type RincianItem, type RincianNote } from "@/components/payroll/employee-rincian-card";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
 
-type Item = {
-  id: number;
-  employeeId: number;
-  employee: { id: number; name: string; position: string | null; outlet: string | null };
+type Item = RincianItem & {
   daysPresent: number;
   overtimeMinutes: number;
   baseSalary: number;
@@ -39,6 +38,7 @@ type Item = {
   serviceCharge: number;
   bonus: number;
 };
+type AttendanceRecord = { employeeId: number; date: string; clockIn: string | null; clockOut: string | null };
 type Period = {
   id: number;
   label: string;
@@ -47,6 +47,8 @@ type Period = {
   category: string;
   status: string;
   items: Item[];
+  eventNotes: RincianNote[];
+  attendanceRecords: AttendanceRecord[];
 };
 
 const BASE_FIELDS: { key: keyof Item; label: string }[] = [
@@ -133,10 +135,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [dailySearch, setDailySearch] = useState("");
 
   function load() {
     setLoading(true);
-    fetch(`/api/payroll/periods/${periodId}`)
+    fetch(`/api/payroll/periods/${periodId}/rincian`)
       .then((r) => r.json())
       .then((p: Period) => {
         setPeriod(p);
@@ -204,6 +208,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
 
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
   const totalNetPay = items.reduce((sum, it) => sum + netPay(it, editableFields), 0);
+  const dailyItems = items.filter((it) => it.employee.name.toLowerCase().includes(dailySearch.toLowerCase()));
 
   function toggleSelect(itemId: number) {
     setSelectedIds((prev) => {
@@ -248,6 +253,32 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
     }
   }
 
+  async function downloadExcel() {
+    setExportingExcel(true);
+    try {
+      const res = await fetch(`/api/payroll/periods/${periodId}/export-excel`);
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error("Gagal download Excel: " + err.error);
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("content-disposition") ?? "";
+      const match = cd.match(/filename\*=UTF-8''([^;]+)/);
+      const filename = match ? decodeURIComponent(match[1]) : "gaji.xlsx";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportingExcel(false);
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
   if (!period) return <p className="text-sm text-muted-foreground">Periode tidak ditemukan.</p>;
 
@@ -278,13 +309,27 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
               </p>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={toggleStatus} disabled={togglingStatus} className="shrink-0">
-            {isFinal ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-            {isFinal ? "Buka Kembali" : "Finalisasi"}
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" size="sm" onClick={downloadExcel} disabled={exportingExcel || items.length === 0}>
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              {exportingExcel ? "Menyiapkan Excel..." : "Download Excel (2 Sheet)"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={toggleStatus} disabled={togglingStatus}>
+              {isFinal ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+              {isFinal ? "Buka Kembali" : "Finalisasi"}
+            </Button>
+          </div>
         </div>
       </div>
 
+      <Tabs defaultValue="rekap">
+        <TabsList>
+          <TabsIndicator />
+          <TabsTab value="rekap">Sheet 2 · Rekap Bulanan</TabsTab>
+          <TabsTab value="harian">Sheet 1 · Detail Harian</TabsTab>
+        </TabsList>
+
+        <TabsPanel value="rekap">
       <Card>
         <CardContent className="pt-6 flex flex-wrap items-center gap-2 pb-0">
           {category === "outlet" && !isFinal && (
@@ -307,12 +352,6 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
               Batalkan pilihan
             </button>
           )}
-          <Link
-            href={`/hr/payroll/${category}/${periodId}/rincian`}
-            className="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-          >
-            Rincian Perhitungan (per tanggal)
-          </Link>
         </CardContent>
         <div className="thin-scrollbar overflow-x-auto">
           <Table>
@@ -444,6 +483,42 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
           </Table>
         </div>
       </Card>
+        </TabsPanel>
+
+        <TabsPanel value="harian" className="grid gap-4">
+          <Card>
+            <CardContent className="pt-6 flex flex-wrap items-center gap-2">
+              <Input
+                value={dailySearch}
+                onChange={(e) => setDailySearch(e.target.value)}
+                placeholder="Cari nama karyawan..."
+                className="max-w-xs"
+              />
+              <Link
+                href={`/hr/payroll/${category}/${periodId}/rincian`}
+                target="_blank"
+                className="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+              >
+                <Printer className="h-3.5 w-3.5" /> Print / Simpan PDF Semua Karyawan
+              </Link>
+            </CardContent>
+          </Card>
+          <div className="grid gap-5">
+            {dailyItems.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada karyawan yang cocok.</p>}
+            {dailyItems.map((item) => (
+              <EmployeeRincianCard
+                key={item.id}
+                period={period}
+                item={item}
+                notes={period.eventNotes.filter((n) => n.employeeId === item.employeeId)}
+                records={period.attendanceRecords.filter((r) => r.employeeId === item.employeeId)}
+                onNoteAdded={load}
+                onNoteDeleted={load}
+              />
+            ))}
+          </div>
+        </TabsPanel>
+      </Tabs>
     </div>
   );
 }

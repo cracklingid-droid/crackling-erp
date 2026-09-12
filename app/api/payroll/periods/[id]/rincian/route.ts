@@ -23,6 +23,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
               name: true,
               position: true,
               outlet: true,
+              baseSalary: true,
               dailyTransportRate: true,
               dailyMealRate: true,
               dailyBaseRate: true,

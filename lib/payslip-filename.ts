@@ -22,3 +22,11 @@ export function payslipZipFilename(periodEndDate: Date, category: string): strin
   const categoryLabel = category === "outlet" ? "Outlet" : "Kantor";
   return `${yy}${mm}-Slip Gaji ${categoryLabel} ${monthName}.zip`;
 }
+
+export function payrollExcelFilename(periodEndDate: Date, category: string): string {
+  const yy = String(periodEndDate.getFullYear() % 100).padStart(2, "0");
+  const mm = String(periodEndDate.getMonth() + 1).padStart(2, "0");
+  const monthName = MONTH_NAMES_ID[periodEndDate.getMonth()];
+  const categoryLabel = category === "outlet" ? "Outlet" : "Kantor";
+  return `${yy}${mm}-Gaji ${categoryLabel} ${monthName}.xlsx`;
+}
