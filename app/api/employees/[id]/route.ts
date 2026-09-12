@@ -6,7 +6,7 @@ import { getMissingOnboardingFields } from "@/lib/employee-onboarding";
 const VALID_STATUS = ["onboarding", "active", "resigned"];
 const STRING_FIELDS = [
   "employeeCode", "ktpNumber", "name", "email", "phone", "birthPlace", "gender", "address",
-  "position", "outlet", "employmentStatus", "workSchedule",
+  "position", "outlet", "employmentStatus", "workSchedule", "photoUrl",
   "bankName", "bankAccountNumber", "bankAccountHolder",
   "npwp", "bpjsKesehatanNumber", "bpjsKetenagakerjaanNumber",
 ];
@@ -37,6 +37,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       documents: { orderBy: { uploadedAt: "desc" } },
       candidate: { select: { jobPosting: { select: { title: true } } } },
       historyEntries: { orderBy: { effectiveDate: "desc" }, include: { createdBy: { select: { name: true } } } },
+      reportsTo: { select: { id: true, name: true } },
+      directReports: { select: { id: true, name: true, position: true, outlet: true }, orderBy: { name: "asc" } },
     },
   });
   if (!employee) return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
@@ -59,6 +61,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if ("birthDate" in body) data.birthDate = body.birthDate ? new Date(body.birthDate) : null;
   if ("joinDate" in body) data.joinDate = body.joinDate ? new Date(body.joinDate) : null;
   if ("resignDate" in body) data.resignDate = body.resignDate ? new Date(body.resignDate) : null;
+  if ("contractEndDate" in body) data.contractEndDate = body.contractEndDate ? new Date(body.contractEndDate) : null;
+  if ("reportsToId" in body) {
+    const rid = body.reportsToId === "" || body.reportsToId === null ? null : Number(body.reportsToId);
+    if (rid !== null && rid === employeeId) {
+      return NextResponse.json({ error: "Karyawan tidak bisa menjadi atasannya sendiri" }, { status: 400 });
+    }
+    data.reportsToId = rid;
+  }
   if ("baseSalary" in body) data.baseSalary = body.baseSalary === "" || body.baseSalary === null ? null : Number(body.baseSalary);
   if ("allowance" in body) data.allowance = body.allowance === "" || body.allowance === null ? null : Number(body.allowance);
   if ("dailyTransportRate" in body)

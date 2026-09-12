@@ -232,6 +232,21 @@ model Employee {
   bpjsKesehatanNumber       String?
   bpjsKetenagakerjaanNumber String?
 
+  photoUrl String? // foto profil (Vercel Blob) - permintaan Kevin 2026-09-12
+
+  // Tanggal akhir kontrak/PKWT yang berlaku saat ini - dipakai reminder
+  // "Segera Jatuh Tempo" di Database Karyawan (H-30). Beda dari resignDate
+  // (itu tanggal karyawan benar-benar keluar). Permintaan Kevin 2026-09-12.
+  contractEndDate DateTime?
+
+  // Atasan langsung - dipakai utk lihat siapa lapor ke siapa per outlet.
+  // Optional & self-relation, jadi kalau atasannya dihapus dari sistem
+  // field ini otomatis null (bukan ikut terhapus). Permintaan Kevin
+  // 2026-09-12.
+  reportsToId   Int?
+  reportsTo     Employee?  @relation("EmployeeReportsTo", fields: [reportsToId], references: [id])
+  directReports Employee[] @relation("EmployeeReportsTo")
+
   createdById Int?
   createdBy   HrUser?  @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
@@ -281,6 +296,7 @@ model EmployeeDocument {
   type       String // ktp | ijazah | kontrak_kerja | lainnya
   fileUrl    String
   fileName   String?
+  expiryDate DateTime? // opsional - dipakai reminder "Segera Jatuh Tempo" (mis. kontrak kerja, SIM)
   uploadedAt DateTime @default(now())
 }
 

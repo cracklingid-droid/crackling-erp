@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, ArrowLeft, MessageCircle } from "lucide-react";
+import { Plus, ArrowLeft, MessageCircle, AlertTriangle } from "lucide-react";
 import { toWaNumber } from "@/lib/whatsapp";
+import { computeCompleteness } from "@/lib/employee-completeness";
+import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
 
 type Employee = {
   id: number;
@@ -22,7 +24,35 @@ type Employee = {
   outlet: string | null;
   employmentStatus: string | null;
   status: string;
+  photoUrl: string | null;
+  ktpNumber: string | null;
+  address: string | null;
+  birthDate: string | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankAccountHolder: string | null;
+  npwp: string | null;
+  bpjsKesehatanNumber: string | null;
+  bpjsKetenagakerjaanNumber: string | null;
+  documents: { type: string }[];
 };
+
+type Reminders = {
+  contracts: { id: number; name: string; outlet: string | null; position: string | null; contractEndDate: string }[];
+  documents: { id: number; type: string; expiryDate: string; employeeId: number; employee: { name: string } }[];
+};
+
+const DOC_TYPE_LABEL: Record<string, string> = { ktp: "KTP", ijazah: "Ijazah", kontrak_kerja: "Kontrak Kerja", lainnya: "Dokumen" };
+
+function formatDateId(iso: string) {
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function completenessColor(percent: number) {
+  if (percent === 100) return "text-emerald-600";
+  if (percent >= 60) return "text-amber-600";
+  return "text-destructive";
+}
 
 const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -39,6 +69,7 @@ export default function KaryawanPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [reminders, setReminders] = useState<Reminders | null>(null);
 
   function load() {
     setLoading(true);
@@ -49,6 +80,11 @@ export default function KaryawanPage() {
   }
 
   useEffect(load, []);
+  useEffect(() => {
+    fetch("/api/employees/reminders")
+      .then((r) => r.json())
+      .then(setReminders);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -98,6 +134,43 @@ export default function KaryawanPage() {
         </div>
       </div>
 
+      {reminders && (reminders.contracts.length > 0 || reminders.documents.length > 0) && (
+        <Card className="border-amber-500/40">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" /> Segera Jatuh Tempo (30 hari ke depan)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-1.5">
+            {reminders.contracts.map((c) => (
+              <Link
+                key={`c${c.id}`}
+                href={`/hr/karyawan/${c.id}`}
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-sm hover:underline"
+              >
+                <span>
+                  Kontrak <span className="font-medium">{c.name}</span>
+                  {c.outlet ? ` (${c.outlet})` : ""} berakhir
+                </span>
+                <span className="text-muted-foreground shrink-0">{formatDateId(c.contractEndDate)}</span>
+              </Link>
+            ))}
+            {reminders.documents.map((d) => (
+              <Link
+                key={`d${d.id}`}
+                href={`/hr/karyawan/${d.employeeId}`}
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-sm hover:underline"
+              >
+                <span>
+                  {DOC_TYPE_LABEL[d.type] ?? d.type} <span className="font-medium">{d.employee.name}</span> kedaluwarsa
+                </span>
+                <span className="text-muted-foreground shrink-0">{formatDateId(d.expiryDate)}</span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {showForm && (
         <Card>
           <CardHeader>
@@ -142,17 +215,24 @@ export default function KaryawanPage() {
                 <TableHead>Outlet</TableHead>
                 <TableHead>Status Kepegawaian</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Kelengkapan</TableHead>
                 <TableHead>WA</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!loading && employees.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-muted-foreground">Belum ada karyawan.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-muted-foreground">Belum ada karyawan.</TableCell></TableRow>
               )}
-              {employees.map((e) => (
+              {employees.map((e) => {
+                const hasKtp = e.documents.some((d) => d.type === "ktp");
+                const completeness = computeCompleteness(e, hasKtp);
+                return (
                 <TableRow key={e.id}>
                   <TableCell className="font-medium">
-                    <Link href={`/hr/karyawan/${e.id}`} className="hover:underline">{e.name}</Link>
+                    <Link href={`/hr/karyawan/${e.id}`} className="flex items-center gap-2 hover:underline">
+                      <EmployeeAvatar photoUrl={e.photoUrl} name={e.name} size={24} />
+                      {e.name}
+                    </Link>
                     {e.employeeCode && <span className="text-xs text-muted-foreground ml-1.5">({e.employeeCode})</span>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{e.position || "-"}</TableCell>
@@ -162,6 +242,11 @@ export default function KaryawanPage() {
                     <Badge variant={STATUS_VARIANT[e.status] ?? "outline"} className="font-normal">
                       {STATUS_LABEL[e.status] ?? e.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`text-sm tabular-nums font-medium ${completenessColor(completeness.percent)}`} title={completeness.missing.join(", ")}>
+                      {completeness.percent}%
+                    </span>
                   </TableCell>
                   <TableCell>
                     {e.phone ? (
@@ -178,7 +263,8 @@ export default function KaryawanPage() {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

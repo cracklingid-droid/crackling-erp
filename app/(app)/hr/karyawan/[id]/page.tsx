@@ -9,10 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle, Wand2 } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { REQUIRED_ONBOARDING_FIELDS, getMissingOnboardingFields } from "@/lib/employee-onboarding";
+import { computeCompleteness } from "@/lib/employee-completeness";
+import { prefixForOutlet } from "@/lib/employee-code";
 import { toWaNumber } from "@/lib/whatsapp";
+import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
 
 const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
 const EMPLOYMENT_STATUS_OPTIONS = [
@@ -59,7 +62,8 @@ function formatHistoryValue(field: string, value: string | null) {
   return value;
 }
 
-type Document = { id: number; type: string; fileUrl: string; fileName: string | null };
+type Document = { id: number; type: string; fileUrl: string; fileName: string | null; expiryDate: string | null };
+type EmployeeRef = { id: number; name: string; position: string | null; outlet: string | null };
 type HistoryEntry = {
   id: number;
   field: string;
@@ -102,6 +106,11 @@ type Employee = {
   npwp: string | null;
   bpjsKesehatanNumber: string | null;
   bpjsKetenagakerjaanNumber: string | null;
+  photoUrl: string | null;
+  contractEndDate: string | null;
+  reportsToId: number | null;
+  reportsTo: { id: number; name: string } | null;
+  directReports: EmployeeRef[];
   documents: Document[];
   candidate: { jobPosting: { title: string } } | null;
   historyEntries: HistoryEntry[];
@@ -122,6 +131,7 @@ const emptyForm = {
   depositInstallmentsPaid: "", depositBalance: "",
   bankName: "", bankAccountNumber: "", bankAccountHolder: "",
   npwp: "", bpjsKesehatanNumber: "", bpjsKetenagakerjaanNumber: "",
+  contractEndDate: "", reportsToId: "",
 };
 
 export default function KaryawanDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -135,8 +145,13 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   const [historyNote, setHistoryNote] = useState("");
   const [changingStatus, setChangingStatus] = useState(false);
   const [docType, setDocType] = useState("ktp");
+  const [docExpiryDate, setDocExpiryDate] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [otherEmployees, setOtherEmployees] = useState<EmployeeRef[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
     setLoading(true);
@@ -159,12 +174,20 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           depositInstallmentsPaid: String(e.depositInstallmentsPaid ?? 0), depositBalance: String(e.depositBalance ?? 0),
           bankName: e.bankName ?? "", bankAccountNumber: e.bankAccountNumber ?? "", bankAccountHolder: e.bankAccountHolder ?? "",
           npwp: e.npwp ?? "", bpjsKesehatanNumber: e.bpjsKesehatanNumber ?? "", bpjsKetenagakerjaanNumber: e.bpjsKetenagakerjaanNumber ?? "",
+          contractEndDate: toDateInput(e.contractEndDate), reportsToId: e.reportsToId != null ? String(e.reportsToId) : "",
         });
       })
       .finally(() => setLoading(false));
   }
 
   useEffect(load, [id]);
+  useEffect(() => {
+    fetch("/api/employees")
+      .then((r) => r.json())
+      .then((list: (EmployeeRef & { id: number; status: string })[]) =>
+        setOtherEmployees(list.filter((e) => e.id !== Number(id) && e.status !== "resigned"))
+      );
+  }, [id]);
 
   function set<K extends keyof typeof emptyForm>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -222,10 +245,11 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
       const res = await fetch(`/api/employees/${employee.id}/documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: docType, fileUrl: blob.url, fileName: file.name }),
+        body: JSON.stringify({ type: docType, fileUrl: blob.url, fileName: file.name, expiryDate: docExpiryDate || null }),
       });
       if (res.ok) {
         toast.success("Dokumen diupload.");
+        setDocExpiryDate("");
         load();
       } else {
         const err = await res.json();
@@ -236,6 +260,52 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     } finally {
       setUploadingDoc(false);
       e.target.value = "";
+    }
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !employee) return;
+    setUploadingPhoto(true);
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/employees/upload-document",
+      });
+      const res = await fetch(`/api/employees/${employee.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoUrl: blob.url }),
+      });
+      if (res.ok) {
+        toast.success("Foto profil diperbarui.");
+        load();
+      } else {
+        const err = await res.json();
+        toast.error("Gagal simpan foto: " + err.error);
+      }
+    } catch (err) {
+      toast.error("Gagal upload foto: " + (err instanceof Error ? err.message : "unknown"));
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleGenerateCode() {
+    if (!form.outlet) {
+      toast.error("Pilih/isi Outlet dulu");
+      return;
+    }
+    setGeneratingCode(true);
+    const res = await fetch(`/api/employees/next-code?outlet=${encodeURIComponent(form.outlet)}`);
+    const data = await res.json();
+    setGeneratingCode(false);
+    if (res.ok) {
+      set("employeeCode", data.code);
+      toast.success(`Kode diisi: ${data.code} (belum tersimpan, klik "Simpan Perubahan")`);
+    } else {
+      toast.error(data.error);
     }
   }
 
@@ -270,6 +340,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     },
     hasKtp
   );
+  const completeness = computeCompleteness(employee, hasKtp);
 
   return (
     <div className="max-w-3xl grid gap-6">
@@ -278,11 +349,23 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Database Karyawan
         </Link>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-heading font-semibold tracking-tight">{employee.name}</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              {employee.candidate?.jobPosting.title ? `Dari lamaran: ${employee.candidate.jobPosting.title}` : "Ditambahkan manual"}
-            </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              title="Ganti foto profil"
+              className="relative shrink-0 rounded-full ring-1 ring-border hover:opacity-80 transition-opacity"
+            >
+              <EmployeeAvatar photoUrl={employee.photoUrl} name={employee.name} size={56} />
+            </button>
+            <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoUpload} disabled={uploadingPhoto} />
+            <div>
+              <h1 className="text-2xl font-heading font-semibold tracking-tight">{employee.name}</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                {employee.candidate?.jobPosting.title ? `Dari lamaran: ${employee.candidate.jobPosting.title}` : "Ditambahkan manual"}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={employee.status === "active" ? "default" : employee.status === "resigned" ? "secondary" : "outline"}>
@@ -301,6 +384,26 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            Kelengkapan Data
+            <span className={completeness.percent === 100 ? "text-emerald-600" : completeness.percent >= 60 ? "text-amber-600" : "text-destructive"}>
+              {completeness.percent}%
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {completeness.missing.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Semua data standar sudah lengkap.</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Belum lengkap: {completeness.missing.join(", ")}.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {employee.status === "onboarding" && (
         <Card className={missing.length > 0 ? "border-destructive/40" : "border-primary/30"}>
@@ -389,7 +492,24 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           </div>
           <div className="grid gap-1.5">
             <Label>ID Karyawan (opsional)</Label>
-            <Input value={form.employeeCode} onChange={(e) => set("employeeCode", e.target.value)} />
+            <div className="flex gap-2">
+              <Input value={form.employeeCode} onChange={(e) => set("employeeCode", e.target.value)} />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Generate ID Otomatis dari Outlet"
+                disabled={generatingCode || !prefixForOutlet(form.outlet)}
+                onClick={handleGenerateCode}
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            {!prefixForOutlet(form.outlet) && (
+              <p className="text-xs text-muted-foreground">
+                Kode otomatis tersedia utk Outlet: Gading Serpong (GS), Kelapa Gading (KG), Joglo/Central Kitchen (JO), Fatgai (FG).
+              </p>
+            )}
           </div>
           <div className="grid gap-1.5">
             <Label>Jabatan</Label>
@@ -443,10 +563,47 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
             <Label>Tanggal Mulai Kerja</Label>
             <Input type="date" value={form.joinDate} onChange={(e) => set("joinDate", e.target.value)} />
           </div>
+          {(form.employmentStatus === "kontrak" || form.employmentStatus === "pkwt") && (
+            <div className="grid gap-1.5">
+              <Label>Tanggal Akhir Kontrak</Label>
+              <Input type="date" value={form.contractEndDate} onChange={(e) => set("contractEndDate", e.target.value)} />
+              <p className="text-xs text-muted-foreground">Muncul di daftar "Segera Jatuh Tempo" di Database Karyawan, H-30 sebelum tanggal ini.</p>
+            </div>
+          )}
           {employee.status === "resigned" && (
             <div className="grid gap-1.5">
               <Label>Tanggal Resign</Label>
               <Input type="date" value={form.resignDate} onChange={(e) => set("resignDate", e.target.value)} />
+            </div>
+          )}
+          <div className="grid gap-1.5">
+            <Label>Atasan Langsung</Label>
+            <Select value={form.reportsToId || "none"} onValueChange={(v) => set("reportsToId", v === "none" ? "" : v ?? "")}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tidak ada">
+                  {() => otherEmployees.find((o) => String(o.id) === form.reportsToId)?.name ?? "Tidak ada"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Tidak ada</SelectItem>
+                {otherEmployees.map((o) => (
+                  <SelectItem key={o.id} value={String(o.id)}>
+                    {o.name}{o.outlet ? ` (${o.outlet})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {employee.directReports.length > 0 && (
+            <div className="grid gap-1.5 sm:col-span-2">
+              <Label>Bawahan Langsung</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {employee.directReports.map((r) => (
+                  <Link key={r.id} href={`/hr/karyawan/${r.id}`}>
+                    <Badge variant="outline" className="font-normal hover:bg-muted">{r.name}</Badge>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
@@ -616,6 +773,10 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-1.5">
+              <Label>Kedaluwarsa (opsional)</Label>
+              <Input type="date" className="w-40" value={docExpiryDate} onChange={(e) => setDocExpiryDate(e.target.value)} />
+            </div>
             <Button type="button" variant="outline" disabled={uploadingDoc} onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-3.5 w-3.5" /> {uploadingDoc ? "Mengupload..." : "Upload File"}
             </Button>
@@ -633,7 +794,9 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
             <p className="text-sm text-muted-foreground">Belum ada dokumen diupload.</p>
           ) : (
             <div className="grid gap-2">
-              {employee.documents.map((d) => (
+              {employee.documents.map((d) => {
+                const expiringSoon = d.expiryDate && new Date(d.expiryDate).getTime() - Date.now() < 30 * 86400000;
+                return (
                 <div key={d.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
                   <a
                     href={d.fileUrl}
@@ -644,11 +807,19 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                     <FileText className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{documentTypeLabel(d.type)} - {d.fileName ?? "file"}</span>
                   </a>
-                  <button type="button" onClick={() => handleDeleteDoc(d.id)} className="text-muted-foreground hover:text-destructive shrink-0">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {d.expiryDate && (
+                      <span className={`text-xs ${expiringSoon ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                        Kedaluwarsa {new Date(d.expiryDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                    )}
+                    <button type="button" onClick={() => handleDeleteDoc(d.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

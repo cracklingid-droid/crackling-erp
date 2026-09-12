@@ -16,7 +16,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const doc = await prisma.employeeDocument.create({
-    data: { employeeId: Number(id), type, fileUrl, fileName: body.fileName || null },
+    data: {
+      employeeId: Number(id),
+      type,
+      fileUrl,
+      fileName: body.fileName || null,
+      expiryDate: body.expiryDate ? new Date(body.expiryDate) : null,
+    },
   });
   return NextResponse.json(doc, { status: 201 });
 }
