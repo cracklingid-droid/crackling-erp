@@ -48,3 +48,49 @@ export async function getPayrollCostByOutlet(periodId: number): Promise<{
 
   return { outlets, period: { id: period.id, label: period.label, startDate: period.startDate, endDate: period.endDate } };
 }
+
+export type DailyPayrollRate = { outletName: string; dailyCost: number };
+
+function dateKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// Peta tanggal -> biaya gaji harian per outlet, dari periode Payroll Outlet
+// APA PUN statusnya (draft ATAU final) yang cakupan tanggalnya menyentuh
+// rentang diminta - dipakai Dashboard Harian Cost Center supaya tetap ada
+// angka gaji walau periode belum di-final-kan (final cuma disyaratkan utk
+// laporan resmi per-periode, bukan dashboard ringkasan harian). Kalau 1
+// tanggal tidak masuk periode manapun (mis. periode berikutnya belum
+// dibuat HR), tanggal itu sengaja tidak muncul di Map - dashboard
+// menampilkannya sbg "belum ada data gaji". Permintaan Kevin 2026-09-12.
+export async function getPayrollDailyRatesByOutlet(startDate: Date, endDate: Date): Promise<Map<string, DailyPayrollRate[]>> {
+  const periods = await prisma.payrollPeriod.findMany({
+    where: { category: "outlet", startDate: { lte: endDate }, endDate: { gte: startDate } },
+    include: { items: { include: { employee: { select: { outlet: true } } } } },
+  });
+
+  const fields = fieldsForCategory("outlet");
+  const byDate = new Map<string, DailyPayrollRate[]>();
+
+  for (const period of periods) {
+    const daysInPeriod = Math.round((period.endDate.getTime() - period.startDate.getTime()) / 86400000) + 1;
+    const costByOutlet = new Map<string, number>();
+    for (const item of period.items) {
+      const outletName = item.employee.outlet ?? "(Tanpa Outlet)";
+      const cost = computeGrossPayrollCost(item as unknown as Record<string, number>, fields);
+      costByOutlet.set(outletName, (costByOutlet.get(outletName) ?? 0) + cost);
+    }
+    const rates: DailyPayrollRate[] = Array.from(costByOutlet.entries()).map(([outletName, total]) => ({
+      outletName,
+      dailyCost: total / daysInPeriod,
+    }));
+
+    const from = period.startDate > startDate ? period.startDate : startDate;
+    const to = period.endDate < endDate ? period.endDate : endDate;
+    for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
+      byDate.set(dateKey(d), rates);
+    }
+  }
+
+  return byDate;
+}

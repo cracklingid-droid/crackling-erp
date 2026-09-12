@@ -61,6 +61,40 @@ export async function getWarehouseUsageCostByOutlet(startDate: Date, endDate: Da
     }));
 }
 
+export type DailyUsageCost = { hrOutletName: string; usageCost: number };
+
+// Versi per-tanggal dari getWarehouseUsageCostByOutlet di atas - definisi
+// "biaya pemakaian" SAMA PERSIS (qty<0, dikurangi EXCLUDED_USAGE_TYPES),
+// cuma dikelompokkan per hari juga - dipakai Dashboard Harian Cost Center.
+export async function getWarehouseUsageCostByOutletDaily(startDate: Date, endDate: Date): Promise<Map<string, DailyUsageCost[]>> {
+  const [outlets, movements] = await Promise.all([
+    warehouseDb.outlet.findMany(),
+    warehouseDb.stockMovement.findMany({
+      where: { moveDate: { gte: startDate, lte: endDate }, qty: { lt: 0 }, type: { notIn: EXCLUDED_USAGE_TYPES } },
+      select: { outletId: true, totalCost: true, moveDate: true },
+    }),
+  ]);
+  const outletNameById = new Map(
+    outlets.filter((o) => WAREHOUSE_OUTLET_TO_HR_NAME[o.code]).map((o) => [o.id, WAREHOUSE_OUTLET_TO_HR_NAME[o.code]])
+  );
+
+  const byDate = new Map<string, Map<string, number>>();
+  for (const m of movements) {
+    const outletName = outletNameById.get(m.outletId);
+    if (!outletName) continue;
+    const key = m.moveDate.toISOString().slice(0, 10);
+    const dayMap = byDate.get(key) ?? new Map<string, number>();
+    dayMap.set(outletName, (dayMap.get(outletName) ?? 0) + Math.abs(Number(m.totalCost)));
+    byDate.set(key, dayMap);
+  }
+
+  const result = new Map<string, DailyUsageCost[]>();
+  for (const [date, dayMap] of byDate) {
+    result.set(date, Array.from(dayMap.entries()).map(([hrOutletName, usageCost]) => ({ hrOutletName, usageCost })));
+  }
+  return result;
+}
+
 export type CentralKitchenTransfer = { hrOutletName: string; count: number; value: number };
 
 // Info transparansi (BUKAN komponen Total Biaya - keputusan Kevin

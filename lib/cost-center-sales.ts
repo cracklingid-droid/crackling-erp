@@ -25,3 +25,20 @@ export async function getOmzetByOutlet(startDate: Date, endDate: Date): Promise<
     lastSyncedAt: v.lastSyncedAt,
   }));
 }
+
+export type DailyOmzet = { outletName: string; totalOmzet: number };
+
+// Versi per-tanggal dari getOmzetByOutlet - dipakai Dashboard Harian Cost
+// Center. Permintaan Kevin 2026-09-12.
+export async function getOmzetDailyByOutlet(startDate: Date, endDate: Date): Promise<Map<string, DailyOmzet[]>> {
+  const rows = await prisma.dailySales.findMany({ where: { date: { gte: startDate, lte: endDate } } });
+
+  const byDate = new Map<string, DailyOmzet[]>();
+  for (const r of rows) {
+    const key = r.date.toISOString().slice(0, 10);
+    const arr = byDate.get(key) ?? [];
+    arr.push({ outletName: r.outletName, totalOmzet: r.totalOmzet });
+    byDate.set(key, arr);
+  }
+  return byDate;
+}
