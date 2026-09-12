@@ -26,14 +26,15 @@ model HrUser {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  jobPostingsCreated     JobPosting[]
-  candidatesCreated      Candidate[]
-  stageEvents            CandidateStageEvent[]
-  employeesCreated       Employee[]
-  payrollPeriodsCreated  PayrollPeriod[]
-  employeeHistoryEntries EmployeeHistoryEntry[]
-  rosterEntriesCreated   RosterEntry[]
+  jobPostingsCreated       JobPosting[]
+  candidatesCreated        Candidate[]
+  stageEvents              CandidateStageEvent[]
+  employeesCreated         Employee[]
+  payrollPeriodsCreated    PayrollPeriod[]
+  employeeHistoryEntries   EmployeeHistoryEntry[]
+  rosterEntriesCreated     RosterEntry[]
   payrollEventNotesCreated PayrollEventNote[]
+  attendanceNameAliasesCreated AttendanceNameAlias[]
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -252,12 +253,13 @@ model Employee {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  documents         EmployeeDocument[]
-  attendanceRecords AttendanceRecord[]
-  payrollItems      PayrollItem[]
-  historyEntries    EmployeeHistoryEntry[]
-  rosterEntries     RosterEntry[]
-  payrollEventNotes PayrollEventNote[]
+  documents             EmployeeDocument[]
+  attendanceRecords     AttendanceRecord[]
+  payrollItems          PayrollItem[]
+  historyEntries        EmployeeHistoryEntry[]
+  rosterEntries         RosterEntry[]
+  payrollEventNotes     PayrollEventNote[]
+  attendanceNameAliases AttendanceNameAlias[]
 }
 
 // Riwayat perubahan jabatan/outlet/status kepegawaian/gaji - dicatat
@@ -367,6 +369,24 @@ model AttendanceRecord {
   createdAt  DateTime  @default(now())
 
   @@unique([employeeId, date])
+}
+
+// Alias nama mesin absensi -> karyawan - dibuat otomatis begitu HR
+// konfirmasi saran pencocokan nama mirip saat upload absensi (mis. mesin
+// fingerprint tulis "ahmad", tapi Database Karyawan "Ahmad Yani"). Sekali
+// dikonfirmasi, upload berikutnya langsung otomatis kebaca tanpa perlu
+// dikonfirmasi ulang. machineName disimpan trim+lowercase (normalized),
+// berlaku global lintas outlet (1 nama mesin = 1 karyawan tertentu, tidak
+// dibedakan per outlet - keputusan Kevin 2026-09-12, nama karyawan
+// Crackling cukup unik antar outlet).
+model AttendanceNameAlias {
+  id          Int      @id @default(autoincrement())
+  machineName String   @unique
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdById Int?
+  createdBy   HrUser?  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
 }
 
 // Roster kerja mingguan per outlet - cuma "masuk" atau "libur" per karyawan

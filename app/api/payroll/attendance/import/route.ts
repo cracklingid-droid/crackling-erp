@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { buildAttendanceGroups, type AttendanceGroup, type AttendanceMapping } from "@/lib/attendance-parse";
 import { recalcOutletPeriod } from "@/lib/payroll-outlet-recalc";
+import { normalizeName } from "@/lib/attendance-name-match";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -36,14 +37,24 @@ export async function POST(req: Request) {
     totalRows = built.totalRows;
   }
 
-  const employees = await prisma.employee.findMany({ select: { id: true, name: true } });
-  const byName = new Map(employees.map((e) => [e.name.trim().toLowerCase(), e.id]));
+  const [employees, aliases] = await Promise.all([
+    prisma.employee.findMany({ select: { id: true, name: true } }),
+    prisma.attendanceNameAlias.findMany({ select: { machineName: true, employeeId: true } }),
+  ]);
+  const byName = new Map(employees.map((e) => [normalizeName(e.name), e.id]));
+  // Nama yang sudah pernah dikonfirmasi HR (mis. "ahmad" -> Ahmad Yani) di
+  // upload sebelumnya - dicocokkan juga di sini, bukan cuma di preview,
+  // supaya jalur upload lain (mis. format spreadsheet umum yang belum
+  // punya preview fuzzy-match) tetap kebagian manfaatnya. Permintaan Kevin
+  // 2026-09-12.
+  const aliasByName = new Map(aliases.map((a) => [a.machineName, a.employeeId]));
 
   const unmatched = new Set<string>();
   let imported = 0;
 
   for (const g of groups) {
-    const employeeId = byName.get(g.employeeName.trim().toLowerCase());
+    const normalizedName = normalizeName(g.employeeName);
+    const employeeId = byName.get(normalizedName) ?? aliasByName.get(normalizedName);
     if (!employeeId) {
       unmatched.add(g.employeeName);
       continue;

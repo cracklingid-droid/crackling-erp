@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, AlertTriangle, CheckCircle2, Sparkles } from "lucide-react";
+import { ArrowLeft, Upload, AlertTriangle, CheckCircle2, Sparkles, Check, HelpCircle } from "lucide-react";
 
 type ImportResult = {
   totalRows: number;
@@ -19,7 +19,23 @@ type ImportResult = {
 };
 
 type AttendanceGroup = { employeeName: string; date: string; clockIn: string; clockOut: string };
-type MachineReportData = { groups: AttendanceGroup[]; employeeNames: string[]; periodStart: string | null; periodEnd: string | null };
+type EmployeeOption = { id: number; name: string };
+type NameMatchSuggestion = { employeeId: number; employeeName: string; score: number };
+type NameMatch = {
+  name: string;
+  status: "exact" | "alias" | "suggested" | "none";
+  employeeId: number | null;
+  employeeName: string | null;
+  suggestions: NameMatchSuggestion[];
+};
+type MachineReportData = {
+  groups: AttendanceGroup[];
+  employeeNames: string[];
+  periodStart: string | null;
+  periodEnd: string | null;
+  nameMatches: NameMatch[];
+  employees: EmployeeOption[];
+};
 
 function formatDateID(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
@@ -53,9 +69,40 @@ export default function UploadAbsensiPage() {
   const [detecting, setDetecting] = useState(false);
   const [detectNote, setDetectNote] = useState<{ text: string; confidence: string } | null>(null);
   const [machineReport, setMachineReport] = useState<MachineReportData | null>(null);
+  const [nameMatches, setNameMatches] = useState<Record<string, NameMatch>>({});
+  const [confirmingName, setConfirmingName] = useState<string | null>(null);
+  const [manualPickerFor, setManualPickerFor] = useState<string | null>(null);
 
   const headers = rows?.[headerRowIndex] ?? [];
   const preview = rows?.slice(headerRowIndex + 1, headerRowIndex + 6) ?? [];
+
+  // Simpan konfirmasi HR bahwa 1 nama dari mesin absen = 1 karyawan
+  // tertentu, sbg alias permanen (upload berikutnya otomatis kebaca tanpa
+  // perlu dikonfirmasi ulang). Dipanggil saat HR klik "Ya, ini dia" pada
+  // saran, atau pilih manual dari dropdown. Permintaan Kevin 2026-09-12.
+  async function confirmNameMatch(rawName: string, employeeId: number, employeeName: string) {
+    setConfirmingName(rawName);
+    try {
+      const res = await fetch("/api/payroll/attendance/name-aliases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ machineName: rawName, employeeId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error("Gagal simpan konfirmasi: " + err.error);
+        return;
+      }
+      setNameMatches((prev) => ({
+        ...prev,
+        [rawName]: { name: rawName, status: "alias", employeeId, employeeName, suggestions: [] },
+      }));
+      setManualPickerFor(null);
+      toast.success(`"${rawName}" disimpan -> ${employeeName}. Upload absensi berikutnya otomatis kebaca nama ini.`);
+    } finally {
+      setConfirmingName(null);
+    }
+  }
 
   async function detectMapping(fileRows: string[][]) {
     setDetecting(true);
@@ -91,6 +138,8 @@ export default function UploadAbsensiPage() {
     setResult(null);
     setRows(null);
     setMachineReport(null);
+    setNameMatches({});
+    setManualPickerFor(null);
     setParsing(true);
     try {
       const form = new FormData();
@@ -106,6 +155,9 @@ export default function UploadAbsensiPage() {
         // penuh di server, HR tinggal cek preview lalu import, tidak perlu
         // pilih kolom manual. Permintaan Kevin 2026-09-11.
         setMachineReport(data);
+        const matches: Record<string, NameMatch> = {};
+        for (const m of data.nameMatches ?? []) matches[m.name] = m;
+        setNameMatches(matches);
         return;
       }
       setRows(data.rows);
@@ -200,11 +252,18 @@ export default function UploadAbsensiPage() {
         <Link href="/hr/payroll" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Payroll
         </Link>
-        <h1 className="text-2xl font-heading font-semibold tracking-tight">Upload Data Absen</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Import file export mesin fingerprint/absensi digital (.xlsx, .xls, atau .csv). Nama karyawan di file harus sama persis
-          dengan nama di Database Karyawan supaya bisa dicocokkan.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-heading font-semibold tracking-tight">Upload Data Absen</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              Import file export mesin fingerprint/absensi digital (.xlsx, .xls, atau .csv). Kalau nama di mesin absen beda
+              dari Database Karyawan (mis. nama panggilan), sistem akan menawarkan saran pencocokan sebelum diimport.
+            </p>
+          </div>
+          <Link href="/hr/payroll/absensi/alias" className="shrink-0 text-sm text-primary hover:underline whitespace-nowrap">
+            Kelola Alias Nama
+          </Link>
+        </div>
       </div>
 
       <Card>
@@ -256,12 +315,40 @@ export default function UploadAbsensiPage() {
               </p>
             </div>
             <div className="text-sm">
-              <p className="text-muted-foreground mb-1">Nama karyawan yang terbaca (cek dulu sama persis dengan Database Karyawan):</p>
-              <div className="flex flex-wrap gap-1.5">
-                {machineReport.employeeNames.map((n) => (
-                  <span key={n} className="rounded-full border px-2 py-0.5 text-xs">{n}</span>
-                ))}
+              <p className="text-muted-foreground mb-1.5">
+                Nama karyawan yang terbaca - yang berwarna kuning/merah perlu dicek, mesin absen mungkin pakai nama panggilan
+                beda dari Database Karyawan:
+              </p>
+              <div className="grid gap-1.5">
+                {machineReport.employeeNames.map((n) => {
+                  const match = nameMatches[n];
+                  if (!match) return null;
+                  return (
+                    <NameMatchRow
+                      key={n}
+                      match={match}
+                      employees={machineReport.employees}
+                      confirming={confirmingName === n}
+                      manualPickerOpen={manualPickerFor === n}
+                      onOpenManualPicker={() => setManualPickerFor(n)}
+                      onCloseManualPicker={() => setManualPickerFor(null)}
+                      onConfirm={(employeeId, employeeName) => confirmNameMatch(n, employeeId, employeeName)}
+                    />
+                  );
+                })}
               </div>
+              {(() => {
+                const unresolved = machineReport.employeeNames.filter((n) => {
+                  const s = nameMatches[n]?.status;
+                  return s === "suggested" || s === "none";
+                }).length;
+                return unresolved > 0 ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-1.5 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> {unresolved} nama belum dikonfirmasi - absen milik nama itu tetap
+                    bisa diimport (dicek lagi di hasil akhir), tapi lebih aman dikonfirmasi/dipilih manual dulu.
+                  </p>
+                ) : null;
+              })()}
             </div>
 
             <div>
@@ -431,6 +518,98 @@ export default function UploadAbsensiPage() {
             )}
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+}
+
+// Baris 1 nama dari mesin absen + status pencocokan ke Database Karyawan.
+// "exact"/"alias" tidak butuh aksi apa-apa; "suggested" tawarkan tombol
+// konfirmasi 1-klik ke kandidat paling mirip; "none" langsung ke dropdown
+// pilih manual. Konfirmasi (baik dari saran maupun manual) disimpan sbg
+// alias permanen lewat onConfirm. Permintaan Kevin 2026-09-12.
+function NameMatchRow({
+  match,
+  employees,
+  confirming,
+  manualPickerOpen,
+  onOpenManualPicker,
+  onCloseManualPicker,
+  onConfirm,
+}: {
+  match: NameMatch;
+  employees: EmployeeOption[];
+  confirming: boolean;
+  manualPickerOpen: boolean;
+  onOpenManualPicker: () => void;
+  onCloseManualPicker: () => void;
+  onConfirm: (employeeId: number, employeeName: string) => void;
+}) {
+  if (match.status === "exact" || match.status === "alias") {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs">
+        <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <span className="font-medium">{match.name}</span>
+        {match.status === "alias" && match.employeeName && (
+          <span className="text-muted-foreground">→ {match.employeeName} (alias tersimpan)</span>
+        )}
+      </div>
+    );
+  }
+
+  const sortedEmployees = [...employees].sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <div className="grid gap-1.5 rounded-lg border border-amber-300/60 bg-amber-50/50 px-2.5 py-1.5 text-xs dark:border-amber-800/60 dark:bg-amber-950/20">
+      <div className="flex flex-wrap items-center gap-2">
+        <HelpCircle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+        <span className="font-medium">{match.name}</span>
+        <span className="text-muted-foreground">
+          {match.status === "suggested" ? "tidak ditemukan persis - mirip dengan:" : "tidak dikenali sama sekali di Database Karyawan"}
+        </span>
+      </div>
+      {match.status === "suggested" && (
+        <div className="flex flex-wrap gap-1.5">
+          {match.suggestions.map((s) => (
+            <Button
+              key={s.employeeId}
+              type="button"
+              size="xs"
+              variant="outline"
+              disabled={confirming}
+              onClick={() => onConfirm(s.employeeId, s.employeeName)}
+            >
+              Ya, {s.employeeName}
+            </Button>
+          ))}
+        </div>
+      )}
+      {!manualPickerOpen ? (
+        <button type="button" onClick={onOpenManualPicker} className="w-fit text-left text-muted-foreground hover:text-foreground hover:underline">
+          {match.status === "suggested" ? "Bukan salah satu di atas? pilih manual" : "Pilih karyawan manual"}
+        </button>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <Select
+            onValueChange={(v) => {
+              if (!v) return;
+              const emp = employees.find((e) => String(e.id) === v);
+              if (emp) onConfirm(emp.id, emp.name);
+            }}
+          >
+            <SelectTrigger className="h-7 w-56 text-xs">
+              <SelectValue placeholder="Cari karyawan..." />
+            </SelectTrigger>
+            <SelectContent>
+              {sortedEmployees.map((e) => (
+                <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button type="button" onClick={onCloseManualPicker} className="text-xs text-muted-foreground hover:text-foreground">
+            Batal
+          </button>
+        </div>
       )}
     </div>
   );
