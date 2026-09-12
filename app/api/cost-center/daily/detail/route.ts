@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, canAccessCostCenter } from "@/lib/current-user";
 import { getWarehouseUsageDetailForDate } from "@/lib/cost-center-warehouse";
-import { getPayrollDailyDetailForDate } from "@/lib/cost-center-hr";
+import { getPayrollCostByDate } from "@/lib/cost-center-hr";
 
 const SELLING_OUTLETS = ["Gading Serpong", "Kelapa Gading", "Fatgai"];
 
@@ -12,8 +12,10 @@ function parseDateParam(s: string | null): Date | null {
 }
 
 // Rincian di balik 1 angka Biaya Pemakaian / Biaya Gaji pada 1 tanggal di
-// Dashboard Harian - dipakai popup "lihat rinciannya". Permintaan Kevin
-// 2026-09-12 ("bagaimana perhitungannya").
+// Dashboard Harian - dipakai popup "lihat rinciannya". Biaya Gaji: cuma
+// karyawan yang PUNYA absen pada tanggal itu yang muncul (lihat
+// lib/cost-center-hr.ts getPayrollCostByDate). Permintaan Kevin 2026-09-12
+// ("bagaimana perhitungannya" / "salah, harusnya per hari siapa yg masuk").
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
@@ -35,14 +37,16 @@ export async function GET(req: Request) {
     warehouseError = e instanceof Error ? e.message : "Gagal membaca data Warehouse";
   }
 
-  const payroll = await getPayrollDailyDetailForDate(date, outlets);
+  const dateStr = date.toISOString().slice(0, 10);
+  const payrollByDate = await getPayrollCostByDate(date, date, outlets);
+  const employees = (payrollByDate.get(dateStr) ?? []).sort((a, b) => b.cost - a.cost);
 
   return NextResponse.json({
-    date: url.searchParams.get("date"),
+    date: dateStr,
     outlet: outletFilter,
     usage,
     usageTotal: usage.reduce((s, l) => s + l.totalCost, 0),
-    payroll,
+    payroll: { employees },
     warehouseError,
   });
 }

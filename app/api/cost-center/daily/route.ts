@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, canAccessCostCenter } from "@/lib/current-user";
 import { getOmzetDailyByOutlet } from "@/lib/cost-center-sales";
 import { getWarehouseUsageCostByOutletDaily } from "@/lib/cost-center-warehouse";
-import { getPayrollDailyRatesByOutlet } from "@/lib/cost-center-hr";
+import { getPayrollCostByDate } from "@/lib/cost-center-hr";
 
 // Outlet penjualan yang dicakup dashboard harian - Joglo (Central Kitchen)
 // sengaja tidak ada di sini, sama seperti laporan per-periode (bukan titik
@@ -20,11 +20,11 @@ function parseDateParam(s: string | null): Date | null {
 }
 
 // Dashboard Harian Cost Center: Omzet + Biaya Pemakaian Stok + Biaya Gaji
-// (harian, dari periode Payroll Outlet mana pun yg mencakup tanggal itu -
-// TIDAK disyaratkan "final", beda dari /api/cost-center yg per-periode) per
-// hari, dalam 1 rentang tanggal bebas - default 7 hari terakhir. Bisa
-// difilter ke 1 outlet. Permintaan Kevin 2026-09-12 (sebelumnya Cost
-// Center kosong total kalau belum ada periode Payroll Outlet yg final).
+// per hari, dalam 1 rentang tanggal bebas - default 7 hari terakhir. Bisa
+// difilter ke 1 outlet. Biaya Gaji dihitung LANGSUNG dari AttendanceRecord
+// tanggal itu (lib/cost-center-hr.ts getPayrollCostByDate) - TIDAK
+// bergantung pada PayrollPeriod sama sekali, jadi selalu akurat per hari
+// walau periode belum dibuat/difinalisasi. Permintaan Kevin 2026-09-12.
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
@@ -59,12 +59,12 @@ export async function GET(req: Request) {
     warehouseError = e instanceof Error ? e.message : "Gagal membaca data Warehouse";
   }
 
+  const outlets = outletFilter ? [outletFilter] : SELLING_OUTLETS;
+
   const [omzetByDate, payrollByDate] = await Promise.all([
     getOmzetDailyByOutlet(startDate, endDate),
-    getPayrollDailyRatesByOutlet(startDate, endDate),
+    getPayrollCostByDate(startDate, endDate, outlets),
   ]);
-
-  const outlets = outletFilter ? [outletFilter] : SELLING_OUTLETS;
 
   const days: {
     date: string;
@@ -85,7 +85,7 @@ export async function GET(req: Request) {
 
     const omzet = omzetRows.reduce((s, r) => s + r.totalOmzet, 0);
     const usageCost = usageRows.reduce((s, r) => s + r.usageCost, 0);
-    const payrollCost = payrollRows.reduce((s, r) => s + r.dailyCost, 0);
+    const payrollCost = payrollRows.reduce((s, r) => s + r.cost, 0);
     const totalCost = usageCost + payrollCost;
     const hasSalesData = omzetRows.length > 0;
 

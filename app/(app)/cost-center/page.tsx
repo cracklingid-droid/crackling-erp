@@ -12,11 +12,9 @@ import {
   AlertTriangle,
   RefreshCw,
   CalendarDays,
-  FileBarChart,
   TrendingUp,
   TrendingDown,
   Wallet,
-  Store,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,55 +45,20 @@ type UsageDetailLine = { outletName: string; itemName: string; type: string; qty
 type PayrollDetailEmployee = {
   employeeName: string;
   outletName: string;
-  daysPresent: number;
   overtimeMinutes: number;
   baseSalary: number;
   partTimePay: number;
   mealAllowance: number;
   transportReimbursement: number;
   overtimePay: number;
-  grossCost: number;
-  dailyCost: number;
+  cost: number;
 };
-type PayrollDetail = {
-  periodId: number;
-  periodLabel: string;
-  periodStart: string;
-  periodEnd: string;
-  daysInPeriod: number;
-  employees: PayrollDetailEmployee[];
-} | null;
 type DailyDetail = {
   date: string;
   outlet: string | null;
   usage: UsageDetailLine[];
   usageTotal: number;
-  payroll: PayrollDetail;
-  warehouseError: string | null;
-};
-
-type Period = { id: number; label: string; startDate: string; endDate: string; status: string };
-type Row = {
-  outletName: string;
-  isCentralKitchen: boolean;
-  grossPayrollCost: number;
-  dailyPayrollCost: number;
-  usageCost: number;
-  hasWarehouseData: boolean;
-  totalCost: number;
-  omzet: number;
-  hasSalesData: boolean;
-  lastSalesSyncAt: string | null;
-  grossProfit: number;
-  ckTransfer: { count: number; value: number } | null;
-};
-type Report = {
-  period: { id: number; label: string; startDate: string; endDate: string };
-  daysInPeriod: number;
-  rows: Row[];
-  grandTotal: number;
-  grandOmzet: number;
-  grandGrossProfit: number;
+  payroll: { employees: PayrollDetailEmployee[] } | null;
   warehouseError: string | null;
 };
 
@@ -106,8 +69,14 @@ function fmtRupiah(n: number) {
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
-function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+function fmtQty(n: number) {
+  return n.toLocaleString("id-ID", { maximumFractionDigits: 2 });
+}
+function formatMinutes(min: number) {
+  if (min <= 0) return "-";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}j ${m}m`;
 }
 function fmtDayLong(iso: string) {
   return new Date(`${iso}T00:00:00.000Z`).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
@@ -180,12 +149,7 @@ function defaultDailyRange() {
 export default function CostCenterPage() {
   const { user } = useAuthContext();
   const canSync = !!user && hasFullAccess(user);
-  const [periods, setPeriods] = useState<Period[]>([]);
-  const [periodId, setPeriodId] = useState<string>("");
-  const [report, setReport] = useState<Report | null>(null);
-  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const initialRange = defaultDailyRange();
   const [dailyStart, setDailyStart] = useState(initialRange.start);
@@ -254,37 +218,6 @@ export default function CostCenterPage() {
     return dailyStart === toDateInput(start) && dailyEnd === toDateInput(end);
   }
 
-  function loadPeriods() {
-    fetch("/api/payroll/periods?category=outlet")
-      .then((r) => r.json())
-      .then((data: (Period & { _count: { items: number } })[]) => {
-        const final = data.filter((p) => p.status === "final");
-        setPeriods(final);
-        if (final.length > 0 && !periodId) setPeriodId(String(final[0].id));
-      });
-  }
-
-  useEffect(loadPeriods, []);
-
-  function loadReport() {
-    if (!periodId) return;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/cost-center?periodId=${periodId}`)
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) {
-          setError(data.error ?? "Gagal memuat");
-          setReport(null);
-          return;
-        }
-        setReport(data);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(loadReport, [periodId]);
-
   async function handleSync() {
     setSyncing(true);
     const res = await fetch("/api/cost-center/sync-sales", { method: "POST" });
@@ -295,7 +228,6 @@ export default function CostCenterPage() {
       return;
     }
     toast.success(`Omzet disinkron: ${data.totalRows} hari (${data.byOutlet.map((o: { outletName: string; days: number }) => `${o.outletName} ${o.days} hari`).join(", ")}).`);
-    loadReport();
     loadDaily();
   }
 
@@ -456,7 +388,7 @@ export default function CostCenterPage() {
                               {fmtRupiah(d.payrollCost)}
                             </button>
                           ) : (
-                            <Badge variant="outline" className="font-normal">blm ada periode</Badge>
+                            <Badge variant="outline" className="font-normal">tdk ada absen</Badge>
                           )}
                         </TableCell>
                         <TableCell className="font-medium tabular-nums">{fmtRupiah(d.totalCost)}</TableCell>
@@ -480,14 +412,14 @@ export default function CostCenterPage() {
 
           {dailyReport && (
             <p className="text-xs text-muted-foreground text-right">
-              Klik angka Biaya Pemakaian/Biaya Gaji utk lihat rinciannya. Biaya Gaji dihitung dari periode Payroll Outlet yang mencakup tanggal itu (draft atau final). Total Omzet/Gross Profit di atas hanya menjumlah hari yang omzetnya sudah di-sync.
+              Klik angka Biaya Pemakaian/Biaya Gaji utk lihat rinciannya. Total Omzet/Gross Profit di atas hanya menjumlah hari yang omzetnya sudah di-sync.
             </p>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={!!detailDate} onOpenChange={(open) => !open && setDetailDate(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[min(52rem,95vw)] sm:max-w-[min(52rem,95vw)] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{detailTab === "usage" ? "Rincian Biaya Pemakaian" : "Rincian Biaya Gaji"}</DialogTitle>
             <DialogDescription>
@@ -525,25 +457,27 @@ export default function CostCenterPage() {
                 <p className="text-sm text-muted-foreground">Tidak ada transaksi pemakaian stok pada tanggal ini.</p>
               )}
               {detailData.usage.length > 0 && (
-                <div className="overflow-x-auto rounded-lg border border-border">
+                <div className="rounded-lg border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {dailyOutlet === DAILY_OUTLET_ALL && <TableHead>Outlet</TableHead>}
                         <TableHead>Item</TableHead>
-                        <TableHead>Tipe</TableHead>
-                        <TableHead>Qty</TableHead>
-                        <TableHead>Biaya</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Biaya</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {detailData.usage.map((l, i) => (
                         <TableRow key={i}>
-                          {dailyOutlet === DAILY_OUTLET_ALL && <TableCell>{l.outletName}</TableCell>}
-                          <TableCell className="font-medium">{l.itemName}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs">{l.type}</TableCell>
-                          <TableCell className="tabular-nums">{l.qty}</TableCell>
-                          <TableCell className="tabular-nums">{fmtRupiah(l.totalCost)}</TableCell>
+                          <TableCell className="whitespace-normal break-words">
+                            <span className="font-medium">{l.itemName}</span>
+                            <p className="text-xs text-muted-foreground font-normal">
+                              {l.type}
+                              {dailyOutlet === DAILY_OUTLET_ALL && ` · ${l.outletName}`}
+                            </p>
+                          </TableCell>
+                          <TableCell className="tabular-nums text-right whitespace-nowrap">{fmtQty(l.qty)}</TableCell>
+                          <TableCell className="tabular-nums text-right whitespace-nowrap">{fmtRupiah(l.totalCost)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -556,41 +490,40 @@ export default function CostCenterPage() {
 
           {!detailLoading && detailData && detailTab === "payroll" && (
             <div className="grid gap-2">
-              {!detailData.payroll ? (
-                <p className="text-sm text-muted-foreground">Belum ada periode Payroll Outlet yang mencakup tanggal ini.</p>
+              <p className="text-xs text-muted-foreground">
+                Karyawan yang benar-benar tercatat hadir pada tanggal ini saja, dengan biaya hari itu (uang makan/transport tarif harian penuh, gaji pokok dipecah rata per hari kerja standar, lembur dari jam kerja aktual hari itu).
+              </p>
+              {!detailData.payroll || detailData.payroll.employees.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada karyawan yang tercatat hadir pada tanggal ini.</p>
               ) : (
                 <>
-                  <p className="text-xs text-muted-foreground">
-                    Dari periode <span className="font-medium text-foreground">{detailData.payroll.periodLabel}</span> (
-                    {fmtDate(detailData.payroll.periodStart)} &ndash; {fmtDate(detailData.payroll.periodEnd)}, {detailData.payroll.daysInPeriod} hari).
-                    Biaya Gaji harian = total gaji kotor tiap karyawan pada periode ini &divide; {detailData.payroll.daysInPeriod} hari - dibagi rata, bukan nominal yang benar-benar keluar hari itu saja.
-                  </p>
-                  <div className="overflow-x-auto rounded-lg border border-border">
+                  <div className="rounded-lg border border-border">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Karyawan</TableHead>
-                          {dailyOutlet === DAILY_OUTLET_ALL && <TableHead>Outlet</TableHead>}
-                          <TableHead>Hari Hadir</TableHead>
-                          <TableHead>Gaji Kotor/Periode</TableHead>
-                          <TableHead>/Hari</TableHead>
+                          <TableHead className="text-right">Lembur</TableHead>
+                          <TableHead className="text-right">Biaya Hari Ini</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {detailData.payroll.employees.map((e, i) => (
                           <TableRow key={i}>
-                            <TableCell className="font-medium">{e.employeeName}</TableCell>
-                            {dailyOutlet === DAILY_OUTLET_ALL && <TableCell>{e.outletName}</TableCell>}
-                            <TableCell className="tabular-nums">{e.daysPresent}</TableCell>
-                            <TableCell className="tabular-nums">{fmtRupiah(e.grossCost)}</TableCell>
-                            <TableCell className="tabular-nums">{fmtRupiah(e.dailyCost)}</TableCell>
+                            <TableCell className="whitespace-normal break-words">
+                              <span className="font-medium">{e.employeeName}</span>
+                              {dailyOutlet === DAILY_OUTLET_ALL && (
+                                <p className="text-xs text-muted-foreground font-normal">{e.outletName}</p>
+                              )}
+                            </TableCell>
+                            <TableCell className="tabular-nums text-right whitespace-nowrap">{formatMinutes(e.overtimeMinutes)}</TableCell>
+                            <TableCell className="tabular-nums text-right whitespace-nowrap font-medium">{fmtRupiah(e.cost)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
                   <p className="text-sm text-right font-medium">
-                    Total/Hari: {fmtRupiah(detailData.payroll.employees.reduce((s, e) => s + e.dailyCost, 0))}
+                    Total: {fmtRupiah(detailData.payroll.employees.reduce((s, e) => s + e.cost, 0))}
                   </p>
                 </>
               )}
@@ -598,149 +531,6 @@ export default function CostCenterPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      <div className="flex items-center gap-2 -mb-2">
-        <FileBarChart className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-lg font-heading font-semibold">Laporan per Periode Payroll</h2>
-      </div>
-
-      <Card className="transition-shadow hover:shadow-sm">
-        <CardContent className="pt-6 flex flex-wrap items-end gap-3">
-          <div className="grid gap-1.5">
-            <span className="text-xs text-muted-foreground">Periode (Payroll Outlet, final)</span>
-            <Select value={periodId} onValueChange={(v) => v && setPeriodId(v)}>
-              <SelectTrigger className="w-72">
-                <SelectValue placeholder="Pilih periode...">
-                  {() => periods.find((p) => String(p.id) === periodId)?.label ?? "Pilih periode..."}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    {p.label} ({fmtDate(p.startDate)} - {fmtDate(p.endDate)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {periods.length === 0 && !loading && (
-            <p className="text-sm text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2">
-              Belum ada periode Payroll Outlet yang final.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      {loading && (
-        <Card>
-          <CardContent className="pt-6 grid gap-2">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {report && (
-        <>
-          {report.warehouseError && (
-            <Card className="border-amber-500/40">
-              <CardContent className="pt-6 flex items-start gap-2 text-sm">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  Gagal membaca data Warehouse: {report.warehouseError}. Biaya Gaji tetap ditampilkan, kolom Biaya
-                  Pemakaian sementara kosong.
-                </span>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card className="transition-shadow hover:shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">
-                {report.period.label} &middot; {report.daysInPeriod} hari
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-3 pb-4">
-              <StatTile icon={TrendingUp} tile="icon-tile-2" label="Total Omzet" value={fmtRupiah(report.grandOmzet)} />
-              <StatTile icon={Wallet} tile="icon-tile-4" label="Total Biaya" value={fmtRupiah(report.grandTotal)} />
-              <StatTile
-                icon={report.grandGrossProfit < 0 ? TrendingDown : TrendingUp}
-                tile="icon-tile-3"
-                label="Gross Profit"
-                value={fmtRupiah(report.grandGrossProfit)}
-                tone={report.grandGrossProfit < 0 ? "negative" : "positive"}
-              />
-            </CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Outlet</TableHead>
-                    <TableHead>Biaya Gaji</TableHead>
-                    <TableHead>Biaya Pemakaian Stok</TableHead>
-                    <TableHead>Total Biaya</TableHead>
-                    <TableHead>Omzet</TableHead>
-                    <TableHead>Gross Profit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.rows.map((r) => (
-                    <TableRow key={r.outletName} className={r.isCentralKitchen ? "bg-muted/30" : undefined}>
-                      <TableCell className="font-medium">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Store className="h-3.5 w-3.5 text-muted-foreground" />
-                          {r.outletName}
-                        </span>
-                        {r.isCentralKitchen && (
-                          <p className="text-xs text-muted-foreground font-normal">Central Kitchen &middot; di luar Total/Gross Profit gabungan</p>
-                        )}
-                        {r.ckTransfer && (
-                          <p className="text-xs text-muted-foreground font-normal">
-                            Terima dari CK: {r.ckTransfer.count} surat jalan &middot; {fmtRupiah(r.ckTransfer.value)}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {fmtRupiah(r.grossPayrollCost)}
-                        <p className="text-xs text-muted-foreground font-normal">{fmtRupiah(r.dailyPayrollCost)}/hari</p>
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {r.hasWarehouseData ? fmtRupiah(r.usageCost) : <Badge variant="outline" className="font-normal">belum ada data</Badge>}
-                      </TableCell>
-                      <TableCell className="font-medium tabular-nums">{fmtRupiah(r.totalCost)}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {r.isCentralKitchen ? (
-                          "-"
-                        ) : r.hasSalesData ? (
-                          <>
-                            {fmtRupiah(r.omzet)}
-                            {r.lastSalesSyncAt && (
-                              <p className="text-xs text-muted-foreground font-normal">sync {fmtDateTime(r.lastSalesSyncAt)}</p>
-                            )}
-                          </>
-                        ) : (
-                          <Badge variant="outline" className="font-normal">belum di-sync</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className={`font-medium tabular-nums ${r.grossProfit < 0 && !r.isCentralKitchen ? "text-destructive" : r.isCentralKitchen ? "" : "text-emerald-600 dark:text-emerald-400"}`}>
-                        {!r.isCentralKitchen && r.hasSalesData ? fmtRupiah(r.grossProfit) : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <CardContent className="grid gap-1 pt-4 border-t text-sm">
-              <p className="text-xs text-muted-foreground text-right">
-                Central Kitchen dikecualikan dari semua total di atas. Total Omzet &amp; Gross Profit hanya menjumlah outlet yang omzetnya sudah di-sync.
-              </p>
-            </CardContent>
-          </Card>
-        </>
-      )}
     </div>
   );
 }

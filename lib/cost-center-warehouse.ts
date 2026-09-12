@@ -11,13 +11,6 @@ export const WAREHOUSE_OUTLET_TO_HR_NAME: Record<string, string> = {
   KG: "Kelapa Gading",
 };
 
-// Joglo bukan titik jual (tidak ada Omzet) - dipakai buat kecualikan
-// barisnya dari Total Biaya/Gross Profit gabungan. Keputusan Kevin
-// 2026-09-12.
-export const CENTRAL_KITCHEN_OUTLET_NAME = WAREHOUSE_OUTLET_TO_HR_NAME.JOGLO;
-
-export type WarehouseOutletCost = { hrOutletName: string; warehouseOutletCode: string; usageCost: number };
-
 // Type StockMovement yang SENGAJA tidak dihitung sbg "biaya pemakaian":
 // - TRANSFER_OUT: barang cuma pindah outlet (Surat Jalan), bukan terpakai/
 //   hilang di outlet asal - nilainya nanti ikut ke outlet TUJUAN lewat FIFO
@@ -33,33 +26,6 @@ export type WarehouseOutletCost = { hrOutletName: string; warehouseOutletCode: s
 //   pemakaian riil Central Kitchen cuma dari movement selain transformasi
 //   & pengiriman (mis. USAGE/ADJUSTMENT beneran, bukan proses/kirim).
 const EXCLUDED_USAGE_TYPES = ["TRANSFER_OUT", "PRODUCTION_OUT"];
-
-// Biaya pemakaian per outlet dalam 1 rentang tanggal - basisnya SAMA dgn
-// definisi "keluar" laporan Pemakaian Harian Warehouse sendiri (qty < 0),
-// dikurangi type transformasi/pengiriman di atas supaya tidak dobel hitung
-// antara Central Kitchen & outlet penerima.
-export async function getWarehouseUsageCostByOutlet(startDate: Date, endDate: Date): Promise<WarehouseOutletCost[]> {
-  const [outlets, movements] = await Promise.all([
-    warehouseDb.outlet.findMany(),
-    warehouseDb.stockMovement.findMany({
-      where: { moveDate: { gte: startDate, lte: endDate }, qty: { lt: 0 }, type: { notIn: EXCLUDED_USAGE_TYPES } },
-      select: { outletId: true, totalCost: true },
-    }),
-  ]);
-
-  const costByOutletId = new Map<number, number>();
-  for (const m of movements) {
-    costByOutletId.set(m.outletId, (costByOutletId.get(m.outletId) ?? 0) + Math.abs(Number(m.totalCost)));
-  }
-
-  return outlets
-    .filter((o) => WAREHOUSE_OUTLET_TO_HR_NAME[o.code])
-    .map((o) => ({
-      hrOutletName: WAREHOUSE_OUTLET_TO_HR_NAME[o.code],
-      warehouseOutletCode: o.code,
-      usageCost: costByOutletId.get(o.id) ?? 0,
-    }));
-}
 
 export type DailyUsageCost = { hrOutletName: string; usageCost: number };
 
@@ -136,37 +102,4 @@ export async function getWarehouseUsageDetailForDate(date: Date, outletHrNames: 
       totalCost: Math.abs(Number(m.totalCost)),
     }))
     .sort((a, b) => b.totalCost - a.totalCost);
-}
-
-export type CentralKitchenTransfer = { hrOutletName: string; count: number; value: number };
-
-// Info transparansi (BUKAN komponen Total Biaya - keputusan Kevin
-// 2026-09-12): jumlah & nilai Surat Jalan yang diterbitkan Joglo (Central
-// Kitchen) ke tiap outlet dalam 1 rentang tanggal. Nilainya = totalCost
-// movement TRANSFER_IN (sourceType "TRANSFER") di outlet penerima - sudah
-// otomatis kehitung sbg bagian Biaya Pemakaian outlet itu waktu barangnya
-// betulan dipakai, jadi TIDAK dijumlahkan lagi ke Total Biaya di sini.
-export async function getCentralKitchenTransfersByOutlet(startDate: Date, endDate: Date): Promise<CentralKitchenTransfer[]> {
-  const [outlets, movements] = await Promise.all([
-    warehouseDb.outlet.findMany(),
-    warehouseDb.stockMovement.findMany({
-      where: { moveDate: { gte: startDate, lte: endDate }, type: "TRANSFER_IN", sourceType: "TRANSFER" },
-      select: { outletId: true, totalCost: true, sourceId: true },
-    }),
-  ]);
-
-  const byOutletId = new Map<number, { transferIds: Set<number>; value: number }>();
-  for (const m of movements) {
-    const entry = byOutletId.get(m.outletId) ?? { transferIds: new Set<number>(), value: 0 };
-    entry.transferIds.add(m.sourceId);
-    entry.value += Number(m.totalCost);
-    byOutletId.set(m.outletId, entry);
-  }
-
-  return outlets
-    .filter((o) => WAREHOUSE_OUTLET_TO_HR_NAME[o.code] && byOutletId.has(o.id))
-    .map((o) => {
-      const entry = byOutletId.get(o.id)!;
-      return { hrOutletName: WAREHOUSE_OUTLET_TO_HR_NAME[o.code], count: entry.transferIds.size, value: entry.value };
-    });
 }
