@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, Warehouse, ArrowRight, LucideIcon } from "lucide-react";
+import { Users, Warehouse, PiggyBank, ArrowRight, LucideIcon } from "lucide-react";
 
 const cardClass =
   "group block h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5";
@@ -32,14 +32,14 @@ function ModuleCard({
 export default function Home() {
   return (
     <div className="min-h-full flex flex-col items-center justify-center px-6 py-16">
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-4xl">
         <div className="mb-10 text-center">
           <p className="text-sm font-medium text-primary mb-1.5">Selamat datang di</p>
           <h1 className="text-4xl font-heading font-semibold tracking-tight">Crackling ERP</h1>
           <p className="text-muted-foreground mt-2 text-sm">Pilih aplikasi yang ingin dibuka.</p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link href="/hr" className={cardClass}>
             <ModuleCard
               icon={Users}
@@ -58,6 +58,17 @@ export default function Home() {
               tile="icon-tile-2"
             />
           </a>
+          {/* Akses: owner/developer/manager - halaman itu sendiri yang menolak
+              role lain (403), kartu ini tetap tampil ke semua sesuai pola
+              kartu lain di halaman ini. Permintaan Kevin 2026-09-12. */}
+          <Link href="/cost-center" className={cardClass}>
+            <ModuleCard
+              icon={PiggyBank}
+              title="Cost Center"
+              desc="Biaya gaji, pemakaian stok, dan Gross Profit per outlet."
+              tile="icon-tile-3"
+            />
+          </Link>
         </div>
       </div>
     </div>
