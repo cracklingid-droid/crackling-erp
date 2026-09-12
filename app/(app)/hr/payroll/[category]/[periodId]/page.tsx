@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { ArrowLeft, Lock, Unlock, FileText } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, FileText, RefreshCw } from "lucide-react";
 import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
@@ -132,6 +132,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [downloading, setDownloading] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   function load() {
     setLoading(true);
@@ -186,6 +187,19 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
     } else {
       toast.error("Gagal mengubah status.");
     }
+  }
+
+  async function recalculate() {
+    setRecalculating(true);
+    const res = await fetch(`/api/payroll/periods/${periodId}/recalculate`, { method: "POST" });
+    const data = await res.json();
+    setRecalculating(false);
+    if (!res.ok) {
+      toast.error("Gagal refresh: " + data.error);
+      return;
+    }
+    toast.success(`Dihitung ulang dari absensi terbaru (${data.updated} karyawan).`);
+    load();
   }
 
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
@@ -259,7 +273,8 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             {category === "outlet" && (
               <p className="text-xs text-muted-foreground mt-1">
                 Gaji Pokok, Uang Makan, Reimb. Transport, Lembur &amp; BPJS dihitung otomatis dari absensi - kunci ikon di
-                sebelah kolomnya menandakan tidak bisa diedit manual, otomatis diperbarui begitu absensi diupload ulang.
+                sebelah kolomnya menandakan tidak bisa diedit manual, otomatis diperbarui begitu absensi diupload ulang
+                (atau klik &quot;Refresh dari Absensi&quot; kapan saja tanpa perlu upload ulang).
               </p>
             )}
           </div>
@@ -272,6 +287,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
 
       <Card>
         <CardContent className="pt-6 flex flex-wrap items-center gap-2 pb-0">
+          {category === "outlet" && !isFinal && (
+            <Button variant="outline" size="sm" onClick={recalculate} disabled={recalculating}>
+              <RefreshCw className={`h-3.5 w-3.5 ${recalculating ? "animate-spin" : ""}`} />
+              {recalculating ? "Menghitung ulang..." : "Refresh dari Absensi"}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

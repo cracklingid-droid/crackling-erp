@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { buildAttendanceGroups, type AttendanceGroup, type AttendanceMapping } from "@/lib/attendance-parse";
-import { employeeCategory } from "@/lib/payroll-config";
-import { computeOutletPayrollFields } from "@/lib/payroll-outlet-calc";
-import { computeAttendanceSummaries } from "@/lib/attendance-summary";
+import { recalcOutletPeriod } from "@/lib/payroll-outlet-recalc";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -85,25 +83,11 @@ async function recalcOverlappingOutletPeriods(groups: AttendanceGroup[]): Promis
 
   const periods = await prisma.payrollPeriod.findMany({
     where: { category: "outlet", status: "draft", startDate: { lte: maxDate }, endDate: { gte: minDate } },
-    include: { items: { select: { id: true, employeeId: true } } },
+    select: { id: true, label: true },
   });
-  if (periods.length === 0) return [];
-
-  const employees = await prisma.employee.findMany({ where: { status: "active" } });
-  const byId = new Map(employees.map((e) => [e.id, e]));
 
   for (const period of periods) {
-    const employeeIds = period.items.map((it) => it.employeeId);
-    const summaries = await computeAttendanceSummaries(employeeIds, period.startDate, period.endDate);
-    for (const item of period.items) {
-      const emp = byId.get(item.employeeId);
-      if (!emp || employeeCategory(emp.outlet) !== "outlet") continue;
-      const { daysPresent, overtimeMinutes } = summaries.get(item.employeeId) ?? { daysPresent: 0, overtimeMinutes: 0 };
-      await prisma.payrollItem.update({
-        where: { id: item.id },
-        data: computeOutletPayrollFields(emp, daysPresent, overtimeMinutes),
-      });
-    }
+    await recalcOutletPeriod(period.id);
   }
   return periods.map((p) => p.label);
 }
