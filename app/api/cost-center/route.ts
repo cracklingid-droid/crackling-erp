@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, canAccessCostCenter } from "@/lib/current-user";
 import { getPayrollCostByOutlet } from "@/lib/cost-center-hr";
-import { getWarehouseUsageCostByOutlet, WAREHOUSE_OUTLET_TO_HR_NAME } from "@/lib/cost-center-warehouse";
+import {
+  getWarehouseUsageCostByOutlet,
+  getCentralKitchenTransfersByOutlet,
+  WAREHOUSE_OUTLET_TO_HR_NAME,
+  CENTRAL_KITCHEN_OUTLET_NAME,
+} from "@/lib/cost-center-warehouse";
 import { getOmzetByOutlet } from "@/lib/cost-center-sales";
 
 // Laporan biaya & Gross Profit per outlet (Cost Center, 2026-09-12): Biaya
@@ -21,9 +26,13 @@ export async function GET(req: Request) {
   if (!hrResult) return NextResponse.json({ error: "Periode tidak ditemukan / bukan periode Outlet" }, { status: 404 });
 
   let warehouseCosts: Awaited<ReturnType<typeof getWarehouseUsageCostByOutlet>> = [];
+  let ckTransfers: Awaited<ReturnType<typeof getCentralKitchenTransfersByOutlet>> = [];
   let warehouseError: string | null = null;
   try {
-    warehouseCosts = await getWarehouseUsageCostByOutlet(hrResult.period.startDate, hrResult.period.endDate);
+    [warehouseCosts, ckTransfers] = await Promise.all([
+      getWarehouseUsageCostByOutlet(hrResult.period.startDate, hrResult.period.endDate),
+      getCentralKitchenTransfersByOutlet(hrResult.period.startDate, hrResult.period.endDate),
+    ]);
   } catch (e) {
     // Warehouse adalah sistem terpisah di luar kendali crackling-erp - kalau
     // koneksinya gagal, laporan biaya gaji TETAP tampil, cuma kolom
@@ -43,12 +52,14 @@ export async function GET(req: Request) {
     const hr = hrResult.outlets.find((o) => o.outletName === outletName);
     const wh = warehouseCosts.find((o) => o.hrOutletName === outletName);
     const sales = omzets.find((o) => o.outletName === outletName);
+    const ck = ckTransfers.find((o) => o.hrOutletName === outletName);
     const grossPayrollCost = hr?.grossPayrollCost ?? 0;
     const usageCost = wh?.usageCost ?? 0;
     const totalCost = grossPayrollCost + usageCost;
     const omzet = sales?.totalOmzet ?? 0;
     return {
       outletName,
+      isCentralKitchen: outletName === CENTRAL_KITCHEN_OUTLET_NAME,
       grossPayrollCost,
       dailyPayrollCost: hr?.dailyCost ?? 0,
       usageCost,
@@ -58,19 +69,33 @@ export async function GET(req: Request) {
       hasSalesData: !!sales,
       lastSalesSyncAt: sales?.lastSyncedAt ?? null,
       grossProfit: omzet - totalCost,
+      // Info transparansi saja (surat jalan dari Central Kitchen) - TIDAK
+      // ditambahkan ke totalCost/grossProfit, sudah otomatis kehitung
+      // lewat usageCost outlet ini waktu barangnya betulan dipakai.
+      // Keputusan Kevin 2026-09-12.
+      ckTransfer: ck ? { count: ck.count, value: ck.value } : null,
     };
   });
   rows.sort((a, b) => a.outletName.localeCompare(b.outletName));
 
   const daysInPeriod = Math.round((hrResult.period.endDate.getTime() - hrResult.period.startDate.getTime()) / 86400000) + 1;
 
+  // Central Kitchen (Joglo) bukan titik jual - biayanya (termasuk gaji
+  // karyawan CK) TIDAK dijumlahkan ke Total Biaya/Gross Profit gabungan
+  // outlet. Outlet tanpa data omzet (mis. Fatgai, belum di-sync) juga
+  // dikecualikan dari grandOmzet/grandGrossProfit spy tidak kebaca seolah
+  // rugi - Total Biaya (cost riil) tetap dijumlah krn itu beneran keluar.
+  // Keputusan Kevin 2026-09-12.
+  const sellingRows = rows.filter((r) => !r.isCentralKitchen);
+  const rowsWithSales = sellingRows.filter((r) => r.hasSalesData);
+
   return NextResponse.json({
     period: hrResult.period,
     daysInPeriod,
     rows,
-    grandTotal: rows.reduce((s, r) => s + r.totalCost, 0),
-    grandOmzet: rows.reduce((s, r) => s + r.omzet, 0),
-    grandGrossProfit: rows.reduce((s, r) => s + r.grossProfit, 0),
+    grandTotal: sellingRows.reduce((s, r) => s + r.totalCost, 0),
+    grandOmzet: rowsWithSales.reduce((s, r) => s + r.omzet, 0),
+    grandGrossProfit: rowsWithSales.reduce((s, r) => s + r.grossProfit, 0),
     warehouseError,
   });
 }

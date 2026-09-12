@@ -14,6 +14,7 @@ import { hasFullAccess } from "@/lib/roles";
 type Period = { id: number; label: string; startDate: string; endDate: string; status: string };
 type Row = {
   outletName: string;
+  isCentralKitchen: boolean;
   grossPayrollCost: number;
   dailyPayrollCost: number;
   usageCost: number;
@@ -23,6 +24,7 @@ type Row = {
   hasSalesData: boolean;
   lastSalesSyncAt: string | null;
   grossProfit: number;
+  ckTransfer: { count: number; value: number } | null;
 };
 type Report = {
   period: { id: number; label: string; startDate: string; endDate: string };
@@ -180,8 +182,18 @@ export default function CostCenterPage() {
                 </TableHeader>
                 <TableBody>
                   {report.rows.map((r) => (
-                    <TableRow key={r.outletName}>
-                      <TableCell className="font-medium">{r.outletName}</TableCell>
+                    <TableRow key={r.outletName} className={r.isCentralKitchen ? "bg-muted/30" : undefined}>
+                      <TableCell className="font-medium">
+                        {r.outletName}
+                        {r.isCentralKitchen && (
+                          <p className="text-xs text-muted-foreground font-normal">Central Kitchen &middot; di luar Total/Gross Profit gabungan</p>
+                        )}
+                        {r.ckTransfer && (
+                          <p className="text-xs text-muted-foreground font-normal">
+                            Terima dari CK: {r.ckTransfer.count} surat jalan &middot; {fmtRupiah(r.ckTransfer.value)}
+                          </p>
+                        )}
+                      </TableCell>
                       <TableCell className="tabular-nums">
                         {fmtRupiah(r.grossPayrollCost)}
                         <p className="text-xs text-muted-foreground font-normal">{fmtRupiah(r.dailyPayrollCost)}/hari</p>
@@ -191,7 +203,9 @@ export default function CostCenterPage() {
                       </TableCell>
                       <TableCell className="font-medium tabular-nums">{fmtRupiah(r.totalCost)}</TableCell>
                       <TableCell className="tabular-nums">
-                        {r.hasSalesData ? (
+                        {r.isCentralKitchen ? (
+                          "-"
+                        ) : r.hasSalesData ? (
                           <>
                             {fmtRupiah(r.omzet)}
                             {r.lastSalesSyncAt && (
@@ -202,22 +216,27 @@ export default function CostCenterPage() {
                           <Badge variant="outline" className="font-normal">belum di-sync</Badge>
                         )}
                       </TableCell>
-                      <TableCell className={`font-medium tabular-nums ${r.grossProfit < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                        {r.hasSalesData ? fmtRupiah(r.grossProfit) : "-"}
+                      <TableCell className={`font-medium tabular-nums ${r.grossProfit < 0 && !r.isCentralKitchen ? "text-destructive" : r.isCentralKitchen ? "" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {!r.isCentralKitchen && r.hasSalesData ? fmtRupiah(r.grossProfit) : "-"}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-            <CardContent className="flex flex-wrap justify-end gap-x-6 gap-y-1 pt-4 border-t text-sm">
-              <p>Total Biaya: <span className="font-medium">{fmtRupiah(report.grandTotal)}</span></p>
-              <p>Total Omzet: <span className="font-medium">{fmtRupiah(report.grandOmzet)}</span></p>
-              <p>
-                Gross Profit:{" "}
-                <span className={`font-medium ${report.grandGrossProfit < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                  {fmtRupiah(report.grandGrossProfit)}
-                </span>
+            <CardContent className="grid gap-1 pt-4 border-t text-sm">
+              <div className="flex flex-wrap justify-end gap-x-6 gap-y-1">
+                <p>Total Biaya: <span className="font-medium">{fmtRupiah(report.grandTotal)}</span></p>
+                <p>Total Omzet: <span className="font-medium">{fmtRupiah(report.grandOmzet)}</span></p>
+                <p>
+                  Gross Profit:{" "}
+                  <span className={`font-medium ${report.grandGrossProfit < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    {fmtRupiah(report.grandGrossProfit)}
+                  </span>
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground text-right">
+                Central Kitchen dikecualikan dari semua total di atas. Total Omzet &amp; Gross Profit hanya menjumlah outlet yang omzetnya sudah di-sync.
               </p>
             </CardContent>
           </Card>
