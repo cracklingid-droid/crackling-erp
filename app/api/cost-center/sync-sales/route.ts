@@ -3,6 +3,15 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser, hasFullAccess } from "@/lib/current-user";
 import { fetchAllDailySales } from "@/lib/sales-sheet";
 
+// Google Sheets-nya sekarang sudah berisi data 1 tahun kalender penuh (Jan-
+// Des) per outlet - ukuran CSV & jumlah baris jadi besar, upsert satu-satu
+// bisa >15 detik dan gampang kena timeout default Vercel. maxDuration
+// dinaikkan + upsert dijalankan paralel per-batch. Permintaan Kevin
+// 2026-09-12 (perlu sync 1 Jan - 31 Des, sebelumnya gagal krn timeout).
+export const maxDuration = 60;
+
+const UPSERT_BATCH_SIZE = 25;
+
 // Tarik ulang omzet dari Google Sheets & timpa (upsert) DailySales - manual
 // (tombol "Sync Sekarang"), bukan cron. Owner/developer saja (bukan
 // "manager" - dia cuma boleh lihat Cost Center, bukan trigger sync).
@@ -19,12 +28,17 @@ export async function POST() {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Gagal mengambil data sheet" }, { status: 502 });
   }
 
-  for (const row of rows) {
-    await prisma.dailySales.upsert({
-      where: { outletName_date: { outletName: row.outletName, date: new Date(row.date) } },
-      update: { totalOmzet: row.totalOmzet, syncedAt: new Date() },
-      create: { outletName: row.outletName, date: new Date(row.date), totalOmzet: row.totalOmzet },
-    });
+  for (let i = 0; i < rows.length; i += UPSERT_BATCH_SIZE) {
+    const batch = rows.slice(i, i + UPSERT_BATCH_SIZE);
+    await Promise.all(
+      batch.map((row) =>
+        prisma.dailySales.upsert({
+          where: { outletName_date: { outletName: row.outletName, date: new Date(row.date) } },
+          update: { totalOmzet: row.totalOmzet, syncedAt: new Date() },
+          create: { outletName: row.outletName, date: new Date(row.date), totalOmzet: row.totalOmzet },
+        })
+      )
+    );
   }
 
   const byOutlet = new Map<string, number>();
