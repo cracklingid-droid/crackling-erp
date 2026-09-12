@@ -189,16 +189,20 @@ export default function CostCenterPage() {
     setDetailDate(date);
   }
 
-  useEffect(() => {
+  function loadDetail() {
     if (!detailDate) return;
     setDetailLoading(true);
-    setDetailData(null);
     const params = new URLSearchParams({ date: detailDate });
     if (dailyOutlet !== DAILY_OUTLET_ALL) params.set("outlet", dailyOutlet);
     fetch(`/api/cost-center/daily/detail?${params}`)
       .then((r) => r.json())
       .then(setDetailData)
       .finally(() => setDetailLoading(false));
+  }
+
+  useEffect(() => {
+    setDetailData(null);
+    loadDetail();
   }, [detailDate, dailyOutlet]);
 
   function applyPreset(days: number) {
@@ -227,8 +231,11 @@ export default function CostCenterPage() {
       toast.error("Gagal sync: " + data.error);
       return;
     }
-    toast.success(`Omzet disinkron: ${data.totalRows} hari (${data.byOutlet.map((o: { outletName: string; days: number }) => `${o.outletName} ${o.days} hari`).join(", ")}).`);
+    toast.success(
+      `Omzet disinkron: ${data.totalRows} hari (${data.byOutlet.map((o: { outletName: string; days: number }) => `${o.outletName} ${o.days} hari`).join(", ")}). Biaya Gaji & Biaya Pemakaian ikut ter-refresh (selalu real-time).`
+    );
     loadDaily();
+    loadDetail();
   }
 
   return (
@@ -242,11 +249,14 @@ export default function CostCenterPage() {
           <p className="text-muted-foreground text-sm mt-0.5">
             Biaya Gaji (HR) + Biaya Pemakaian Stok/Central Kitchen (Warehouse) + Omzet (POS) sampai Gross Profit, per outlet.
           </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Biaya Gaji &amp; Biaya Pemakaian selalu real-time (dihitung ulang tiap dibuka) - cuma Omzet yang perlu di-sync manual krn sumbernya Google Sheets eksternal.
+          </p>
         </div>
         {canSync && (
           <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing} className="shrink-0">
             <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sinkron..." : "Sync Omzet Sekarang"}
+            {syncing ? "Sinkron..." : "Sync & Refresh Semua"}
           </Button>
         )}
       </div>
