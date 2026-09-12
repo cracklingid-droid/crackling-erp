@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { ArrowLeft, Lock, Unlock, FileText } from "lucide-react";
+import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
 
@@ -255,6 +256,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
               {formatDate(period.startDate)} - {formatDate(period.endDate)} &middot; {items.length} karyawan &middot; Total gaji
               bersih Rp {formatRupiah(totalNetPay)}
             </p>
+            {category === "outlet" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Gaji Pokok, Uang Makan, Reimb. Transport, Lembur &amp; BPJS dihitung otomatis dari absensi - kunci ikon di
+                sebelah kolomnya menandakan tidak bisa diedit manual, otomatis diperbarui begitu absensi diupload ulang.
+              </p>
+            )}
           </div>
           <Button variant="outline" size="sm" onClick={toggleStatus} disabled={togglingStatus} className="shrink-0">
             {isFinal ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
@@ -305,7 +312,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                   <TableHead key={f.key as string} className="whitespace-nowrap">{f.label}</TableHead>
                 ))}
                 {editableFields.map((f) => (
-                  <TableHead key={f.key as string} className="whitespace-nowrap">{f.label}</TableHead>
+                  <TableHead key={f.key as string} className="whitespace-nowrap">
+                    {category === "outlet" && OUTLET_LOCKED_FIELD_KEYS.has(f.key as string) && (
+                      <Lock className="h-3 w-3 inline mr-1 text-muted-foreground" />
+                    )}
+                    {f.label}
+                  </TableHead>
                 ))}
                 <TableHead className="whitespace-nowrap">Gaji Bersih</TableHead>
                 <TableHead className="whitespace-nowrap">Slip</TableHead>
@@ -365,6 +377,22 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       : isDeduction
                         ? "text-red-600 dark:text-red-400"
                         : "text-emerald-600 dark:text-emerald-400";
+                    // Field Outlet dari absensi/konfigurasi karyawan dikunci
+                    // (dihitung ulang otomatis, bukan input manual) - keputusan
+                    // Kevin 2026-09-12, supaya tidak ada ruang salah edit HR.
+                    const isLocked = category === "outlet" && OUTLET_LOCKED_FIELD_KEYS.has(f.key as string);
+                    if (isLocked) {
+                      return (
+                        <TableCell key={f.key as string}>
+                          <span
+                            className={`block w-32 tabular-nums text-right text-sm ${colorClass}`}
+                            title="Dihitung otomatis dari data absensi - tidak bisa diedit manual"
+                          >
+                            {formatRupiah(value)}
+                          </span>
+                        </TableCell>
+                      );
+                    }
                     return (
                       <TableCell key={f.key as string}>
                         <Input

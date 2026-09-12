@@ -6,14 +6,12 @@ import {
   calcOvertimePay,
   calcBpjsKesehatan,
   calcBpjsKetenagakerjaan,
-  calcOutletOvertimePay,
-  calcOutletMealAllowance,
-  calcOutletTransportAllowance,
-  calcOutletBaseSalary,
   DEFAULT_DAILY_MEAL_ALLOWANCE,
   CONTRACT_DEPOSIT_INSTALLMENT,
   CONTRACT_DEPOSIT_INSTALLMENT_COUNT,
 } from "@/lib/payroll-config";
+import { computeOutletPayrollFields } from "@/lib/payroll-outlet-calc";
+import { nextOutletPeriodRange, outletPeriodLabel } from "@/lib/payroll-outlet-schedule";
 import { computeAttendanceSummaries } from "@/lib/attendance-summary";
 
 export async function GET(req: Request) {
@@ -38,12 +36,46 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
 
   const body = await req.json();
-  const label = typeof body.label === "string" ? body.label.trim() : "";
   const category = body.category === "outlet" || body.category === "kantor" ? body.category : null;
-  const startDate = body.startDate ? new Date(body.startDate) : null;
-  const endDate = body.endDate ? new Date(body.endDate) : null;
-  if (!label || !category || !startDate || !endDate) {
-    return NextResponse.json({ error: "Label, kategori, dan rentang tanggal wajib diisi" }, { status: 400 });
+  if (!category) return NextResponse.json({ error: "Kategori wajib diisi" }, { status: 400 });
+
+  let label: string;
+  let startDate: Date;
+  let endDate: Date;
+
+  if (category === "outlet") {
+    // Rentang tanggal & label Payroll Outlet TIDAK BISA dikustomisasi lagi -
+    // dihitung sendiri oleh server dari periode outlet terakhir, mengikuti
+    // jadwal tetap yang sudah diumumkan Kevin ke grup, supaya HR tidak
+    // punya ruang salah input tanggal. Body startDate/endDate/label dari
+    // client diabaikan sepenuhnya (bukan cuma disembunyikan di UI).
+    // Keputusan Kevin 2026-09-12.
+    const lastPeriod = await prisma.payrollPeriod.findFirst({
+      where: { category: "outlet" },
+      orderBy: { endDate: "desc" },
+    });
+    if (!lastPeriod) {
+      return NextResponse.json(
+        { error: "Belum ada periode outlet sebelumnya - hubungi developer utk seed periode pertama." },
+        { status: 400 }
+      );
+    }
+    const range = nextOutletPeriodRange(lastPeriod.endDate);
+    startDate = range.start;
+    endDate = range.end;
+    label = outletPeriodLabel(endDate);
+
+    const dup = await prisma.payrollPeriod.findFirst({ where: { category: "outlet", startDate, endDate } });
+    if (dup) {
+      return NextResponse.json({ error: `Periode "${dup.label}" utk rentang ini sudah ada.` }, { status: 400 });
+    }
+  } else {
+    label = typeof body.label === "string" ? body.label.trim() : "";
+    startDate = body.startDate ? new Date(body.startDate) : (null as never);
+    endDate = body.endDate ? new Date(body.endDate) : (null as never);
+    if (!label || !startDate || !endDate) {
+      return NextResponse.json({ error: "Label, kategori, dan rentang tanggal wajib diisi" }, { status: 400 });
+    }
   }
 
   const employees = await prisma.employee.findMany({ where: { status: "active" } });
@@ -60,18 +92,6 @@ export async function POST(req: Request) {
       const baseSalary = emp.baseSalary ?? 0;
 
       if (category === "outlet") {
-        // Ikut logika spreadsheet gaji outlet Crackling (permintaan Kevin
-        // 2026-09-11) - lihat komentar di lib/payroll-config.ts.
-        const dailyMealRate = emp.dailyMealRate ?? 0;
-        const dailyTransportRate = emp.dailyTransportRate ?? 0;
-        // Karyawan part time (gaji harian, mis. Ridho/Wise) tidak punya gaji
-        // pokok bulanan - gajinya cuma rate harian x hari hadir, terpisah
-        // dari baseSalary. Permintaan Kevin 2026-09-11.
-        const partTimePay = emp.dailyBaseRate != null ? emp.dailyBaseRate * daysPresent : 0;
-        // Gaji pokok diprorata kalau hari hadir < 24 hari (permintaan Kevin
-        // 2026-09-11) - lihat calcOutletBaseSalary di lib/payroll-config.ts.
-        const proratedBaseSalary = calcOutletBaseSalary(baseSalary, daysPresent);
-
         // Deposit wajib karyawan kontrak - Rp250rb otomatis di 2 periode
         // pertama, berhenti sendiri setelahnya. Permintaan Kevin 2026-09-11.
         const isContractDepositDue = emp.employmentStatus === "kontrak" && emp.depositInstallmentsPaid < CONTRACT_DEPOSIT_INSTALLMENT_COUNT;
@@ -81,15 +101,7 @@ export async function POST(req: Request) {
           data: {
             periodId: created.id,
             employeeId: emp.id,
-            daysPresent,
-            overtimeMinutes,
-            baseSalary: proratedBaseSalary,
-            partTimePay,
-            mealAllowance: calcOutletMealAllowance(dailyMealRate, daysPresent),
-            transportReimbursement: calcOutletTransportAllowance(dailyTransportRate, daysPresent),
-            overtimePay: calcOutletOvertimePay(dailyMealRate, overtimeMinutes),
-            bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
-            bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
+            ...computeOutletPayrollFields(emp, daysPresent, overtimeMinutes),
             depositDeduction,
           },
         });

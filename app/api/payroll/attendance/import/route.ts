@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { buildAttendanceGroups, type AttendanceGroup, type AttendanceMapping } from "@/lib/attendance-parse";
+import { employeeCategory } from "@/lib/payroll-config";
+import { computeOutletPayrollFields } from "@/lib/payroll-outlet-calc";
+import { computeAttendanceSummaries } from "@/lib/attendance-summary";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -55,11 +58,52 @@ export async function POST(req: Request) {
     imported++;
   }
 
+  const recalculatedPeriods = imported > 0 ? await recalcOverlappingOutletPeriods(groups) : [];
+
   return NextResponse.json({
     totalRows,
     skippedRows: skipped,
     groupsFound: groups.length,
     imported,
     unmatchedNames: Array.from(unmatched),
+    recalculatedPeriods,
   });
+}
+
+// Begitu absensi diupload, langsung hitung ulang gaji Outlet utk periode
+// (draft) manapun yang tanggalnya kena rentang absensi ini - supaya HR
+// tidak perlu ingat urutan "upload absen dulu baru bikin periode" atau
+// takut lupa update manual. Periode yang sudah "final" TIDAK disentuh
+// (gaji yang sudah difinalisasi/dibayar tidak boleh berubah sendiri).
+// Cuma memperbarui baris karyawan yang SUDAH ada di periode itu (tidak
+// menambah baris baru utk karyawan yang belum ada saat periode dibuat).
+// Keputusan Kevin 2026-09-12.
+async function recalcOverlappingOutletPeriods(groups: AttendanceGroup[]): Promise<string[]> {
+  const dates = groups.map((g) => new Date(g.date).getTime());
+  const minDate = new Date(Math.min(...dates));
+  const maxDate = new Date(Math.max(...dates));
+
+  const periods = await prisma.payrollPeriod.findMany({
+    where: { category: "outlet", status: "draft", startDate: { lte: maxDate }, endDate: { gte: minDate } },
+    include: { items: { select: { id: true, employeeId: true } } },
+  });
+  if (periods.length === 0) return [];
+
+  const employees = await prisma.employee.findMany({ where: { status: "active" } });
+  const byId = new Map(employees.map((e) => [e.id, e]));
+
+  for (const period of periods) {
+    const employeeIds = period.items.map((it) => it.employeeId);
+    const summaries = await computeAttendanceSummaries(employeeIds, period.startDate, period.endDate);
+    for (const item of period.items) {
+      const emp = byId.get(item.employeeId);
+      if (!emp || employeeCategory(emp.outlet) !== "outlet") continue;
+      const { daysPresent, overtimeMinutes } = summaries.get(item.employeeId) ?? { daysPresent: 0, overtimeMinutes: 0 };
+      await prisma.payrollItem.update({
+        where: { id: item.id },
+        data: computeOutletPayrollFields(emp, daysPresent, overtimeMinutes),
+      });
+    }
+  }
+  return periods.map((p) => p.label);
 }

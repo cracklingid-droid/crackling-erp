@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Lock } from "lucide-react";
 import { getDefaultPeriodRange, toDateInputValue } from "@/lib/payroll-period-cycle";
+import { nextOutletPeriodRange, outletPeriodLabel } from "@/lib/payroll-outlet-schedule";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
 
@@ -57,8 +58,17 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
 
   useEffect(load, [category]);
 
+  // Payroll Outlet: tanggal & label TIDAK bisa dikustomisasi lagi - ikut
+  // jadwal tetap dari pengumuman Kevin di grup, dihitung dari periode
+  // outlet terakhir yang sudah ada (bukan dari tanggal hari ini seperti
+  // Kantor). Keputusan Kevin 2026-09-12, supaya tidak ada ruang salah
+  // input tanggal dari HR.
+  const lastOutletPeriod = category === "outlet" ? periods[0] : undefined;
+  const nextOutletRange =
+    category === "outlet" && lastOutletPeriod ? nextOutletPeriodRange(new Date(lastOutletPeriod.endDate)) : null;
+
   function openForm() {
-    if (!showForm) {
+    if (!showForm && category === "kantor") {
       const { start, end } = getDefaultPeriodRange();
       setLabel(defaultPeriodLabel(category, end));
       setStartDate(toDateInputValue(start));
@@ -69,15 +79,16 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!label.trim() || !startDate || !endDate) {
+    if (category === "kantor" && (!label.trim() || !startDate || !endDate)) {
       toast.error("Label dan rentang tanggal wajib diisi");
       return;
     }
     setSaving(true);
+    const body = category === "outlet" ? { category } : { label, category, startDate, endDate };
     const res = await fetch("/api/payroll/periods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label, category, startDate, endDate }),
+      body: JSON.stringify(body),
     });
     setSaving(false);
     if (res.ok) {
@@ -119,32 +130,69 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
             <CardTitle className="text-base">Buat Periode Gaji</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground mb-3">
-              Default rentang tanggal 21 s.d. 20 bulan berikutnya (siklus gajian tanggal 25) - boleh diubah bebas kalau
-              perlu penyesuaian sementara. Sistem otomatis membuat baris gaji untuk semua karyawan aktif kategori{" "}
-              {categoryLabel.toLowerCase()}, dengan saran awal dari gaji pokok & data absensi pada rentang tanggal ini -
-              tetap bisa diedit satu-satu di halaman berikutnya.
-            </p>
-            <form onSubmit={handleSubmit} className="grid gap-4">
-              <div className="grid gap-1.5">
-                <Label>Label Periode</Label>
-                <Input value={label} onChange={(e) => setLabel(e.target.value)} />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label>Mulai</Label>
-                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            {category === "outlet" ? (
+              <form onSubmit={handleSubmit} className="grid gap-4">
+                <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  Rentang tanggal &amp; label ikut jadwal tetap yang sudah diumumkan (siklus 21 s.d. 20, gajian tanggal
+                  25) - tidak bisa diubah, supaya tidak ada ruang salah input. Sistem otomatis hitung gaji semua karyawan
+                  aktif Outlet dari data absensi yang sudah diupload utk rentang ini.
+                </p>
+                {nextOutletRange ? (
+                  <div className="grid gap-4 sm:grid-cols-3 rounded-lg border bg-muted/30 px-4 py-3">
+                    <div className="grid gap-0.5">
+                      <span className="text-xs text-muted-foreground">Label Periode</span>
+                      <span className="text-sm font-medium">{outletPeriodLabel(nextOutletRange.end)}</span>
+                    </div>
+                    <div className="grid gap-0.5">
+                      <span className="text-xs text-muted-foreground">Mulai</span>
+                      <span className="text-sm font-medium">{formatDate(toDateInputValue(nextOutletRange.start))}</span>
+                    </div>
+                    <div className="grid gap-0.5">
+                      <span className="text-xs text-muted-foreground">Sampai</span>
+                      <span className="text-sm font-medium">{formatDate(toDateInputValue(nextOutletRange.end))}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-destructive">Tidak ada periode outlet sebelumnya - hubungi developer.</p>
+                )}
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={saving || !nextOutletRange}>
+                    {saving ? "Membuat..." : "Buat & Hitung Periode Berikutnya"}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Batal</Button>
                 </div>
-                <div className="grid gap-1.5">
-                  <Label>Sampai</Label>
-                  <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={saving}>{saving ? "Membuat..." : "Buat & Hitung"}</Button>
-                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Batal</Button>
-              </div>
-            </form>
+              </form>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Default rentang tanggal 21 s.d. 20 bulan berikutnya (siklus gajian tanggal 25) - boleh diubah bebas
+                  kalau perlu penyesuaian sementara. Sistem otomatis membuat baris gaji untuk semua karyawan aktif
+                  kategori kantor, dengan saran awal dari gaji pokok &amp; data absensi pada rentang tanggal ini - tetap
+                  bisa diedit satu-satu di halaman berikutnya.
+                </p>
+                <form onSubmit={handleSubmit} className="grid gap-4">
+                  <div className="grid gap-1.5">
+                    <Label>Label Periode</Label>
+                    <Input value={label} onChange={(e) => setLabel(e.target.value)} />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-1.5">
+                      <Label>Mulai</Label>
+                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>Sampai</Label>
+                      <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={saving}>{saving ? "Membuat..." : "Buat & Hitung"}</Button>
+                    <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Batal</Button>
+                  </div>
+                </form>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

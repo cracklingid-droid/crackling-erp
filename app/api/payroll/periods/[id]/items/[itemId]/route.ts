@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
 
 const NUMBER_FIELDS = [
   "baseSalary",
@@ -29,7 +30,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; i
   if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
 
   const { id, itemId } = await ctx.params;
-  const period = await prisma.payrollPeriod.findUnique({ where: { id: Number(id) }, select: { status: true } });
+  const period = await prisma.payrollPeriod.findUnique({ where: { id: Number(id) }, select: { status: true, category: true } });
   if (!period) return NextResponse.json({ error: "Periode tidak ditemukan" }, { status: 404 });
   if (period.status === "final") {
     return NextResponse.json({ error: "Periode ini sudah difinalisasi, tidak bisa diedit lagi" }, { status: 400 });
@@ -38,6 +39,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; i
   const body = await req.json();
   const data: Record<string, unknown> = {};
   for (const f of NUMBER_FIELDS) {
+    // Field Payroll Outlet yang asalnya dari absensi/konfigurasi karyawan
+    // dikunci - dihitung ulang otomatis, bukan input manual HR (keputusan
+    // Kevin 2026-09-12, supaya tidak ada ruang salah edit).
+    if (period.category === "outlet" && OUTLET_LOCKED_FIELD_KEYS.has(f)) continue;
     if (f in body) data[f] = Number(body[f]) || 0;
   }
   if ("note" in body) data.note = body.note || null;

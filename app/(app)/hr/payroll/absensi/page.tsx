@@ -141,6 +141,9 @@ export default function UploadAbsensiPage() {
     }
     setResult(data);
     toast.success(`${data.imported} rekap absensi berhasil disimpan.`);
+    if (data.recalculatedPeriods?.length > 0) {
+      toast.success(`Gaji Outlet otomatis dihitung ulang: ${data.recalculatedPeriods.join(", ")}.`);
+    }
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -186,6 +189,9 @@ export default function UploadAbsensiPage() {
     }
     setResult(data);
     toast.success(`${data.imported} rekap absensi berhasil disimpan.`);
+    if (data.recalculatedPeriods?.length > 0) {
+      toast.success(`Gaji Outlet otomatis dihitung ulang: ${data.recalculatedPeriods.join(", ")}.`);
+    }
   }
 
   return (
