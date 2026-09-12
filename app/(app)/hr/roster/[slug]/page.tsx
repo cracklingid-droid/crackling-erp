@@ -24,6 +24,15 @@ function optionToValue(o: string): boolean | null {
   return o === "masuk" ? true : o === "libur" ? false : null;
 }
 
+// Outlet resto (bukan Central Kitchen) selalu ramai di akhir pekan - default
+// Sabtu & Minggu "Masuk" utk semua karyawan, beda dari pola "Hari Libur
+// Rutin" per-karyawan yang cuma berlaku kalau memang diisi HR. Kalau
+// karyawan itu justru punya pola eksplisit yang menandai Sabtu/Minggu
+// sebagai hari liburnya, pola pribadinya itu yang menang (lebih spesifik).
+// Permintaan Kevin 2026-09-12.
+const WEEKEND_MASUK_OUTLETS = ["Gading Serpong", "Kelapa Gading", "Fatgai"];
+const WEEKEND_DAYS = [0, 6]; // Minggu, Sabtu
+
 export default function RosterOutletPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = usePromise(params);
   const outlet = slugToOutlet(slug);
@@ -54,13 +63,22 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
     if (backfilledWeekRef.current === weekKey) return;
     backfilledWeekRef.current = weekKey;
 
+    const weekendMasuk = WEEKEND_MASUK_OUTLETS.includes(data.outlet);
+
     for (const emp of data.employees) {
-      if (!emp.defaultOffDays || emp.defaultOffDays.length === 0) continue;
+      const offDays = emp.defaultOffDays ?? [];
       for (const d of data.days) {
         const hasEntry = data.entries.some((e) => e.employeeId === emp.id && e.date === d);
         if (hasEntry) continue;
         const dayOfWeek = new Date(d).getDay();
-        setCell(emp.id, d, !emp.defaultOffDays.includes(dayOfWeek));
+
+        if (weekendMasuk && WEEKEND_DAYS.includes(dayOfWeek) && !offDays.includes(dayOfWeek)) {
+          setCell(emp.id, d, true);
+          continue;
+        }
+        if (offDays.length > 0) {
+          setCell(emp.id, d, !offDays.includes(dayOfWeek));
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,7 +113,12 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Roster Kerja
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Roster - {outlet}</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Pilih status Masuk/Libur tiap karyawan lewat dropdown di bawah.</p>
+        <p className="text-muted-foreground text-sm mt-0.5">
+          Pilih status Masuk/Libur tiap karyawan lewat dropdown di bawah.
+          {outlet && WEEKEND_MASUK_OUTLETS.includes(outlet) && (
+            <> Sabtu &amp; Minggu otomatis "Masuk" (resto ramai akhir pekan), kecuali karyawan itu punya pola libur pribadi di hari itu.</>
+          )}
+        </p>
       </div>
 
       <Card>
