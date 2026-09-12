@@ -19,11 +19,17 @@ async function main() {
   await ensureUser("owner", "Owner", "erpOwner026", "owner");
   await ensureUser("developer", "Developer", "erpDev026", "developer");
   await ensureUser("hr_manager", "HR Manager", "erpHr026", "hr_manager");
+  // Cost Center (permintaan Kevin 2026-09-12) - orang yang sama yang sudah
+  // pegang role "manager" di Crackling Warehouse (lihat prisma/seed.ts
+  // crackling-warehouse: username "manager"). HANYA akses Cost Center,
+  // tidak akses modul HR lain - lihat guard di app/(app)/hr/layout.tsx.
+  await ensureUser("manager", "Manager", "erpMgr026", "manager");
 
   console.log("Seed HR selesai. Login:");
   console.log("  owner / erpOwner026        - akses penuh");
   console.log("  developer / erpDev026      - akses penuh (testing)");
   console.log("  hr_manager / erpHr026      - kerja harian HR (rekrutmen dst)");
+  console.log("  manager / erpMgr026        - Cost Center saja");
 }
 
 main()

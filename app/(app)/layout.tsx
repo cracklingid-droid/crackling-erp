@@ -5,7 +5,8 @@ import { AuthProvider, useAuthContext } from "../components/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, LogOut, Home } from "lucide-react";
+import { ChevronDown, LogOut, Home, PiggyBank } from "lucide-react";
+import { canAccessCostCenter } from "@/lib/roles";
 
 // Role yang aksesnya lebih dari 1 modul (HR + Warehouse, dst) - butuh jalan
 // pintas balik ke halaman pilih modul. Role HR biasa (hr_manager/hr_staff)
@@ -16,9 +17,13 @@ const MULTI_MODULE_ROLES = ["owner", "developer"];
 function TopBar() {
   const { user, logout } = useAuthContext();
   const showHomeButton = !!user && MULTI_MODULE_ROLES.includes(user.role);
+  const showCostCenter = !!user && canAccessCostCenter(user);
+  // Role "manager" cuma boleh akses Cost Center (lihat app/(app)/hr/layout.tsx)
+  // jadi logo-nya langsung ke sana, bukan ke /hr yang bakal langsung dilempar balik.
+  const homeHref = user?.role === "manager" ? "/cost-center" : "/hr";
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 md:px-6">
-      <Link href="/hr" className="flex items-center gap-2">
+      <Link href={homeHref} className="flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground text-[10px] font-heading font-bold">
           CE
         </div>
@@ -27,6 +32,11 @@ function TopBar() {
       {showHomeButton && (
         <Button variant="ghost" size="sm" className="gap-1.5" render={<a href="/" />}>
           <Home className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Pilih Modul</span>
+        </Button>
+      )}
+      {showCostCenter && (
+        <Button variant="ghost" size="sm" className="gap-1.5" render={<Link href="/cost-center" />}>
+          <PiggyBank className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Cost Center</span>
         </Button>
       )}
       <div className="ml-auto">

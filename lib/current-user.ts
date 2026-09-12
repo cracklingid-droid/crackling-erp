@@ -9,7 +9,4 @@ export async function getCurrentUser() {
   return user;
 }
 
-// owner & developer selalu akses penuh ke semua modul HR.
-export function hasFullAccess(user: { role: string }): boolean {
-  return user.role === "owner" || user.role === "developer";
-}
+export { hasFullAccess, canAccessCostCenter } from "./roles";

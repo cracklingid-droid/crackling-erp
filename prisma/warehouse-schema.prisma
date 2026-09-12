@@ -1,0 +1,41 @@
+// Client Prisma KEDUA, terpisah dari prisma/schema.prisma - khusus BACA SAJA
+// dari database Crackling Warehouse (Tahap 1 rencana penggabungan ERP,
+// 2026-09-12). JANGAN JALANKAN `prisma migrate`/`db push` dgn --schema
+// file ini - Warehouse py migration lifecycle sendiri, di repo terpisah.
+// Model di sini cuma subset yang benar-benar dipakai laporan Cost Center,
+// field & tipe disalin persis dari crackling-warehouse/prisma/schema.prisma.
+generator warehouseClient {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/warehouse-client"
+}
+
+datasource warehouseDb {
+  provider = "postgresql"
+  url      = env("WAREHOUSE_DATABASE_URL")
+}
+
+model Outlet {
+  id       Int     @id
+  code     String
+  name     String
+  type     String
+  isActive Boolean
+}
+
+// qty/totalCost negatif = pemakaian/keluar, positif = masuk - sama definisi
+// "keluar" yg dipakai laporan Pemakaian Harian Warehouse sendiri
+// (lib/fifo.ts getDailyMovementReport: target = qty < 0 ? keluar : masuk).
+// Dipakai apa adanya spy angka Cost Center selalu cocok dgn laporan
+// Warehouse, tidak bikin definisi baru yang bisa beda.
+model StockMovement {
+  id         Int      @id
+  itemId     Int
+  outletId   Int
+  areaId     Int?
+  moveDate   DateTime
+  type       String
+  qty        Decimal
+  totalCost  Decimal
+  sourceType String
+  sourceId   Int
+}
