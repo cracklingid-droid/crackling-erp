@@ -38,7 +38,7 @@ export async function createNextOutletPeriod(createdById: number | null): Promis
     });
 
     for (const emp of inCategory) {
-      const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 };
+      const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0, incompleteClockInCount: 0, incompleteClockOutCount: 0 };
 
       // Deposit wajib karyawan kontrak - Rp250rb otomatis di 2 periode
       // pertama, berhenti sendiri setelahnya. Permintaan Kevin 2026-09-11.

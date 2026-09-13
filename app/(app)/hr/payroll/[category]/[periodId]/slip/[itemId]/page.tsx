@@ -188,6 +188,17 @@ export default function PayrollSlipPage({ params }: { params: Promise<{ category
           </div>
         </div>
 
+        {category === "kantor" && ((item.fuelReimbursement as number) ?? 0) !== 0 && (
+          <div className="grid gap-1 text-sm border-t pt-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground" title="Dibayar terpisah, bukan bagian dari Gaji Bersih di atas">
+                Reimburse Bensin ({item.fuelKm as number} KM) - di luar Gaji Bersih
+              </span>
+              <span className="tabular-nums">{formatRupiah(item.fuelReimbursement as number)}</span>
+            </div>
+          </div>
+        )}
+
         {showTransferSplit && (
           <div className="grid gap-1 text-sm border-t pt-3">
             <p className="text-sm font-semibold mb-1">Rincian Transfer</p>

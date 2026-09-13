@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { computeAttendanceSummaries } from "@/lib/attendance-summary";
 
 // Rekap absensi per karyawan dalam 1 rentang tanggal - laporan lihat-saja,
@@ -8,8 +8,8 @@ import { computeAttendanceSummaries } from "@/lib/attendance-summary";
 // (mis. ketahuan ada karyawan yang absennya 0 sebelum bikin periode gaji).
 // Permintaan Kevin 2026-09-11.
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const url = new URL(req.url);
   const startParam = url.searchParams.get("start");
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
 
   const result = employees.map((e) => ({
     ...e,
-    ...(summaries.get(e.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 }),
+    ...(summaries.get(e.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0, incompleteClockInCount: 0, incompleteClockOutCount: 0 }),
   }));
 
   return NextResponse.json(result);

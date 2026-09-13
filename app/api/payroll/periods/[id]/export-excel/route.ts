@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
-import { fieldsForCategory, computeNetPay, DEDUCTION_FIELD_KEYS } from "@/lib/payroll-fields";
+import { requireHrReadUser, canViewCategory } from "@/lib/hr-access";
+import { fieldsForCategory, infoFieldsForCategory, computeNetPay, DEDUCTION_FIELD_KEYS, type FieldDef } from "@/lib/payroll-fields";
 import { computeEmployeeDailyDetail } from "@/lib/payroll-daily-detail";
 import { payrollExcelFilename } from "@/lib/payslip-filename";
 
-const INFO_FIELDS = [{ key: "lateCount", label: "Jml Telat" }];
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
 
 const HEADER_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFEFEF" } };
@@ -25,8 +24,8 @@ function formatDateID(d: Date): string {
 // Sheet 2), Sheet 2 "Rekap Bulanan" (persis tabel utama halaman periode).
 // Permintaan Kevin 2026-09-12.
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrReadUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const period = await prisma.payrollPeriod.findUnique({
@@ -54,6 +53,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     },
   });
   if (!period) return NextResponse.json({ error: "Periode tidak ditemukan" }, { status: 404 });
+  if (!canViewCategory(user, period.category)) {
+    return NextResponse.json({ error: "Tidak punya akses ke periode ini" }, { status: 403 });
+  }
 
   const employeeIds = period.items.map((it) => it.employeeId);
   const attendanceRecords = await prisma.attendanceRecord.findMany({
@@ -62,13 +64,21 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   });
 
   const editableFields = fieldsForCategory(period.category);
-  const infoFields = period.category === "outlet" ? INFO_FIELDS : [];
+  const infoFields = infoFieldsForCategory(period.category);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Crackling ERP";
   workbook.created = new Date();
 
   // ---------- Sheet 1: Detail Harian ----------
+  // Kantor SENGAJA TIDAK punya Sheet 1 - computeEmployeeDailyDetail
+  // (lib/payroll-daily-detail.ts) khusus formula Outlet (gaji pokok
+  // diprorata, dst), tidak berlaku utk Kantor (gaji pokok penuh, potongan
+  // per-kejadian bukan per-tanggal). Rekap Bulanan (Sheet 2) sudah cukup
+  // merepresentasikan payroll Kantor. Keputusan scope 2026-09-13.
+  if (period.category === "kantor") {
+    return exportKantorExcel(workbook, period, editableFields, infoFields);
+  }
   const sheet1 = workbook.addWorksheet("Detail Harian", { views: [{ state: "frozen", ySplit: 0 }] });
   const isOutletPartTimeAny = period.items.some((it) => it.employee.dailyBaseRate != null);
   const sheet1Header = [
@@ -170,7 +180,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     sheet1.addRow([]);
   }
 
-  // ---------- Sheet 2: Rekap Bulanan ----------
+  return addRekapSheetAndRespond(workbook, period, editableFields, infoFields);
+}
+
+// Kantor tidak punya Sheet 1 "Detail Harian" (lihat catatan di GET) - export
+// Excel-nya cuma Sheet "Rekap Bulanan".
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function exportKantorExcel(workbook: ExcelJS.Workbook, period: any, editableFields: FieldDef[], infoFields: FieldDef[]) {
+  return addRekapSheetAndRespond(workbook, period, editableFields, infoFields);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function addRekapSheetAndRespond(workbook: ExcelJS.Workbook, period: any, editableFields: FieldDef[], infoFields: FieldDef[]) {
   const sheet2 = workbook.addWorksheet("Rekap Bulanan");
   const sheet2Header = [
     "Karyawan",
@@ -198,8 +219,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       item.employee.name,
       item.employee.position ?? "-",
       item.employee.outlet ?? "-",
-      item.daysPresent,
-      item.overtimeMinutes,
+      record.daysPresent,
+      record.overtimeMinutes,
       ...infoFields.map((f) => record[f.key] ?? 0),
       ...editableFields.map((f) => {
         const v = record[f.key] ?? 0;
@@ -216,14 +237,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   totalRow2.font = { bold: true };
   totalRow2.getCell(sheet2Header.length).numFmt = RUPIAH_FORMAT;
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  const filename = payrollExcelFilename(period.endDate, period.category);
-  const categoryLabel = CATEGORY_LABEL[period.category] ?? period.category;
-
-  return new NextResponse(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="gaji-${categoryLabel.toLowerCase()}.xlsx"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-    },
+  return workbook.xlsx.writeBuffer().then((buffer) => {
+    const filename = payrollExcelFilename(period.endDate, period.category);
+    const categoryLabel = CATEGORY_LABEL[period.category] ?? period.category;
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="gaji-${categoryLabel.toLowerCase()}.xlsx"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      },
+    });
   });
 }

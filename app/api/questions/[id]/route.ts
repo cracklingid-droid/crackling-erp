@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const questionId = Number(id);
@@ -40,8 +40,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   await prisma.psychTestQuestion.delete({ where: { id: Number(id) } });

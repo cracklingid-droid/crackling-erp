@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrReadUser, requireHrWriteUser, canViewCategory } from "@/lib/hr-access";
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrReadUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const period = await prisma.payrollPeriod.findUnique({
@@ -17,14 +17,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     },
   });
   if (!period) return NextResponse.json({ error: "Periode tidak ditemukan" }, { status: 404 });
+  if (!canViewCategory(user, period.category)) {
+    return NextResponse.json({ error: "Tidak punya akses ke periode ini" }, { status: 403 });
+  }
   return NextResponse.json(period);
 }
 
 const VALID_STATUS = ["draft", "final"];
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const body = await req.json();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { deleteCvForRejectedCandidate } from "@/lib/delete-cv";
 import { isStageTransitionAllowed, STAGE_ROLLBACK_ERROR } from "@/lib/candidate-stages";
 import { sendMail } from "@/lib/mail";
@@ -8,8 +8,8 @@ import { sendMail } from "@/lib/mail";
 const VALID_STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const candidate = await prisma.candidate.findUnique({
@@ -26,8 +26,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const candidateId = Number(id);

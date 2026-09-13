@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrReadUser, requireHrWriteUser, canViewCategory } from "@/lib/hr-access";
+import { employeeCategory } from "@/lib/payroll-config";
 import { getMissingOnboardingFields } from "@/lib/employee-onboarding";
+
+// Rate Payroll Kantor (permintaan Kevin 2026-09-13) - nullable, dikosongkan
+// kalau string kosong sama seperti field rate Outlet yang sudah ada.
+const KANTOR_RATE_FIELDS = [
+  "kantorOvertimeRate",
+  "kantorLateRate",
+  "kantorIncompleteClockRate",
+  "kantorFuelRatePerKm",
+  "kantorBpjsAllowance",
+  "kantorBpjsEmployerObligation",
+  "kantorBpjsRemittance",
+] as const;
 
 const VALID_STATUS = ["onboarding", "active", "resigned"];
 const STRING_FIELDS = [
@@ -27,8 +40,8 @@ const TRACKED_HISTORY_FIELDS = [
 ] as const;
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrReadUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const employee = await prisma.employee.findUnique({
@@ -42,12 +55,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     },
   });
   if (!employee) return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
+  if (!canViewCategory(user, employeeCategory(employee.outlet))) {
+    return NextResponse.json({ error: "Tidak punya akses ke data karyawan ini" }, { status: 403 });
+  }
   return NextResponse.json(employee);
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const employeeId = Number(id);
@@ -79,6 +95,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     data.standardWorkDays = body.standardWorkDays === "" || body.standardWorkDays === null ? null : Number(body.standardWorkDays);
   if ("dailyBaseRate" in body)
     data.dailyBaseRate = body.dailyBaseRate === "" || body.dailyBaseRate === null ? null : Number(body.dailyBaseRate);
+  for (const f of KANTOR_RATE_FIELDS) {
+    if (f in body) data[f] = body[f] === "" || body[f] === null ? null : Number(body[f]);
+  }
   if ("depositInstallmentsPaid" in body) data.depositInstallmentsPaid = Number(body.depositInstallmentsPaid) || 0;
   if ("depositBalance" in body) data.depositBalance = Number(body.depositBalance) || 0;
   if ("defaultOffDays" in body) data.defaultOffDays = Array.isArray(body.defaultOffDays) ? body.defaultOffDays.map(Number) : [];

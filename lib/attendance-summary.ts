@@ -1,6 +1,15 @@
 import { prisma } from "./db";
 
-export type AttendanceSummary = { daysPresent: number; overtimeMinutes: number; totalMinutes: number; lateCount: number };
+export type AttendanceSummary = {
+  daysPresent: number;
+  overtimeMinutes: number;
+  totalMinutes: number;
+  lateCount: number;
+  // "Absen Tidak Lengkap Clock In/Out" (khusus Payroll Kantor, permintaan
+  // Kevin 2026-09-13) - hari hadir tapi salah satu jam scan tidak tercatat.
+  incompleteClockInCount: number;
+  incompleteClockOutCount: number;
+};
 
 // Jadwal kerja standar karyawan (field Employee.workSchedule, mis.
 // "08:00-20:00") - dipakai utk bandingkan jam masuk aktual vs jadwal, jadi
@@ -29,7 +38,8 @@ export async function computeAttendanceSummaries(
   schedules?: Map<number, string | null>
 ): Promise<Map<number, AttendanceSummary>> {
   const map = new Map<number, AttendanceSummary>();
-  for (const id of employeeIds) map.set(id, { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 });
+  for (const id of employeeIds)
+    map.set(id, { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0, incompleteClockInCount: 0, incompleteClockOutCount: 0 });
   if (employeeIds.length === 0) return map;
 
   const records = await prisma.attendanceRecord.findMany({
@@ -45,6 +55,8 @@ export async function computeAttendanceSummaries(
       s.totalMinutes += worked;
       s.overtimeMinutes += Math.max(0, Math.round(worked - 8 * 60));
     }
+    if (!r.clockIn) s.incompleteClockInCount++;
+    if (!r.clockOut) s.incompleteClockOutCount++;
     if (r.clockIn && schedules) {
       const sched = parseScheduleStart(schedules.get(r.employeeId));
       if (sched) {

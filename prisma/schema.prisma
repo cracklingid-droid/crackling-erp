@@ -203,8 +203,26 @@ model Employee {
   // dibayar penuh apapun kehadirannya), dan "hari kerja standar" beda-beda
   // per karyawan (dipakai basis hitung rate lembur/telat).
   dailyTransportRate Int? // Uang Transport per hari hadir, dalam rupiah
-  dailyMealRate      Int? // Uang Makan per hari hadir, dalam rupiah
+  dailyMealRate      Int? // Uang Makan per hari hadir, dalam rupiah (dipakai jg utk "Uang Makan" Kantor - konsep sama, kategori tidak pernah dobel)
   standardWorkDays   Int? // "Day Work" - jumlah hari kerja standar per bulan
+
+  // Khusus kalkulator Payroll Kantor (permintaan Kevin 2026-09-13, ikut
+  // logika spreadsheet gaji kantor "2608 rekap gaji FINAL.xlsx" yang sudah
+  // berjalan) - BEDA dari Outlet: Gaji Pokok dibayar PENUH (tidak
+  // diprorata dari hari hadir), lembur dihitung per JAM dgn rate tetap
+  // (bukan turunan Uang Makan/3 spt Outlet), Keterlambatan & Absen Tidak
+  // Lengkap dihitung otomatis dari absensi vs workSchedule x rate ini. 3
+  // angka BPJS di bawah nominal TETAP per bulan (bukan hasil rumus BPJS
+  // umum - angka kebijakan perusahaan sendiri, bukan rumus) - "Kewajiban
+  // BPJS Ktr" MENAMBAH gross (bukan mengurangi), sesuai spreadsheet asli
+  // (sudah dikonfirmasi Kevin, kedengaran ganjil tapi memang begitu).
+  kantorOvertimeRate           Int? // Lembur per JAM (kantor)
+  kantorLateRate               Int? // Potongan Keterlambatan per kejadian (kantor)
+  kantorIncompleteClockRate    Int? // Potongan Absen Tidak Lengkap per kejadian (kantor) - 1 rate dipakai utk Clock In maupun Clock Out
+  kantorFuelRatePerKm          Int? // Reimburse Bensin per KM ditempuh (kantor) - KM diinput manual per periode, TIDAK termasuk Take Home Pay
+  kantorBpjsAllowance          Int? // Tunjangan BPJS Kar - nominal tetap/bulan (kantor), penambah
+  kantorBpjsEmployerObligation Int? // Kewajiban BPJS Ktr - nominal tetap/bulan (kantor), penambah
+  kantorBpjsRemittance         Int? // Setoran ke BPJS - nominal tetap/bulan (kantor), pengurang
 
   // Karyawan part time digaji per hari (bukan gaji pokok bulanan) - dipisah
   // dari baseSalary supaya jelas beda skema, mis. Ridho/Wise yang gajinya
@@ -498,6 +516,27 @@ model PayrollItem {
   depositRefund          Int @default(0) // Pengembalian Deposit (refund, penambah)
   serviceCharge          Int @default(0) // Service Charge (bagi hasil tip, penambah)
   bonus                  Int @default(0)
+
+  // Kategori tambahan khusus Payroll Kantor, ikut logika spreadsheet gaji
+  // kantor "2608 rekap gaji FINAL.xlsx" (permintaan Kevin 2026-09-13) -
+  // tidak tampil di Outlet. bonusSales & fuelKm sengaja manual (tidak ada
+  // sumber datanya di sistem) - PPh21 & "Potongan" generik kantor pakai
+  // field yang sudah ada (pph21Deduction, otherAdjustment). Keterlambatan &
+  // Absen Tidak Lengkap DIHITUNG OTOMATIS dari absensi vs Employee.
+  // workSchedule x rate (beda dari Outlet yang manual). fuelReimbursement
+  // dihitung dari fuelKm x rate karyawan tapi SENGAJA TIDAK ikut Take Home
+  // Pay (dibayar terpisah - sesuai sheet Recap Kevin, kolom "Reimburse"
+  // berdiri sendiri di luar Total Penghasilan/Pengurang).
+  bonusSales                   Int @default(0) // Bonus Atas Penjualan (kantor, manual per periode)
+  incompleteClockInCount       Int @default(0) // jumlah hari absen tidak lengkap Clock In (kantor, dari absensi)
+  incompleteClockInDeduction   Int @default(0) // = incompleteClockInCount x Employee.kantorIncompleteClockRate
+  incompleteClockOutCount      Int @default(0)
+  incompleteClockOutDeduction  Int @default(0)
+  bpjsAllowance                Int @default(0) // Tunjangan BPJS Kar (kantor, penambah) - saran dari Employee.kantorBpjsAllowance
+  bpjsEmployerObligation       Int @default(0) // Kewajiban BPJS Ktr (kantor, penambah) - saran dari Employee.kantorBpjsEmployerObligation
+  bpjsRemittance               Int @default(0) // Setoran ke BPJS (kantor, pengurang) - saran dari Employee.kantorBpjsRemittance
+  fuelKm                       Int @default(0) // KM ditempuh bulan ini (kantor, input manual - tidak ada sumber data GPS/mileage)
+  fuelReimbursement            Int @default(0) // = fuelKm x Employee.kantorFuelRatePerKm - DI LUAR Take Home Pay
 
   @@unique([periodId, employeeId])
 }

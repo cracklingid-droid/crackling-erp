@@ -1,23 +1,29 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrReadUser, requireHrWriteUser } from "@/lib/hr-access";
+import { hasHrWriteAccess } from "@/lib/roles";
+import { employeeCategory } from "@/lib/payroll-config";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrReadUser();
+  if (error) return error;
 
   const employees = await prisma.employee.findMany({
     include: { documents: { select: { type: true } } },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(employees);
+
+  // "manager" cuma boleh lihat Database Karyawan Resto (view-only,
+  // permintaan Kevin 2026-09-13) - Kantor disaring keluar sebelum dikirim.
+  const scoped = hasHrWriteAccess(user) ? employees : employees.filter((e) => employeeCategory(e.outlet) === "outlet");
+  return NextResponse.json(scoped);
 }
 
 // Tambah karyawan manual - untuk karyawan lama yang tidak lewat pipeline
 // Rekrutmen. Cukup nama dulu, sisa data dilengkapi di halaman detail.
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";

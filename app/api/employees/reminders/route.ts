@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 
 // Daftar kontrak & dokumen karyawan yang segera (atau sudah) jatuh tempo -
 // ditampilkan sbg kartu di Database Karyawan. Sengaja cuma daftar di
@@ -8,8 +8,8 @@ import { getCurrentUser } from "@/lib/current-user";
 const WINDOW_DAYS = 30;
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const until = new Date();
   until.setDate(until.getDate() + WINDOW_DAYS);

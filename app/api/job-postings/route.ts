@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const postings = await prisma.jobPosting.findMany({
     include: { createdBy: true, candidates: true, position: true },
@@ -30,8 +30,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const body = await req.json();
   const title = typeof body.title === "string" ? body.title.trim() : "";

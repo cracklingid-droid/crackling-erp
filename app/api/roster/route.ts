@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { getWeekDates, dateKey, ROSTER_OUTLETS } from "@/lib/roster";
 
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { searchParams } = new URL(req.url);
   const outlet = searchParams.get("outlet") ?? "";
@@ -39,8 +39,8 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const body = await req.json();
   const employeeId = Number(body.employeeId);

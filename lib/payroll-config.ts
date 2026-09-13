@@ -104,3 +104,32 @@ export const OUTLET_NAMES = ["Joglo (Central Kitchen)", "Gading Serpong", "Kelap
 export function employeeCategory(outlet: string | null): "outlet" | "kantor" {
   return outlet && OUTLET_NAMES.includes(outlet) ? "outlet" : "kantor";
 }
+
+// Formula gaji Kantor Crackling (dipelajari & diverifikasi langsung dari
+// spreadsheet referensi Kevin "2608 rekap gaji FINAL.xlsx" sheet
+// SSOD/Recap/Hitungan, dikonfirmasi Kevin 2026-09-13). BEDA dari Outlet:
+// - Gaji Pokok TIDAK diprorata (dibayar penuh apapun hari hadirnya).
+// - Lembur dihitung PER JAM dgn rate tetap per karyawan (Employee.
+//   kantorOvertimeRate), bukan turunan Uang Makan/3 spt Outlet.
+// - Keterlambatan & Absen Tidak Lengkap Clock In/Out dihitung OTOMATIS dari
+//   absensi vs Employee.workSchedule, dikalikan rate tetap per karyawan
+//   (beda dari Outlet yang keduanya manual).
+// - Reimburse Bensin per KM dihitung dari input KM manual x rate tetap,
+//   TAPI SENGAJA TIDAK ikut Take Home Pay (dibayar terpisah, sesuai sheet
+//   Recap - kolom "Reimburse" berdiri sendiri di luar Total Penghasilan/
+//   Pengurang).
+export function calcKantorOvertimePay(kantorOvertimeRate: number, overtimeMinutes: number): number {
+  return Math.round(kantorOvertimeRate * (overtimeMinutes / 60));
+}
+
+export function calcKantorLateDeduction(kantorLateRate: number, lateCount: number): number {
+  return kantorLateRate * lateCount;
+}
+
+export function calcKantorIncompleteClockDeduction(kantorIncompleteClockRate: number, count: number): number {
+  return kantorIncompleteClockRate * count;
+}
+
+export function calcKantorFuelReimbursement(kantorFuelRatePerKm: number, km: number): number {
+  return kantorFuelRatePerKm * km;
+}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrReadUser, canViewCategory } from "@/lib/hr-access";
 import { generatePayslipPDF, pdfDocToBuffer } from "@/lib/payslip-pdf";
 import { payslipFilename, payslipZipFilename } from "@/lib/payslip-filename";
 
@@ -10,12 +10,15 @@ import { payslipFilename, payslipZipFilename } from "@/lib/payslip-filename";
 // ZIP. HR bisa pilih semua atau sebagian karyawan lewat checkbox di tabel
 // periode gaji. Permintaan Kevin 2026-09-11.
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrReadUser();
+  if (error) return error;
 
   const { id } = await ctx.params;
   const period = await prisma.payrollPeriod.findUnique({ where: { id: Number(id) } });
   if (!period) return NextResponse.json({ error: "Periode tidak ditemukan" }, { status: 404 });
+  if (!canViewCategory(user, period.category)) {
+    return NextResponse.json({ error: "Tidak punya akses ke periode ini" }, { status: 403 });
+  }
 
   const body = await req.json();
   const itemIds: number[] | undefined = Array.isArray(body.itemIds) ? body.itemIds.map(Number) : undefined;

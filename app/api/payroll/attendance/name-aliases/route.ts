@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { normalizeName } from "@/lib/attendance-name-match";
 
 // Daftar alias nama mesin absensi -> karyawan yang sudah dikonfirmasi HR -
 // dipakai halaman kelola alias (permintaan Kevin 2026-09-12) & referensi
 // saat mencocokkan upload absensi berikutnya (lihat parse & import route).
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const aliases = await prisma.attendanceNameAlias.findMany({
     include: { employee: { select: { id: true, name: true, outlet: true } }, createdBy: { select: { name: true } } },
@@ -23,8 +23,8 @@ export async function GET() {
 // Upsert by machineName (normalized) supaya kalau HR salah pilih & benerin
 // lagi, tidak numpuk alias ganda utk nama mesin yang sama.
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const body = await req.json();
   const machineNameRaw = typeof body.machineName === "string" ? body.machineName : "";

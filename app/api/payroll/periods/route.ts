@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
-import {
-  employeeCategory,
-  calcOvertimePay,
-  calcBpjsKesehatan,
-  calcBpjsKetenagakerjaan,
-  DEFAULT_DAILY_MEAL_ALLOWANCE,
-} from "@/lib/payroll-config";
+import { employeeCategory } from "@/lib/payroll-config";
 import { computeAttendanceSummaries } from "@/lib/attendance-summary";
 import { createNextOutletPeriod } from "@/lib/payroll-outlet-auto";
+import { computeKantorPayrollFields } from "@/lib/payroll-kantor-calc";
+import { requireHrReadUser, requireHrWriteUser, canViewCategory } from "@/lib/hr-access";
 
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrReadUser();
+  if (error) return error;
 
-  const category = new URL(req.url).searchParams.get("category");
+  const requested = new URL(req.url).searchParams.get("category");
+  // "manager" cuma boleh lihat Payroll Outlet (view-only, permintaan Kevin
+  // 2026-09-13) - kategori "kantor" ditolak, kategori kosong dipaksa outlet.
+  if (requested === "kantor" && !canViewCategory(user, "kantor")) {
+    return NextResponse.json({ error: "Tidak punya akses ke Payroll Kantor" }, { status: 403 });
+  }
+  const category = requested ?? (canViewCategory(user, "kantor") ? null : "outlet");
+
   const periods = await prisma.payrollPeriod.findMany({
     where: category ? { category } : undefined,
     include: { _count: { select: { items: true } } },
@@ -29,8 +31,8 @@ export async function GET(req: Request) {
 // lembur, BPJS) dari data yang ada - tetap bisa diedit HR satu-satu
 // sebelum periode difinalisasi. Permintaan Kevin 2026-09-11.
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const body = await req.json();
   const category = body.category === "outlet" || body.category === "kantor" ? body.category : null;
@@ -56,7 +58,8 @@ export async function POST(req: Request) {
 
   const employees = await prisma.employee.findMany({ where: { status: "active" } });
   const inCategory = employees.filter((e) => employeeCategory(e.outlet) === category);
-  const summaries = await computeAttendanceSummaries(inCategory.map((e) => e.id), startDate, endDate);
+  const schedules = new Map(inCategory.map((e) => [e.id, e.workSchedule]));
+  const summaries = await computeAttendanceSummaries(inCategory.map((e) => e.id), startDate, endDate, schedules);
 
   const period = await prisma.$transaction(async (tx) => {
     const created = await tx.payrollPeriod.create({
@@ -64,20 +67,20 @@ export async function POST(req: Request) {
     });
 
     for (const emp of inCategory) {
-      const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 };
-      const baseSalary = emp.baseSalary ?? 0;
+      const s = summaries.get(emp.id) ?? {
+        daysPresent: 0,
+        overtimeMinutes: 0,
+        totalMinutes: 0,
+        lateCount: 0,
+        incompleteClockInCount: 0,
+        incompleteClockOutCount: 0,
+      };
 
       await tx.payrollItem.create({
         data: {
           periodId: created.id,
           employeeId: emp.id,
-          daysPresent,
-          overtimeMinutes,
-          baseSalary,
-          mealAllowance: daysPresent * DEFAULT_DAILY_MEAL_ALLOWANCE,
-          overtimePay: calcOvertimePay(baseSalary, overtimeMinutes),
-          bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
-          bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
+          ...computeKantorPayrollFields(emp, s),
         },
       });
     }

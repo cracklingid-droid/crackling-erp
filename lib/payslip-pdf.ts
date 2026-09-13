@@ -116,6 +116,14 @@ export function generatePayslipPDF(period: Period, item: Item): PDFKit.PDFDocume
   y += 6;
   totalRow("Gaji Bersih", formatRupiah(netPay), true);
 
+  const fuelReimbursement = (item.fuelReimbursement as number) ?? 0;
+  if (category === "kantor" && fuelReimbursement !== 0) {
+    y += 8;
+    doc.moveTo(48, y).lineTo(547, y).strokeColor("#dddddd").stroke();
+    y += 8;
+    totalRow(`Reimburse Bensin (${item.fuelKm as number} KM) - di luar Gaji Bersih`, formatRupiah(fuelReimbursement));
+  }
+
   if (category === "outlet") {
     y += 8;
     doc.moveTo(48, y).lineTo(547, y).strokeColor("#dddddd").stroke();

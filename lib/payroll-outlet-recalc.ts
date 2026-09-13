@@ -29,7 +29,7 @@ export async function recalcOutletPeriod(periodId: number): Promise<RecalcResult
   let updated = 0;
   for (const item of period.items) {
     if (employeeCategory(item.employee.outlet) !== "outlet") continue;
-    const { daysPresent, overtimeMinutes } = summaries.get(item.employeeId) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0 };
+    const { daysPresent, overtimeMinutes } = summaries.get(item.employeeId) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0, incompleteClockInCount: 0, incompleteClockOutCount: 0 };
     await prisma.payrollItem.update({
       where: { id: item.id },
       data: computeOutletPayrollFields(item.employee, daysPresent, overtimeMinutes),

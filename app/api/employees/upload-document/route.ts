@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 
 const MAX_SIZE = 15 * 1024 * 1024; // 15MB - cukup untuk scan/foto KTP, ijazah, kontrak
 const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
@@ -9,8 +9,8 @@ const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp
 // dengan upload CV publik - file tidak lewat function serverless kita.
 // Ini endpoint HR (butuh login), bukan publik.
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const body = (await req.json()) as HandleUploadBody;
   try {

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { parseAttendanceFile } from "@/lib/attendance-parse";
 import { looksLikeAttendanceMachineReport, parseAttendanceMachineReport } from "@/lib/attendance-machine-report";
 import { matchAttendanceName } from "@/lib/attendance-name-match";
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const form = await req.formData();
   const file = form.get("file");

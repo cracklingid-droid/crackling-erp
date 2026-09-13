@@ -8,11 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Plus, ArrowLeft, MessageCircle, AlertTriangle } from "lucide-react";
 import { toWaNumber } from "@/lib/whatsapp";
 import { computeCompleteness } from "@/lib/employee-completeness";
+import { employeeCategory } from "@/lib/payroll-config";
 import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
+import { useAuthContext } from "../../../components/AuthContext";
 
 type Employee = {
   id: number;
@@ -62,6 +65,12 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 export default function KaryawanPage() {
+  const { user } = useAuthContext();
+  // "manager" cuma boleh lihat karyawan Resto, view-only (permintaan Kevin
+  // 2026-09-13) - API /api/employees sendiri sudah menyaring, ini cuma
+  // pertahanan tambahan + sembunyikan tombol tulis di tampilan.
+  const readOnly = user?.role === "manager";
+  const [tab, setTab] = useState<"outlet" | "kantor">("outlet");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -114,6 +123,12 @@ export default function KaryawanPage() {
 
   const onboardingCount = employees.filter((e) => e.status === "onboarding").length;
   const activeCount = employees.filter((e) => e.status === "active").length;
+  // Dua "database karyawan" terpisah (Resto vs Kantor) - beda total cara
+  // hitung gaji & lemburnya (lihat lib/payroll-kantor-calc.ts vs
+  // lib/payroll-outlet-calc.ts). Permintaan Kevin 2026-09-13.
+  const restoEmployees = employees.filter((e) => employeeCategory(e.outlet) === "outlet");
+  const kantorEmployees = employees.filter((e) => employeeCategory(e.outlet) === "kantor");
+  const tabEmployees = tab === "outlet" ? restoEmployees : kantorEmployees;
 
   return (
     <div className="max-w-5xl grid gap-6">
@@ -137,9 +152,11 @@ export default function KaryawanPage() {
             >
               Portal Karyawan &rarr;
             </a>
-            <Button onClick={() => setShowForm((v) => !v)} className="whitespace-nowrap">
-              <Plus className="h-4 w-4" /> Tambah Karyawan
-            </Button>
+            {!readOnly && (
+              <Button onClick={() => setShowForm((v) => !v)} className="whitespace-nowrap">
+                <Plus className="h-4 w-4" /> Tambah Karyawan
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -215,6 +232,14 @@ export default function KaryawanPage() {
         </Card>
       )}
 
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "outlet" | "kantor")}>
+        <TabsList>
+          <TabsIndicator />
+          <TabsTab value="outlet">Resto ({restoEmployees.length})</TabsTab>
+          {!readOnly && <TabsTab value="kantor">Kantor ({kantorEmployees.length})</TabsTab>}
+        </TabsList>
+      </Tabs>
+
       <Card>
         <div className="overflow-x-auto">
           <Table>
@@ -230,10 +255,10 @@ export default function KaryawanPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!loading && employees.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-muted-foreground">Belum ada karyawan.</TableCell></TableRow>
+              {!loading && tabEmployees.length === 0 && (
+                <TableRow><TableCell colSpan={7} className="text-muted-foreground">Belum ada karyawan {tab === "outlet" ? "resto" : "kantor"}.</TableCell></TableRow>
               )}
-              {employees.map((e) => {
+              {tabEmployees.map((e) => {
                 const hasKtp = e.documents.some((d) => d.type === "ktp");
                 const completeness = computeCompleteness(e, hasKtp);
                 return (

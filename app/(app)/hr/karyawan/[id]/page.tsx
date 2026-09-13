@@ -16,7 +16,9 @@ import { computeCompleteness } from "@/lib/employee-completeness";
 import { derivePortalPassword, canUsePortal } from "@/lib/employee-portal";
 import { prefixForOutlet } from "@/lib/employee-code";
 import { toWaNumber } from "@/lib/whatsapp";
+import { employeeCategory } from "@/lib/payroll-config";
 import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
+import { useAuthContext } from "../../../../components/AuthContext";
 
 const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
 const EMPLOYMENT_STATUS_OPTIONS = [
@@ -99,6 +101,13 @@ type Employee = {
   dailyMealRate: number | null;
   standardWorkDays: number | null;
   dailyBaseRate: number | null;
+  kantorOvertimeRate: number | null;
+  kantorLateRate: number | null;
+  kantorIncompleteClockRate: number | null;
+  kantorFuelRatePerKm: number | null;
+  kantorBpjsAllowance: number | null;
+  kantorBpjsEmployerObligation: number | null;
+  kantorBpjsRemittance: number | null;
   depositInstallmentsPaid: number;
   depositBalance: number;
   bankName: string | null;
@@ -129,6 +138,8 @@ const emptyForm = {
   name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
   employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", workSchedule: "", joinDate: "", resignDate: "",
   baseSalary: "", allowance: "", dailyTransportRate: "", dailyMealRate: "", standardWorkDays: "", dailyBaseRate: "",
+  kantorOvertimeRate: "", kantorLateRate: "", kantorIncompleteClockRate: "", kantorFuelRatePerKm: "",
+  kantorBpjsAllowance: "", kantorBpjsEmployerObligation: "", kantorBpjsRemittance: "",
   depositInstallmentsPaid: "", depositBalance: "",
   bankName: "", bankAccountNumber: "", bankAccountHolder: "",
   npwp: "", bpjsKesehatanNumber: "", bpjsKetenagakerjaanNumber: "",
@@ -137,6 +148,7 @@ const emptyForm = {
 
 export default function KaryawanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
+  const { user } = useAuthContext();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
@@ -172,6 +184,13 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           dailyMealRate: e.dailyMealRate != null ? String(e.dailyMealRate) : "",
           standardWorkDays: e.standardWorkDays != null ? String(e.standardWorkDays) : "",
           dailyBaseRate: e.dailyBaseRate != null ? String(e.dailyBaseRate) : "",
+          kantorOvertimeRate: e.kantorOvertimeRate != null ? String(e.kantorOvertimeRate) : "",
+          kantorLateRate: e.kantorLateRate != null ? String(e.kantorLateRate) : "",
+          kantorIncompleteClockRate: e.kantorIncompleteClockRate != null ? String(e.kantorIncompleteClockRate) : "",
+          kantorFuelRatePerKm: e.kantorFuelRatePerKm != null ? String(e.kantorFuelRatePerKm) : "",
+          kantorBpjsAllowance: e.kantorBpjsAllowance != null ? String(e.kantorBpjsAllowance) : "",
+          kantorBpjsEmployerObligation: e.kantorBpjsEmployerObligation != null ? String(e.kantorBpjsEmployerObligation) : "",
+          kantorBpjsRemittance: e.kantorBpjsRemittance != null ? String(e.kantorBpjsRemittance) : "",
           depositInstallmentsPaid: String(e.depositInstallmentsPaid ?? 0), depositBalance: String(e.depositBalance ?? 0),
           bankName: e.bankName ?? "", bankAccountNumber: e.bankAccountNumber ?? "", bankAccountHolder: e.bankAccountHolder ?? "",
           npwp: e.npwp ?? "", bpjsKesehatanNumber: e.bpjsKesehatanNumber ?? "", bpjsKetenagakerjaanNumber: e.bpjsKetenagakerjaanNumber ?? "",
@@ -342,8 +361,14 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     hasKtp
   );
   const completeness = computeCompleteness(employee, hasKtp);
+  // "manager" cuma boleh LIHAT (view-only) - fieldset disabled menutup
+  // semua input/tombol form sekaligus tanpa perlu tandai satu-satu.
+  // Proteksi sebenarnya tetap di server (PATCH selalu tolak role manager).
+  // Permintaan Kevin 2026-09-13.
+  const readOnly = user?.role === "manager";
 
   return (
+    <fieldset disabled={readOnly} className="contents">
     <div className="max-w-3xl grid gap-6">
       <div>
         <Link href="/hr/karyawan" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
@@ -731,6 +756,48 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         </CardContent>
       </Card>
 
+      {employeeCategory(form.outlet || null) === "kantor" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Rate Payroll Kantor</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label>Lembur (Rp/jam)</Label>
+              <Input type="number" value={form.kantorOvertimeRate} onChange={(e) => set("kantorOvertimeRate", e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Potongan Keterlambatan (Rp/kejadian)</Label>
+              <Input type="number" value={form.kantorLateRate} onChange={(e) => set("kantorLateRate", e.target.value)} />
+              <p className="text-xs text-muted-foreground">Dihitung otomatis dari absensi vs Jadwal Kerja x rate ini.</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Potongan Absen Tdk Lengkap (Rp/kejadian)</Label>
+              <Input type="number" value={form.kantorIncompleteClockRate} onChange={(e) => set("kantorIncompleteClockRate", e.target.value)} />
+              <p className="text-xs text-muted-foreground">Berlaku sama untuk lupa Clock In maupun Clock Out.</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Reimburse Bensin (Rp/KM)</Label>
+              <Input type="number" value={form.kantorFuelRatePerKm} onChange={(e) => set("kantorFuelRatePerKm", e.target.value)} />
+              <p className="text-xs text-muted-foreground">KM diinput manual tiap periode gaji - di luar Take Home Pay.</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Tunjangan BPJS Kar (Rp/bulan)</Label>
+              <Input type="number" value={form.kantorBpjsAllowance} onChange={(e) => set("kantorBpjsAllowance", e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Kewajiban BPJS Ktr (Rp/bulan)</Label>
+              <Input type="number" value={form.kantorBpjsEmployerObligation} onChange={(e) => set("kantorBpjsEmployerObligation", e.target.value)} />
+              <p className="text-xs text-muted-foreground">Ikut menambah Total Penghasilan (sesuai kebijakan, bukan salah ketik).</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Setoran ke BPJS (Rp/bulan)</Label>
+              <Input type="number" value={form.kantorBpjsRemittance} onChange={(e) => set("kantorBpjsRemittance", e.target.value)} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader><CardTitle className="text-base">Legal &amp; Pajak</CardTitle></CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -871,5 +938,6 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         </CardContent>
       </Card>
     </div>
+    </fieldset>
   );
 }

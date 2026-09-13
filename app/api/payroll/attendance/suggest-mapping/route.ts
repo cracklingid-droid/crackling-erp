@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import Anthropic from "@anthropic-ai/sdk";
 
 // AI bantu deteksi struktur kolom file absensi (nama/tanggal/jam masuk-
@@ -15,8 +15,8 @@ Tugasmu: baca contoh baris data yang diberikan, lalu tentukan struktur kolomnya.
 Index kolom mulai dari 0. Kalau tidak yakin sama sekali strukturnya, tetap balas JSON dengan tebakan terbaikmu dan confidence "rendah" plus catatan di note.`;
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

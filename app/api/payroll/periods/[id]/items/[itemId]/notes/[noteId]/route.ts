@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { itemFieldForCategory } from "@/lib/payroll-event-notes";
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string; itemId: string; noteId: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id, itemId, noteId } = await ctx.params;
   const period = await prisma.payrollPeriod.findUnique({ where: { id: Number(id) }, select: { status: true } });

@@ -17,3 +17,14 @@ export function hasFullAccess(user: { role: string }): boolean {
 export function canAccessCostCenter(user: { role: string }): boolean {
   return user.role === "owner" || user.role === "developer" || user.role === "manager";
 }
+
+// Role yang boleh MENULIS apapun di modul HR (Rekrutmen/Karyawan/Payroll/
+// Roster) - owner & developer (akses penuh) + hr_manager/hr_staff (kerja
+// harian HR). Role "manager" TIDAK PERNAH termasuk di sini, cuma boleh baca
+// lewat lib/hr-access.ts (requireHrReadUser/canViewCategory). Permintaan
+// Kevin 2026-09-13 - menutup celah: sebelumnya SEMUA endpoint API HR cuma
+// cek login, siapa pun role-nya bisa menulis lewat panggilan API langsung
+// (curl/devtools), bukan cuma lewat tampilan.
+export function hasHrWriteAccess(user: { role: string }): boolean {
+  return user.role === "owner" || user.role === "developer" || user.role === "hr_manager" || user.role === "hr_staff";
+}

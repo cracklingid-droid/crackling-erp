@@ -1,7 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import { UserPlus, ArrowRight, Users, Wallet, CalendarDays } from "lucide-react";
+import { useAuthContext } from "../../components/AuthContext";
 
 export default function HrHomePage() {
+  const { user } = useAuthContext();
+  // "manager" cuma boleh lihat Database Karyawan & Payroll (resto, view-
+  // only) - Rekrutmen & Roster disembunyikan total. Permintaan Kevin
+  // 2026-09-13.
+  const readOnly = user?.role === "manager";
+
   return (
     <div className="max-w-5xl">
       <div className="mb-7">
@@ -9,6 +18,7 @@ export default function HrHomePage() {
         <p className="text-muted-foreground mt-1.5 text-sm">Pilih modul di bawah untuk mulai kerja.</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {!readOnly && (
         <Link href="/hr/rekrutmen" className="group">
           <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-1 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
@@ -21,13 +31,16 @@ export default function HrHomePage() {
             </div>
           </div>
         </Link>
+        )}
         <Link href="/hr/karyawan" className="group">
           <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-2 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
               <Users className="h-5 w-5" />
             </div>
             <h2 className="text-base font-heading font-semibold mt-2.5">Database Karyawan</h2>
-            <p className="text-muted-foreground text-sm mt-1">Biodata, kepegawaian, gaji & dokumen karyawan.</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {readOnly ? "Biodata & kepegawaian karyawan resto (lihat saja)." : "Biodata, kepegawaian, gaji & dokumen karyawan."}
+            </p>
             <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
               Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
             </div>
@@ -39,12 +52,15 @@ export default function HrHomePage() {
               <Wallet className="h-5 w-5" />
             </div>
             <h2 className="text-base font-heading font-semibold mt-2.5">Payroll</h2>
-            <p className="text-muted-foreground text-sm mt-1">Absensi & perhitungan gaji outlet/kantor.</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {readOnly ? "Perhitungan & slip gaji outlet (lihat saja)." : "Absensi & perhitungan gaji outlet/kantor."}
+            </p>
             <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
               Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
             </div>
           </div>
         </Link>
+        {!readOnly && (
         <Link href="/hr/roster" className="group">
           <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-3 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
@@ -57,6 +73,7 @@ export default function HrHomePage() {
             </div>
           </div>
         </Link>
+        )}
       </div>
     </div>
   );

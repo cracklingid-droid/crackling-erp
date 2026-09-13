@@ -1,7 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Upload, Store, Building2, ClipboardList } from "lucide-react";
+import { useAuthContext } from "../../../components/AuthContext";
 
 export default function PayrollHomePage() {
+  const { user } = useAuthContext();
+  // "manager" cuma boleh lihat Perhitungan Gaji Outlet (view-only) -
+  // Upload Absen, Rekap Absensi & Gaji Kantor disembunyikan total.
+  // Permintaan Kevin 2026-09-13.
+  const readOnly = user?.role === "manager";
+
   return (
     <div className="max-w-5xl">
       <Link href="/hr" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4">
@@ -9,9 +18,12 @@ export default function PayrollHomePage() {
       </Link>
       <div className="mb-7">
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Payroll</h1>
-        <p className="text-muted-foreground mt-1.5 text-sm">Upload absensi, lalu hitung gaji outlet dan gaji kantor secara terpisah.</p>
+        <p className="text-muted-foreground mt-1.5 text-sm">
+          {readOnly ? "Lihat perhitungan & slip gaji outlet." : "Upload absensi, lalu hitung gaji outlet dan gaji kantor secara terpisah."}
+        </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {!readOnly && (
         <Link href="/hr/payroll/absensi" className="group">
           <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-3 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
@@ -24,6 +36,8 @@ export default function PayrollHomePage() {
             </div>
           </div>
         </Link>
+        )}
+        {!readOnly && (
         <Link href="/hr/payroll/rekap-absensi" className="group">
           <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-1 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
@@ -36,6 +50,7 @@ export default function PayrollHomePage() {
             </div>
           </div>
         </Link>
+        )}
         <Link href="/hr/payroll/outlet" className="group">
           <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-2 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
@@ -48,18 +63,20 @@ export default function PayrollHomePage() {
             </div>
           </div>
         </Link>
+        {!readOnly && (
         <Link href="/hr/payroll/kantor" className="group">
           <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-4 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
               <Building2 className="h-5 w-5" />
             </div>
             <h2 className="text-base font-heading font-semibold mt-2.5">Perhitungan Gaji Kantor</h2>
-            <p className="text-muted-foreground text-sm mt-1">Gaji tetap + uang makan, lembur & reimbursement transport.</p>
+            <p className="text-muted-foreground text-sm mt-1">Gaji tetap + uang makan, lembur, keterlambatan & BPJS kantor.</p>
             <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
               Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
             </div>
           </div>
         </Link>
+        )}
       </div>
     </div>
   );

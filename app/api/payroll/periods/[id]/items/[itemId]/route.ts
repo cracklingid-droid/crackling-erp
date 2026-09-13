@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
+import { KANTOR_LOCKED_FIELD_KEYS } from "@/lib/payroll-kantor-calc";
 
 const NUMBER_FIELDS = [
   "baseSalary",
@@ -23,11 +24,21 @@ const NUMBER_FIELDS = [
   "depositRefund",
   "serviceCharge",
   "bonus",
+  // Payroll Kantor (permintaan Kevin 2026-09-13) - lihat lib/payroll-kantor-calc.ts
+  "bonusSales",
+  "incompleteClockInCount",
+  "incompleteClockInDeduction",
+  "incompleteClockOutCount",
+  "incompleteClockOutDeduction",
+  "bpjsAllowance",
+  "bpjsEmployerObligation",
+  "bpjsRemittance",
+  "fuelKm",
 ];
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; itemId: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id, itemId } = await ctx.params;
   const period = await prisma.payrollPeriod.findUnique({ where: { id: Number(id) }, select: { status: true, category: true } });
@@ -39,18 +50,27 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; i
   const body = await req.json();
   const data: Record<string, unknown> = {};
   for (const f of NUMBER_FIELDS) {
-    // Field Payroll Outlet yang asalnya dari absensi/konfigurasi karyawan
-    // dikunci - dihitung ulang otomatis, bukan input manual HR (keputusan
-    // Kevin 2026-09-12, supaya tidak ada ruang salah edit).
+    // Field yang asalnya dari absensi/konfigurasi karyawan dikunci - dihitung
+    // ulang otomatis, bukan input manual HR (keputusan Kevin 2026-09-12
+    // utk Outlet, 2026-09-13 utk Kantor - field/rumusnya beda total).
     if (period.category === "outlet" && OUTLET_LOCKED_FIELD_KEYS.has(f)) continue;
+    if (period.category === "kantor" && KANTOR_LOCKED_FIELD_KEYS.has(f)) continue;
     if (f in body) data[f] = Number(body[f]) || 0;
   }
   if ("note" in body) data.note = body.note || null;
 
   const existing = await prisma.payrollItem.findUnique({
     where: { id: Number(itemId) },
-    select: { employeeId: true, depositDeduction: true, depositRefund: true },
+    select: { employeeId: true, depositDeduction: true, depositRefund: true, employee: { select: { kantorFuelRatePerKm: true } } },
   });
+
+  // Reimburse Bensin (Kantor): KM diinput manual, tapi nominalnya SELALU
+  // diturunkan dari KM x rate karyawan - tidak pernah diketik langsung, biar
+  // tidak pernah tidak-sinkron dgn rate yang tersimpan. Permintaan Kevin
+  // 2026-09-13.
+  if (period.category === "kantor" && "fuelKm" in data) {
+    data.fuelReimbursement = (existing?.employee.kantorFuelRatePerKm ?? 0) * (data.fuelKm as number);
+  }
 
   const item = await prisma.$transaction(async (tx) => {
     const updated = await tx.payrollItem.update({ where: { id: Number(itemId) }, data });

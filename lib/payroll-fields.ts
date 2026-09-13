@@ -29,6 +29,34 @@ export const OUTLET_FIELDS: FieldDef[] = [
   { key: "bonus", label: "Bonus" },
 ];
 
+// Field dasar khusus Payroll Kantor (Gaji Pokok TIDAK diprorata, dst) -
+// TERPISAH dari BASE_FIELDS (Outlet) supaya slip Kantor tidak menampilkan
+// baris nol yang tidak relevan (Gaji Part Time, Reimb. Transport, BPJS
+// Kesehatan/Ketenagakerjaan rumus umum, Potongan Absensi - itu semua
+// konsep Outlet). Permintaan Kevin 2026-09-13.
+export const KANTOR_BASE_FIELDS: FieldDef[] = [
+  { key: "bonus", label: "Bonus" },
+  { key: "baseSalary", label: "Gaji Pokok" },
+  { key: "overtimePay", label: "Lembur (Rp)" },
+  { key: "mealAllowance", label: "Uang Makan" },
+  { key: "pph21Deduction", label: "PPh21" },
+  { key: "lateDeduction", label: "Potongan Telat" },
+  { key: "loanDeduction", label: "Kasbon" },
+];
+
+// Kategori tambahan khusus Payroll Kantor, ikut logika spreadsheet gaji
+// kantor "2608 rekap gaji FINAL.xlsx" (permintaan Kevin 2026-09-13) - tidak
+// tampil di Outlet. "Potongan" generik kantor pakai TAIL_FIELDS
+// (otherAdjustment) yang sudah ada - field itu "boleh minus".
+export const KANTOR_FIELDS: FieldDef[] = [
+  { key: "bonusSales", label: "Bonus Atas Penjualan" },
+  { key: "bpjsAllowance", label: "Tunjangan BPJS Kar" },
+  { key: "bpjsEmployerObligation", label: "Kewajiban BPJS Ktr" },
+  { key: "incompleteClockInDeduction", label: "Absen Tdk Lengkap Clock In" },
+  { key: "incompleteClockOutDeduction", label: "Absen Tdk Lengkap Clock Out" },
+  { key: "bpjsRemittance", label: "Setoran ke BPJS" },
+];
+
 export const TAIL_FIELDS: FieldDef[] = [{ key: "otherAdjustment", label: "Penyesuaian Lain" }];
 
 export const DEDUCTION_FIELD_KEYS = new Set([
@@ -41,10 +69,30 @@ export const DEDUCTION_FIELD_KEYS = new Set([
   "incidentDeduction",
   "warningLetterDeduction",
   "depositDeduction",
+  "incompleteClockInDeduction",
+  "incompleteClockOutDeduction",
+  "bpjsRemittance",
 ]);
 
 export function fieldsForCategory(category: string): FieldDef[] {
-  return category === "outlet" ? [...BASE_FIELDS, ...OUTLET_FIELDS, ...TAIL_FIELDS] : [...BASE_FIELDS, ...TAIL_FIELDS];
+  if (category === "outlet") return [...BASE_FIELDS, ...OUTLET_FIELDS, ...TAIL_FIELDS];
+  if (category === "kantor") return [...KANTOR_BASE_FIELDS, ...KANTOR_FIELDS, ...TAIL_FIELDS];
+  return [...BASE_FIELDS, ...TAIL_FIELDS];
+}
+
+// Field non-uang (referensi HR, bukan komponen gaji) per kategori - dulu
+// diduplikat lokal di beberapa halaman, disatukan di sini. Permintaan
+// Kevin 2026-09-13.
+export const OUTLET_INFO_FIELDS: FieldDef[] = [{ key: "lateCount", label: "Jml Telat" }];
+export const KANTOR_INFO_FIELDS: FieldDef[] = [
+  { key: "lateCount", label: "Jml Telat" },
+  { key: "incompleteClockInCount", label: "Hari Tdk Lengkap Clock In" },
+  { key: "incompleteClockOutCount", label: "Hari Tdk Lengkap Clock Out" },
+];
+export function infoFieldsForCategory(category: string): FieldDef[] {
+  if (category === "outlet") return OUTLET_INFO_FIELDS;
+  if (category === "kantor") return KANTOR_INFO_FIELDS;
+  return [];
 }
 
 export function computeNetPay(item: Record<string, number>, fields: FieldDef[]): number {

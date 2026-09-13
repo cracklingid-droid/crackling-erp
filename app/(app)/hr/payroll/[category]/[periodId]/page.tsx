@@ -11,6 +11,9 @@ import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/
 import { toast } from "sonner";
 import { ArrowLeft, Lock, Unlock, FileText, RefreshCw, FileSpreadsheet, Printer } from "lucide-react";
 import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
+import { KANTOR_LOCKED_FIELD_KEYS } from "@/lib/payroll-kantor-calc";
+import { fieldsForCategory, infoFieldsForCategory, DEDUCTION_FIELD_KEYS, TAIL_FIELDS, computeNetPay, type FieldDef } from "@/lib/payroll-fields";
+import { useAuthContext } from "../../../../../components/AuthContext";
 import { EmployeeRincianCard, type RincianItem, type RincianNote } from "@/components/payroll/employee-rincian-card";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
@@ -37,6 +40,17 @@ type Item = RincianItem & {
   depositRefund: number;
   serviceCharge: number;
   bonus: number;
+  // Payroll Kantor (permintaan Kevin 2026-09-13)
+  bonusSales: number;
+  incompleteClockInCount: number;
+  incompleteClockInDeduction: number;
+  incompleteClockOutCount: number;
+  incompleteClockOutDeduction: number;
+  bpjsAllowance: number;
+  bpjsEmployerObligation: number;
+  bpjsRemittance: number;
+  fuelKm: number;
+  fuelReimbursement: number;
 };
 type AttendanceRecord = { employeeId: number; date: string; clockIn: string | null; clockOut: string | null };
 type Period = {
@@ -51,57 +65,13 @@ type Period = {
   attendanceRecords: AttendanceRecord[];
 };
 
-const BASE_FIELDS: { key: keyof Item; label: string }[] = [
-  { key: "baseSalary", label: "Gaji Pokok" },
-  { key: "partTimePay", label: "Gaji Part Time" },
-  { key: "mealAllowance", label: "Uang Makan" },
-  { key: "transportReimbursement", label: "Reimb. Transport" },
-  { key: "overtimePay", label: "Lembur (Rp)" },
-  { key: "attendanceDeduction", label: "Potongan Absensi" },
-  { key: "bpjsKesehatanDeduction", label: "BPJS Kesehatan" },
-  { key: "bpjsKetenagakerjaanDeduction", label: "BPJS Ketenagakerjaan" },
-  { key: "pph21Deduction", label: "PPh21" },
-  { key: "loanDeduction", label: "Kasbon" },
-];
-
-// Kategori tambahan khusus Payroll Outlet, ikut logika spreadsheet gaji
-// outlet Crackling (permintaan Kevin 2026-09-11) - tidak tampil di Kantor.
-const OUTLET_FIELDS: { key: keyof Item; label: string }[] = [
-  { key: "lateDeduction", label: "Potongan Telat" },
-  { key: "incidentDeduction", label: "Potongan Kejadian" },
-  { key: "warningLetterDeduction", label: "Potongan SP" },
-  { key: "depositDeduction", label: "Bayar Deposit" },
-  { key: "depositRefund", label: "Kembali Deposit" },
-  { key: "serviceCharge", label: "Service Charge" },
-  { key: "bonus", label: "Bonus" },
-];
-
-const TAIL_FIELDS: { key: keyof Item; label: string }[] = [{ key: "otherAdjustment", label: "Penyesuaian Lain" }];
-
-// Field bukan uang - jumlah kejadian telat, sekadar catatan HR (dasar
-// hitung manual "Potongan Telat" di atas, tidak otomatis dihitung ulang
-// karena rate lembur/telat sumbernya dari Database Karyawan per orang).
-const INFO_FIELDS: { key: keyof Item; label: string }[] = [{ key: "lateCount", label: "Jml Telat" }];
-
-const DEDUCTION_FIELDS = new Set<keyof Item>([
-  "attendanceDeduction",
-  "bpjsKesehatanDeduction",
-  "bpjsKetenagakerjaanDeduction",
-  "pph21Deduction",
-  "loanDeduction",
-  "lateDeduction",
-  "incidentDeduction",
-  "warningLetterDeduction",
-  "depositDeduction",
-]);
-
-function netPay(item: Item, editableFields: { key: keyof Item; label: string }[]): number {
-  let total = 0;
-  for (const f of editableFields) {
-    const v = item[f.key] as number;
-    total += DEDUCTION_FIELDS.has(f.key) ? -v : v;
-  }
-  return total;
+// Daftar kolom & mana yang penambah/pengurang gaji bersih SEKARANG dari
+// lib/payroll-fields.ts (satu sumber kebenaran dipakai bareng halaman ini,
+// halaman slip, PDF slip, & export Excel - dulu diduplikat lokal di sini,
+// disatukan 2026-09-13 saat menambah Payroll Kantor supaya tidak ada
+// salinan ke-4 yang bisa ketinggalan zaman).
+function netPay(item: Item, editableFields: FieldDef[]): number {
+  return computeNetPay(item as unknown as Record<string, number>, editableFields);
 }
 
 function formatRupiah(n: number): string {
@@ -152,18 +122,24 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   useEffect(load, [periodId]);
 
   const isFinal = period?.status === "final";
-  const editableFields = category === "outlet" ? [...BASE_FIELDS, ...OUTLET_FIELDS, ...TAIL_FIELDS] : [...BASE_FIELDS, ...TAIL_FIELDS];
-  const infoFields = category === "outlet" ? INFO_FIELDS : [];
+  const { user } = useAuthContext();
+  // "manager" cuma boleh lihat Payroll Outlet - view only, tidak bisa
+  // edit/finalisasi/refresh apa pun. Permintaan Kevin 2026-09-13.
+  const readOnly = user?.role === "manager";
+  const editableFields = fieldsForCategory(category);
+  const infoFields = infoFieldsForCategory(category);
+  const lockedFieldKeys = category === "outlet" ? OUTLET_LOCKED_FIELD_KEYS : category === "kantor" ? KANTOR_LOCKED_FIELD_KEYS : new Set<string>();
 
-  function updateLocal(itemId: number, field: keyof Item, value: number) {
+  function updateLocal(itemId: number, field: string, value: number) {
     setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, [field]: value } : it)));
   }
 
   async function saveItem(itemId: number) {
     const item = items.find((it) => it.id === itemId);
     if (!item) return;
+    const record = item as unknown as Record<string, number>;
     const body: Record<string, number> = {};
-    for (const f of [...editableFields, ...infoFields]) body[f.key as string] = item[f.key] as number;
+    for (const f of [...editableFields, ...infoFields]) body[f.key] = record[f.key];
     const res = await fetch(`/api/payroll/periods/${periodId}/items/${itemId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -312,12 +288,14 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
           <div className="flex shrink-0 gap-2">
             <Button variant="outline" size="sm" onClick={downloadExcel} disabled={exportingExcel || items.length === 0}>
               <FileSpreadsheet className="h-3.5 w-3.5" />
-              {exportingExcel ? "Menyiapkan Excel..." : "Download Excel (2 Sheet)"}
+              {exportingExcel ? "Menyiapkan Excel..." : category === "kantor" ? "Download Excel" : "Download Excel (2 Sheet)"}
             </Button>
-            <Button variant="outline" size="sm" onClick={toggleStatus} disabled={togglingStatus}>
-              {isFinal ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-              {isFinal ? "Buka Kembali" : "Finalisasi"}
-            </Button>
+            {!readOnly && (
+              <Button variant="outline" size="sm" onClick={toggleStatus} disabled={togglingStatus}>
+                {isFinal ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                {isFinal ? "Buka Kembali" : "Finalisasi"}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -325,14 +303,17 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
       <Tabs defaultValue="rekap">
         <TabsList>
           <TabsIndicator />
-          <TabsTab value="rekap">Sheet 2 · Rekap Bulanan</TabsTab>
-          <TabsTab value="harian">Sheet 1 · Detail Harian</TabsTab>
+          <TabsTab value="rekap">{category === "kantor" ? "Rekap Bulanan" : "Sheet 2 · Rekap Bulanan"}</TabsTab>
+          {/* Kantor tidak punya Detail Harian - gaji pokok tidak diprorata &
+              potongannya per-kejadian, bukan per-tanggal, jadi Rekap Bulanan
+              sudah cukup. Keputusan scope 2026-09-13. */}
+          {category === "outlet" && <TabsTab value="harian">Sheet 1 · Detail Harian</TabsTab>}
         </TabsList>
 
         <TabsPanel value="rekap">
       <Card>
         <CardContent className="pt-6 flex flex-wrap items-center gap-2 pb-0">
-          {category === "outlet" && !isFinal && (
+          {(category === "outlet" || category === "kantor") && !isFinal && !readOnly && (
             <Button variant="outline" size="sm" onClick={recalculate} disabled={recalculating}>
               <RefreshCw className={`h-3.5 w-3.5 ${recalculating ? "animate-spin" : ""}`} />
               {recalculating ? "Menghitung ulang..." : "Refresh dari Absensi"}
@@ -372,13 +353,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                   <TableHead key={f.key as string} className="whitespace-nowrap">{f.label}</TableHead>
                 ))}
                 {editableFields.map((f) => (
-                  <TableHead key={f.key as string} className="whitespace-nowrap">
-                    {category === "outlet" && OUTLET_LOCKED_FIELD_KEYS.has(f.key as string) && (
-                      <Lock className="h-3 w-3 inline mr-1 text-muted-foreground" />
-                    )}
+                  <TableHead key={f.key} className="whitespace-nowrap">
+                    {lockedFieldKeys.has(f.key) && <Lock className="h-3 w-3 inline mr-1 text-muted-foreground" />}
                     {f.label}
                   </TableHead>
                 ))}
+                {category === "kantor" && <TableHead className="whitespace-nowrap">Reimburse Bensin</TableHead>}
                 <TableHead className="whitespace-nowrap">Gaji Bersih</TableHead>
                 <TableHead className="whitespace-nowrap">Slip</TableHead>
               </TableRow>
@@ -386,7 +366,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             <TableBody>
               {items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6 + infoFields.length + editableFields.length} className="text-muted-foreground">
+                  <TableCell colSpan={6 + infoFields.length + editableFields.length + (category === "kantor" ? 1 : 0)} className="text-muted-foreground">
                     Tidak ada karyawan aktif di kategori ini.
                   </TableCell>
                 </TableRow>
@@ -409,22 +389,26 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                   <TableCell className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
                     {formatMinutes(item.overtimeMinutes)}
                   </TableCell>
-                  {infoFields.map((f) => (
-                    <TableCell key={f.key as string}>
-                      <Input
-                        type="number"
-                        className="w-20 tabular-nums"
-                        value={item[f.key] as number}
-                        disabled={isFinal}
-                        onChange={(e) => updateLocal(item.id, f.key, Number(e.target.value) || 0)}
-                        onBlur={() => saveItem(item.id)}
-                      />
-                    </TableCell>
-                  ))}
+                  {infoFields.map((f) => {
+                    const record = item as unknown as Record<string, number>;
+                    return (
+                      <TableCell key={f.key}>
+                        <Input
+                          type="number"
+                          className="w-20 tabular-nums"
+                          value={record[f.key]}
+                          disabled={isFinal || readOnly}
+                          onChange={(e) => updateLocal(item.id, f.key, Number(e.target.value) || 0)}
+                          onBlur={() => saveItem(item.id)}
+                        />
+                      </TableCell>
+                    );
+                  })}
                   {editableFields.map((f) => {
-                    const isDeduction = DEDUCTION_FIELDS.has(f.key);
+                    const record = item as unknown as Record<string, number>;
+                    const isDeduction = DEDUCTION_FIELD_KEYS.has(f.key);
                     const isTail = TAIL_FIELDS.some((t) => t.key === f.key);
-                    const value = item[f.key] as number;
+                    const value = record[f.key];
                     // Komponen penambah gaji hijau, pengurang merah - "Penyesuaian
                     // Lain" bisa dua arah jadi warnanya ikut tanda nilainya.
                     // Permintaan Kevin 2026-09-11.
@@ -437,13 +421,13 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       : isDeduction
                         ? "text-red-600 dark:text-red-400"
                         : "text-emerald-600 dark:text-emerald-400";
-                    // Field Outlet dari absensi/konfigurasi karyawan dikunci
-                    // (dihitung ulang otomatis, bukan input manual) - keputusan
-                    // Kevin 2026-09-12, supaya tidak ada ruang salah edit HR.
-                    const isLocked = category === "outlet" && OUTLET_LOCKED_FIELD_KEYS.has(f.key as string);
+                    // Field yang asalnya dari absensi/konfigurasi karyawan
+                    // dikunci (dihitung ulang otomatis, bukan input manual) -
+                    // keputusan Kevin 2026-09-12 (Outlet) & 2026-09-13 (Kantor).
+                    const isLocked = lockedFieldKeys.has(f.key);
                     if (isLocked) {
                       return (
-                        <TableCell key={f.key as string}>
+                        <TableCell key={f.key}>
                           <span
                             className={`block w-32 tabular-nums text-right text-sm ${colorClass}`}
                             title="Dihitung otomatis dari data absensi - tidak bisa diedit manual"
@@ -454,19 +438,37 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       );
                     }
                     return (
-                      <TableCell key={f.key as string}>
+                      <TableCell key={f.key}>
                         <Input
                           type="text"
                           inputMode="numeric"
                           className={`w-32 tabular-nums text-right ${colorClass}`}
                           value={formatRupiah(value)}
-                          disabled={isFinal}
+                          disabled={isFinal || readOnly}
                           onChange={(e) => updateLocal(item.id, f.key, parseRupiahInput(e.target.value))}
                           onBlur={() => saveItem(item.id)}
                         />
                       </TableCell>
                     );
                   })}
+                  {category === "kantor" && (
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          className="w-16 tabular-nums"
+                          value={item.fuelKm}
+                          disabled={isFinal || readOnly}
+                          onChange={(e) => updateLocal(item.id, "fuelKm", Number(e.target.value) || 0)}
+                          onBlur={() => saveItem(item.id)}
+                          title="KM ditempuh bulan ini"
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap" title="Dihitung dari KM x rate karyawan - di luar Take Home Pay">
+                          = Rp {formatRupiah(item.fuelReimbursement)}
+                        </span>
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium tabular-nums whitespace-nowrap">Rp {formatRupiah(netPay(item, editableFields))}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     <Link
@@ -485,6 +487,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
       </Card>
         </TabsPanel>
 
+        {category === "outlet" && (
         <TabsPanel value="harian" className="grid gap-4">
           <Card>
             <CardContent className="pt-6 flex flex-wrap items-center gap-2">
@@ -518,6 +521,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             ))}
           </div>
         </TabsPanel>
+        )}
       </Tabs>
     </div>
   );

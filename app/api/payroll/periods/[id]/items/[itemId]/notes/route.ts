@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireHrWriteUser } from "@/lib/hr-access";
 import { itemFieldForCategory } from "@/lib/payroll-event-notes";
 
 // Catat kejadian/telat/SP di tanggal tertentu - otomatis menambah field
@@ -8,8 +8,8 @@ import { itemFieldForCategory } from "@/lib/payroll-event-notes";
 // SEKALIGUS tersimpan sbg baris rincian tanggal di halaman Rincian
 // Perhitungan. Permintaan Kevin 2026-09-11.
 export async function POST(req: Request, ctx: { params: Promise<{ id: string; itemId: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const { user, error } = await requireHrWriteUser();
+  if (error) return error;
 
   const { id, itemId } = await ctx.params;
   const period = await prisma.payrollPeriod.findUnique({ where: { id: Number(id) }, select: { status: true } });

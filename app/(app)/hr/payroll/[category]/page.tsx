@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Plus, Lock } from "lucide-react";
 import { getDefaultPeriodRange, toDateInputValue } from "@/lib/payroll-period-cycle";
 import { nextOutletPeriodRange, outletPeriodLabel } from "@/lib/payroll-outlet-schedule";
+import { useAuthContext } from "../../../../components/AuthContext";
 
 const CATEGORY_LABEL: Record<string, string> = { outlet: "Outlet", kantor: "Kantor" };
 
@@ -46,6 +47,8 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
 
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
   const valid = category === "outlet" || category === "kantor";
+  const { user } = useAuthContext();
+  const readOnly = user?.role === "manager";
 
   function load() {
     if (!valid) return;
@@ -118,9 +121,11 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
             <h1 className="text-2xl font-heading font-semibold tracking-tight">Perhitungan Gaji {categoryLabel}</h1>
             <p className="text-muted-foreground text-sm mt-0.5">Daftar periode gaji yang sudah dibuat untuk kategori {categoryLabel.toLowerCase()}.</p>
           </div>
-          <Button onClick={openForm} className="shrink-0">
-            <Plus className="h-4 w-4" /> Periode Baru
-          </Button>
+          {!readOnly && (
+            <Button onClick={openForm} className="shrink-0">
+              <Plus className="h-4 w-4" /> Periode Baru
+            </Button>
+          )}
         </div>
       </div>
 
