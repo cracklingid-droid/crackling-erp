@@ -5,9 +5,15 @@ import { cn } from "cn"
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
+    // min-w-0 wajib - kalau Table ini dipakai langsung di dalam wrapper
+    // "flex" (mis. Card, components/ui/card.tsx pakai flex flex-col), div
+    // ini jadi flex item yg defaultnya "min-width: auto" - TIDAK bisa
+    // menyusut mengikuti overflow-x-auto, malah ikut melebar mengikuti
+    // tabel lalu kepotong diam-diam tanpa scrollbar sama sekali. Perbaikan
+    // 2026-09-13 (ditemukan di tabel Payroll yg sangat lebar).
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className="relative w-full min-w-0 overflow-x-auto"
     >
       <table
         data-slot="table"

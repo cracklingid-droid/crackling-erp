@@ -334,11 +334,18 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             </button>
           )}
         </CardContent>
-        <div className="thin-scrollbar overflow-x-auto">
+        {/* min-w-0 WAJIB - Card induk "flex flex-col" (components/ui/card.tsx),
+            child flex item defaultnya "min-width: auto" jadi TIDAK bisa
+            menyusut mengikuti overflow-x-auto (dia malah ikut melebar
+            mengikuti tabel yg sangat lebar, lalu kepotong diam-diam oleh
+            <main> di luar tanpa scrollbar sama sekali). Ini penyebab asli
+            kolom Gaji Bersih/Slip tidak pernah kelihatan/tidak bisa
+            di-scroll - bukan cuma soal kolom terkunci. Perbaikan 2026-09-13. */}
+        <div className="thin-scrollbar overflow-x-auto min-w-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky left-0 bg-card w-10">
+                <TableHead className="w-10">
                   <input
                     type="checkbox"
                     checked={items.length > 0 && selectedIds.size === items.length}
@@ -346,20 +353,29 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead className="sticky left-10 bg-card">Karyawan</TableHead>
-                <TableHead>Hadir</TableHead>
-                <TableHead>Lembur</TableHead>
+                {/* Cuma kolom Karyawan yang sticky (bukan checkbox juga) -
+                    2 kolom sticky butuh lebar checkbox persis matching
+                    left-offset kolom berikutnya, gampang meleset krn tabel
+                    HTML auto-layout tidak menjamin lebar kolom body = lebar
+                    header. Perbaikan 2026-09-13 (sebelumnya kolom Hadir
+                    ketiban/tertutup kolom Karyawan). */}
+                <TableHead className="sticky left-0 bg-card border-r">Karyawan</TableHead>
+                <TableHead className="text-right">Hadir</TableHead>
+                <TableHead className="text-right">Lembur</TableHead>
                 {infoFields.map((f) => (
-                  <TableHead key={f.key as string} className="whitespace-nowrap">{f.label}</TableHead>
+                  <TableHead key={f.key} className="whitespace-nowrap text-right">{f.label}</TableHead>
                 ))}
-                {editableFields.map((f) => (
-                  <TableHead key={f.key} className="whitespace-nowrap">
+                {editableFields.map((f, i) => (
+                  <TableHead
+                    key={f.key}
+                    className={`whitespace-nowrap text-right ${i === 0 ? "border-l pl-4" : ""}`}
+                  >
                     {lockedFieldKeys.has(f.key) && <Lock className="h-3 w-3 inline mr-1 text-muted-foreground" />}
                     {f.label}
                   </TableHead>
                 ))}
-                {category === "kantor" && <TableHead className="whitespace-nowrap">Reimburse Bensin</TableHead>}
-                <TableHead className="whitespace-nowrap">Gaji Bersih</TableHead>
+                {category === "kantor" && <TableHead className="whitespace-nowrap text-right">Reimburse Bensin</TableHead>}
+                <TableHead className="whitespace-nowrap text-right border-l pl-4 bg-muted/30">Gaji Bersih</TableHead>
                 <TableHead className="whitespace-nowrap">Slip</TableHead>
               </TableRow>
             </TableHeader>
@@ -373,7 +389,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
               )}
               {items.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="sticky left-0 bg-card">
+                  <TableCell>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(item.id)}
@@ -381,21 +397,35 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       aria-label={`Pilih ${item.employee.name}`}
                     />
                   </TableCell>
-                  <TableCell className="sticky left-10 bg-card font-medium whitespace-nowrap">
+                  <TableCell className="sticky left-0 bg-card border-r font-medium whitespace-nowrap">
                     <Link href={`/hr/karyawan/${item.employeeId}`} className="hover:underline">{item.employee.name}</Link>
                     <p className="text-xs text-muted-foreground font-normal">{item.employee.position || "-"}</p>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground tabular-nums">{item.daysPresent}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                  <TableCell className="text-sm text-muted-foreground tabular-nums text-right">{item.daysPresent}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground tabular-nums whitespace-nowrap text-right">
                     {formatMinutes(item.overtimeMinutes)}
                   </TableCell>
                   {infoFields.map((f) => {
                     const record = item as unknown as Record<string, number>;
+                    const isLocked = lockedFieldKeys.has(f.key);
+                    // Field referensi yang auto-dihitung (mis. Jml Telat
+                    // Kantor) ditampilkan teks biasa, bukan kotak input
+                    // disabled - kotak input menyiratkan bisa diketik,
+                    // padahal tidak pernah bisa utk field ini. Perbaikan
+                    // 2026-09-13 (sebelumnya semua info field pakai <Input>
+                    // walau field-nya terkunci).
+                    if (isLocked) {
+                      return (
+                        <TableCell key={f.key} className="text-right tabular-nums text-sm text-muted-foreground" title="Dihitung otomatis dari data absensi">
+                          {record[f.key]}
+                        </TableCell>
+                      );
+                    }
                     return (
                       <TableCell key={f.key}>
                         <Input
                           type="number"
-                          className="w-20 tabular-nums"
+                          className="w-20 tabular-nums ml-auto"
                           value={record[f.key]}
                           disabled={isFinal || readOnly}
                           onChange={(e) => updateLocal(item.id, f.key, Number(e.target.value) || 0)}
@@ -404,7 +434,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       </TableCell>
                     );
                   })}
-                  {editableFields.map((f) => {
+                  {editableFields.map((f, i) => {
                     const record = item as unknown as Record<string, number>;
                     const isDeduction = DEDUCTION_FIELD_KEYS.has(f.key);
                     const isTail = TAIL_FIELDS.some((t) => t.key === f.key);
@@ -424,13 +454,18 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                     // Field yang asalnya dari absensi/konfigurasi karyawan
                     // dikunci (dihitung ulang otomatis, bukan input manual) -
                     // keputusan Kevin 2026-09-12 (Outlet) & 2026-09-13 (Kantor).
+                    // Field manual TAPI periode sudah final/read-only juga
+                    // ditampilkan teks polos, bukan kotak input abu-abu -
+                    // kotak disabled di mana-mana bikin tabel terasa penuh
+                    // "kotak mati" & susah dibaca. Perbaikan 2026-09-13.
                     const isLocked = lockedFieldKeys.has(f.key);
-                    if (isLocked) {
+                    const borderClass = i === 0 ? "border-l pl-4" : "";
+                    if (isLocked || isFinal || readOnly) {
                       return (
-                        <TableCell key={f.key}>
+                        <TableCell key={f.key} className={borderClass}>
                           <span
-                            className={`block w-32 tabular-nums text-right text-sm ${colorClass}`}
-                            title="Dihitung otomatis dari data absensi - tidak bisa diedit manual"
+                            className={`block tabular-nums text-right text-sm ${colorClass}`}
+                            title={isLocked ? "Dihitung otomatis dari data absensi - tidak bisa diedit manual" : undefined}
                           >
                             {formatRupiah(value)}
                           </span>
@@ -438,13 +473,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                       );
                     }
                     return (
-                      <TableCell key={f.key}>
+                      <TableCell key={f.key} className={borderClass}>
                         <Input
                           type="text"
                           inputMode="numeric"
                           className={`w-32 tabular-nums text-right ${colorClass}`}
                           value={formatRupiah(value)}
-                          disabled={isFinal || readOnly}
                           onChange={(e) => updateLocal(item.id, f.key, parseRupiahInput(e.target.value))}
                           onBlur={() => saveItem(item.id)}
                         />
@@ -452,24 +486,31 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                     );
                   })}
                   {category === "kantor" && (
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <Input
-                          type="number"
-                          className="w-16 tabular-nums"
-                          value={item.fuelKm}
-                          disabled={isFinal || readOnly}
-                          onChange={(e) => updateLocal(item.id, "fuelKm", Number(e.target.value) || 0)}
-                          onBlur={() => saveItem(item.id)}
-                          title="KM ditempuh bulan ini"
-                        />
-                        <span className="text-xs text-muted-foreground whitespace-nowrap" title="Dihitung dari KM x rate karyawan - di luar Take Home Pay">
-                          = Rp {formatRupiah(item.fuelReimbursement)}
+                    <TableCell className="text-right">
+                      {isFinal || readOnly ? (
+                        <span className="text-sm tabular-nums" title="Di luar Take Home Pay">
+                          {item.fuelKm > 0 ? `${item.fuelKm} KM = Rp ${formatRupiah(item.fuelReimbursement)}` : "-"}
                         </span>
-                      </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Input
+                            type="number"
+                            className="w-16 tabular-nums"
+                            value={item.fuelKm}
+                            onChange={(e) => updateLocal(item.id, "fuelKm", Number(e.target.value) || 0)}
+                            onBlur={() => saveItem(item.id)}
+                            title="KM ditempuh bulan ini"
+                          />
+                          <span className="text-xs text-muted-foreground whitespace-nowrap" title="Dihitung dari KM x rate karyawan - di luar Take Home Pay">
+                            = Rp {formatRupiah(item.fuelReimbursement)}
+                          </span>
+                        </div>
+                      )}
                     </TableCell>
                   )}
-                  <TableCell className="font-medium tabular-nums whitespace-nowrap">Rp {formatRupiah(netPay(item, editableFields))}</TableCell>
+                  <TableCell className="font-medium tabular-nums whitespace-nowrap text-right border-l pl-4 bg-muted/30">
+                    Rp {formatRupiah(netPay(item, editableFields))}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">
                     <Link
                       href={`/hr/payroll/${category}/${periodId}/slip/${item.id}`}

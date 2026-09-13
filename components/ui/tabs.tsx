@@ -5,10 +5,15 @@ import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
 import { cn } from "cn"
 
 function Tabs({ className, ...props }: TabsPrimitive.Root.Props) {
+  // min-w-0 wajib - Tabs ini sendiri sering jadi grid/flex item di
+  // container induknya (mis. halaman detail periode payroll pakai
+  // "grid gap-6"), yang defaultnya "min-width: auto" - tidak bisa
+  // menyusut mengikuti tabel lebar di TabsPanel, malah ikut melebar lalu
+  // kepotong diam-diam tanpa scrollbar. Perbaikan 2026-09-13.
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
-      className={cn("grid gap-3", className)}
+      className={cn("grid min-w-0 gap-3", className)}
       {...props}
     />
   )
@@ -55,10 +60,14 @@ function TabsIndicator({ className, ...props }: TabsPrimitive.Indicator.Props) {
 }
 
 function TabsPanel({ className, ...props }: TabsPrimitive.Panel.Props) {
+  // min-w-0 wajib - TabsPanel adalah grid item langsung di dalam Tabs
+  // (grid), sama alasannya dgn Tabs di atas. Ini elemen yg SEBENARNYA
+  // membungkus tabel lebar, jadi paling kritis dapat min-w-0. Perbaikan
+  // 2026-09-13.
   return (
     <TabsPrimitive.Panel
       data-slot="tabs-panel"
-      className={cn("outline-none", className)}
+      className={cn("min-w-0 outline-none", className)}
       {...props}
     />
   )

@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
 import { ArrowLeft } from "lucide-react";
 import { getDefaultPeriodRange, toDateInputValue } from "@/lib/payroll-period-cycle";
+import { employeeCategory } from "@/lib/payroll-config";
 
 type RecapRow = {
   id: number;
@@ -35,6 +37,10 @@ export default function RekapAbsensiPage() {
   const [endDate, setEndDate] = useState(toDateInputValue(defaultEnd));
   const [rows, setRows] = useState<RecapRow[] | null>(null);
   const [loading, setLoading] = useState(false);
+  // Resto & Kantor dipisah - cara hitung absensi/gaji beda total di antara
+  // keduanya, disatukan dalam 1 tabel bikin bingung. Permintaan Kevin
+  // 2026-09-13.
+  const [tab, setTab] = useState<"outlet" | "kantor">("outlet");
 
   function load() {
     setLoading(true);
@@ -74,45 +80,61 @@ export default function RekapAbsensiPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead>Jabatan / Outlet</TableHead>
-                <TableHead>Hari Hadir</TableHead>
-                <TableHead>Terlambat</TableHead>
-                <TableHead>Total Jam Kerja</TableHead>
-                <TableHead>Jam Lembur</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows?.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-muted-foreground">Tidak ada karyawan aktif.</TableCell></TableRow>
-              )}
-              {rows?.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/hr/karyawan/${r.id}`} className="hover:underline">{r.name}</Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {[r.position, r.outlet].filter(Boolean).join(" · ") || "-"}
-                  </TableCell>
-                  <TableCell className={`tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
-                    {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
-                  </TableCell>
-                  <TableCell className={`tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                    {r.workSchedule ? `${r.lateCount} kali` : "-"}
-                  </TableCell>
-                  <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
-                  <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.overtimeMinutes)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+      {(() => {
+        const restoRows = rows?.filter((r) => employeeCategory(r.outlet) === "outlet");
+        const kantorRows = rows?.filter((r) => employeeCategory(r.outlet) === "kantor");
+        const tabRows = tab === "outlet" ? restoRows : kantorRows;
+        return (
+          <>
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "outlet" | "kantor")}>
+              <TabsList>
+                <TabsIndicator />
+                <TabsTab value="outlet">Resto {restoRows ? `(${restoRows.length})` : ""}</TabsTab>
+                <TabsTab value="kantor">Kantor {kantorRows ? `(${kantorRows.length})` : ""}</TabsTab>
+              </TabsList>
+            </Tabs>
+            <Card>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Jabatan / Outlet</TableHead>
+                      <TableHead>Hari Hadir</TableHead>
+                      <TableHead>Terlambat</TableHead>
+                      <TableHead>Total Jam Kerja</TableHead>
+                      <TableHead>Jam Lembur</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tabRows?.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-muted-foreground">Tidak ada karyawan aktif di kategori ini.</TableCell></TableRow>
+                    )}
+                    {tabRows?.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-medium">
+                          <Link href={`/hr/karyawan/${r.id}`} className="hover:underline">{r.name}</Link>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {[r.position, r.outlet].filter(Boolean).join(" · ") || "-"}
+                        </TableCell>
+                        <TableCell className={`tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
+                          {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
+                        </TableCell>
+                        <TableCell className={`tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                          {r.workSchedule ? `${r.lateCount} kali` : "-"}
+                        </TableCell>
+                        <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
+                        <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.overtimeMinutes)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </>
+        );
+      })()}
     </div>
   );
 }
