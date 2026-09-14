@@ -10,8 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { AlertTriangle, Lock, Unlock, Printer } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, Printer, Plus, X } from "lucide-react";
 import { SELLING_OUTLET_NAMES } from "@/lib/accounting-outlets";
 
 type Row = { accountId: number; code: string; name: string; type: string; subType: string | null; parentId: number | null; debit: number; credit: number; balance: number };
@@ -344,6 +345,8 @@ function GeneralJournal({ start, end }: { start: string; end: string }) {
   const [page, setPage] = useState(1);
   const [sourceType, setSourceType] = useState("");
   const [search, setSearch] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setEntries(null);
@@ -356,13 +359,17 @@ function GeneralJournal({ start, end }: { start: string; end: string }) {
         setEntries(d.entries);
         setTotal(d.total);
       });
-  }, [start, end, page, sourceType, search]);
+  }, [start, end, page, sourceType, search, reloadKey]);
 
   const totalPages = Math.max(1, Math.ceil(total / 40));
   return (
     <Card className="min-w-0">
       <CardContent className="pt-6 grid gap-4 min-w-0">
         <div className="flex flex-col sm:flex-row gap-2">
+          <Button size="sm" onClick={() => setManualOpen(true)}>
+            <Plus className="h-3.5 w-3.5" /> Jurnal Manual / Saldo Awal
+          </Button>
+          {manualOpen && <ManualJournalDialog onClose={() => setManualOpen(false)} onDone={() => { setManualOpen(false); setReloadKey((k) => k + 1); }} />}
           <Select value={sourceType || "all"} onValueChange={(v) => { setSourceType(v === "all" ? "" : v ?? ""); setPage(1); }}>
             <SelectTrigger className="w-full sm:w-52">
               <SelectValue>{() => (sourceType ? SOURCE_LABEL[sourceType] ?? sourceType : "Semua sumber")}</SelectValue>
@@ -439,6 +446,120 @@ function GeneralJournal({ start, end }: { start: string; end: string }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Jurnal bebas (Manual / Saldo Awal) - satu-satunya pintu input jurnal
+// tanpa dokumen sumber. Saldo Awal: waktu buku besar mulai dipakai, isi
+// saldo kas/bank, persediaan, aset tetap, utang, modal per tanggal mulai
+// (keputusan tanggalnya milik Kevin - lihat plan).
+function ManualJournalDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  type Acc = { id: number; code: string; name: string; type: string; isActive: boolean };
+  type L = { accountId: string; debit: string; credit: string; description: string };
+  const [accounts, setAccounts] = useState<Acc[]>([]);
+  const [date, setDate] = useState(todayIso());
+  const [memo, setMemo] = useState("");
+  const [sourceType, setSourceType] = useState("MANUAL");
+  const [lines, setLines] = useState<L[]>([
+    { accountId: "", debit: "", credit: "", description: "" },
+    { accountId: "", debit: "", credit: "", description: "" },
+  ]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/accounting/coa").then((r) => r.json()).then((d: Acc[]) => setAccounts(d.filter((a) => a.isActive && !a.code.endsWith("-0000"))));
+  }, []);
+
+  const parseRp = (s: string) => Number(s.replace(/\D/g, "")) || 0;
+  const totalDebit = lines.reduce((s, l) => s + parseRp(l.debit), 0);
+  const totalCredit = lines.reduce((s, l) => s + parseRp(l.credit), 0);
+  const balanced = totalDebit === totalCredit && totalDebit > 0;
+  const accLabel = (id: string) => {
+    const a = accounts.find((x) => String(x.id) === id);
+    return a ? `${a.code} - ${a.name}` : "Pilih akun...";
+  };
+  const patch = (i: number, p: Partial<L>) => setLines((c) => c.map((l, idx) => (idx === i ? { ...l, ...p } : l)));
+
+  async function save() {
+    if (!memo.trim()) return toast.error("Keterangan wajib diisi.");
+    const payload = lines
+      .filter((l) => l.accountId && (parseRp(l.debit) > 0 || parseRp(l.credit) > 0))
+      .map((l) => ({ accountId: Number(l.accountId), debit: parseRp(l.debit), credit: parseRp(l.credit), description: l.description || null }));
+    setSaving(true);
+    try {
+      const res = await fetch("/api/accounting/journal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, memo, sourceType, lines: payload }) });
+      if (!res.ok) return toast.error((await res.json()).error ?? "Gagal menyimpan jurnal.");
+      toast.success("Jurnal tersimpan.");
+      onDone();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Jurnal Manual / Saldo Awal</DialogTitle>
+          <DialogDescription>Total debit harus sama dgn total kredit. Untuk saldo awal: pilih jenis &quot;Saldo Awal&quot; & tanggal mulai buku.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-1.5">
+              <Label>Tanggal</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Jenis</Label>
+              <Select value={sourceType} onValueChange={(v) => setSourceType(v ?? "MANUAL")}>
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue>{() => (sourceType === "OPENING_BALANCE" ? "Saldo Awal" : "Manual")}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MANUAL">Manual</SelectItem>
+                  <SelectItem value="OPENING_BALANCE">Saldo Awal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5 sm:col-span-3">
+              <Label>Keterangan</Label>
+              <Input value={memo} onChange={(e) => setMemo(e.target.value)} className="h-10" placeholder="mis. Saldo awal per 1 Oktober 2026" />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            {lines.map((l, i) => (
+              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_8rem_8rem_auto] items-start rounded-md border p-2">
+                <Select value={l.accountId} onValueChange={(v) => patch(i, { accountId: v ?? "" })}>
+                  <SelectTrigger className="h-10 w-full">
+                    <SelectValue>{() => accLabel(l.accountId)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>{a.code} - {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input inputMode="numeric" placeholder="Debit" value={l.debit ? parseRp(l.debit).toLocaleString("id-ID") : ""} onChange={(e) => patch(i, { debit: String(parseRp(e.target.value)), credit: "" })} className="h-10 text-right tabular-nums" />
+                <Input inputMode="numeric" placeholder="Kredit" value={l.credit ? parseRp(l.credit).toLocaleString("id-ID") : ""} onChange={(e) => patch(i, { credit: String(parseRp(e.target.value)), debit: "" })} className="h-10 text-right tabular-nums" />
+                <Button type="button" variant="ghost" size="icon-sm" disabled={lines.length <= 2} onClick={() => setLines((c) => c.filter((_, idx) => idx !== i))} aria-label="Hapus baris">
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+            <div className="flex items-center justify-between">
+              <Button type="button" variant="outline" size="sm" onClick={() => setLines((c) => [...c, { accountId: "", debit: "", credit: "", description: "" }])}>+ Baris</Button>
+              <p className={`text-sm tabular-nums ${balanced ? "text-emerald-700" : "text-red-600"}`}>
+                Debit {fmtRp(totalDebit)} &middot; Kredit {fmtRp(totalCredit)}{!balanced && totalDebit + totalCredit > 0 && " (belum balance)"}
+              </p>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Batal</Button>
+          <Button onClick={save} disabled={saving || !balanced}>{saving ? "Menyimpan..." : "Posting Jurnal"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

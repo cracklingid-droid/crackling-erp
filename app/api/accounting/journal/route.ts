@@ -2,8 +2,46 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser, canAccessAccounting } from "@/lib/current-user";
 import { parseDateParam, endOfDay } from "@/lib/accounting-reports";
+import { postJournalEntry, AccountingPostingError } from "@/lib/accounting-ledger";
 
 const PAGE_SIZE = 40;
+
+// Jurnal manual / saldo awal - satu-satunya cara input jurnal bebas (mis.
+// saldo awal kas/persediaan/aset/modal waktu buku besar mulai, koreksi,
+// setoran modal). Tetap lewat postJournalEntry (balance & lock dicek).
+export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  if (!canAccessAccounting(user)) return NextResponse.json({ error: "Tidak punya akses" }, { status: 403 });
+
+  const body = await req.json();
+  const date = parseDateParam(typeof body.date === "string" ? body.date : null);
+  const memo = typeof body.memo === "string" ? body.memo.trim() : "";
+  const sourceType = body.sourceType === "OPENING_BALANCE" ? "OPENING_BALANCE" : "MANUAL";
+  const outletName = typeof body.outletName === "string" && body.outletName ? body.outletName : null;
+  const rawLines: { accountId?: unknown; debit?: unknown; credit?: unknown; description?: unknown }[] = Array.isArray(body.lines) ? body.lines : [];
+
+  if (!date) return NextResponse.json({ error: "Tanggal tidak valid" }, { status: 400 });
+  if (!memo) return NextResponse.json({ error: "Keterangan jurnal wajib diisi" }, { status: 400 });
+
+  const lines = rawLines.map((l) => ({
+    accountId: Number(l.accountId),
+    debit: Math.round(Number(l.debit) || 0),
+    credit: Math.round(Number(l.credit) || 0),
+    description: typeof l.description === "string" && l.description.trim() ? l.description.trim() : null,
+  }));
+  if (lines.some((l) => !Number.isInteger(l.accountId))) return NextResponse.json({ error: "Semua baris harus pilih akun" }, { status: 400 });
+  const accounts = await prisma.account.findMany({ where: { id: { in: lines.map((l) => l.accountId) } }, select: { id: true } });
+  if (accounts.length !== new Set(lines.map((l) => l.accountId)).size) return NextResponse.json({ error: "Ada akun yang tidak ditemukan" }, { status: 400 });
+
+  try {
+    const entry = await postJournalEntry({ date, memo, sourceType, sourceId: null, outletName, createdById: user.id, lines });
+    return NextResponse.json(entry, { status: 201 });
+  } catch (e) {
+    if (e instanceof AccountingPostingError) return NextResponse.json({ error: e.message }, { status: 400 });
+    throw e;
+  }
+}
 
 // Jurnal Umum - daftar semua JournalEntry (+ baris) dlm rentang tanggal,
 // filter sourceType/akun/cari memo. Dasar audit: semua modul lain cuma
