@@ -5,7 +5,9 @@
 // tidak ada auto-refresh terjadwal (keputusan Kevin 2026-09-12).
 // "Omzet" = kolom "Total" (Subtotal + Service Charge 5%) per keputusan
 // Kevin - BUKAN Nett Sales/Subtotal saja.
-const SALES_SHEETS: { fileId: string; hrOutletName: string }[] = [
+// Di-export juga utk lib/sales-daily-sheet.ts (modul Record Sales Accounting
+// baca tab "Daily" dari file yang sama) - 1 daftar file, jangan diduplikat.
+export const SALES_SHEETS: { fileId: string; hrOutletName: string }[] = [
   { fileId: "1ixyKHwthFWyEX7uIsODR6-IGLv9claaunedRr-mhXRA", hrOutletName: "Gading Serpong" },
   { fileId: "1uDMslx7Y2T4xEb1mSaErclBFOrq6IU0GEKiLmgvyjOQ", hrOutletName: "Kelapa Gading" },
 ];
@@ -13,7 +15,7 @@ const SALES_SHEETS: { fileId: string; hrOutletName: string }[] = [
 // Parser CSV penuh (bukan per-baris) - field di sheet ini (mis. "Menu
 // Notes") bisa berisi newline literal di dalam tanda kutip, beda dari
 // sheet "Daily Qty Per Menu" yang cukup di-split per baris dulu.
-function parseCsv(text: string): string[][] {
+export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cur = "";

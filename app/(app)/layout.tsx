@@ -5,8 +5,8 @@ import { AuthProvider, useAuthContext } from "../components/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, LogOut, Home, PiggyBank, Clock3 } from "lucide-react";
-import { canAccessCostCenter, canViewOvertimeRequests } from "@/lib/roles";
+import { ChevronDown, LogOut, Home, PiggyBank, Clock3, Calculator } from "lucide-react";
+import { canAccessCostCenter, canViewOvertimeRequests, canAccessAccounting } from "@/lib/roles";
 
 // Role yang aksesnya lebih dari 1 modul (HR + Warehouse, dst) - butuh jalan
 // pintas balik ke halaman pilih modul. Role HR biasa (hr_manager/hr_staff)
@@ -19,6 +19,7 @@ function TopBar() {
   const showHomeButton = !!user && MULTI_MODULE_ROLES.includes(user.role);
   const showCostCenter = !!user && canAccessCostCenter(user);
   const showLembur = !!user && canViewOvertimeRequests(user);
+  const showAccounting = !!user && canAccessAccounting(user);
   // Role "manager" cuma boleh akses Cost Center (lihat app/(app)/hr/layout.tsx)
   // jadi logo-nya langsung ke sana, bukan ke /hr yang bakal langsung dilempar balik.
   const homeHref = user?.role === "manager" ? "/cost-center" : "/hr";
@@ -31,18 +32,23 @@ function TopBar() {
         <span className="font-heading font-semibold text-sm tracking-wide hidden sm:inline">Crackling ERP · HR</span>
       </Link>
       {showHomeButton && (
-        <Button variant="ghost" size="sm" className="gap-1.5" render={<a href="/" />}>
+        <Button variant="ghost" size="sm" className="gap-1.5" nativeButton={false} render={<a href="/" />}>
           <Home className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Pilih Modul</span>
         </Button>
       )}
       {showCostCenter && (
-        <Button variant="ghost" size="sm" className="gap-1.5" render={<Link href="/cost-center" />}>
+        <Button variant="ghost" size="sm" className="gap-1.5" nativeButton={false} render={<Link href="/cost-center" />}>
           <PiggyBank className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Cost Center</span>
         </Button>
       )}
       {showLembur && (
-        <Button variant="ghost" size="sm" className="gap-1.5" render={<Link href="/lembur" />}>
+        <Button variant="ghost" size="sm" className="gap-1.5" nativeButton={false} render={<Link href="/lembur" />}>
           <Clock3 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Lembur</span>
+        </Button>
+      )}
+      {showAccounting && (
+        <Button variant="ghost" size="sm" className="gap-1.5" nativeButton={false} render={<Link href="/accounting" />}>
+          <Calculator className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Accounting</span>
         </Button>
       )}
       <div className="ml-auto">

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, ArrowRight, Users, Package, Landmark, ShoppingCart, Receipt, Scale, FileBarChart } from "lucide-react";
+import { BookOpen, ArrowRight, Users, Package, Landmark, ShoppingCart, Receipt, Scale, FileBarChart, Boxes } from "lucide-react";
 
 const MODULES: {
   href: string;
@@ -11,13 +11,14 @@ const MODULES: {
   ready: boolean;
 }[] = [
   { href: "/accounting/coa", icon: <BookOpen className="h-5 w-5" />, title: "Chart of Accounts", description: "Daftar akun (COA) - dasar semua jurnal.", ready: true },
-  { href: "/accounting/contacts", icon: <Users className="h-5 w-5" />, title: "Contact", description: "Customer, Vendor, Karyawan & kontak lainnya.", ready: false },
-  { href: "/accounting/products", icon: <Package className="h-5 w-5" />, title: "Product", description: "Referensi katalog item dari Warehouse.", ready: false },
-  { href: "/accounting/fixed-assets", icon: <Landmark className="h-5 w-5" />, title: "Fixed Asset", description: "Daftar aset tetap & depresiasi garis lurus.", ready: false },
-  { href: "/accounting/sales", icon: <ShoppingCart className="h-5 w-5" />, title: "Record Sales", description: "Omzet harian per produk (dari POS).", ready: false },
-  { href: "/accounting/expenses", icon: <Receipt className="h-5 w-5" />, title: "Direct Expense", description: "Pencatatan beban langsung.", ready: false },
-  { href: "/accounting/reconciliation", icon: <Scale className="h-5 w-5" />, title: "Rekonsiliasi", description: "Mutasi bank per akun - 15 akun, ribuan baris.", ready: true },
-  { href: "/accounting/reports", icon: <FileBarChart className="h-5 w-5" />, title: "Laporan", description: "P&L, Neraca, Arus Kas & Notes.", ready: false },
+  { href: "/accounting/contacts", icon: <Users className="h-5 w-5" />, title: "Contact", description: "Customer, Vendor, Karyawan & kontak lainnya.", ready: true },
+  { href: "/accounting/products", icon: <Package className="h-5 w-5" />, title: "Product", description: "Katalog item Warehouse (live) + harga FIFO & foto.", ready: true },
+  { href: "/accounting/fixed-assets", icon: <Landmark className="h-5 w-5" />, title: "Fixed Asset", description: "Daftar aset tetap & depresiasi garis lurus.", ready: true },
+  { href: "/accounting/sales", icon: <ShoppingCart className="h-5 w-5" />, title: "Record Sales", description: "Omzet harian per outlet dari sheet POS - jurnal AR/Sales.", ready: true },
+  { href: "/accounting/cogs", icon: <Boxes className="h-5 w-5" />, title: "COGS (HPP)", description: "Beban pokok penjualan otomatis dari Warehouse.", ready: true },
+  { href: "/accounting/expenses", icon: <Receipt className="h-5 w-5" />, title: "Direct Expense", description: "Beban langsung (gas, listrik, marketing) - bon dibaca otomatis.", ready: true },
+  { href: "/accounting/reconciliation", icon: <Scale className="h-5 w-5" />, title: "Rekonsiliasi", description: "Jurnal vs mutasi bank per akun - cocokkan & catat.", ready: true },
+  { href: "/accounting/reports", icon: <FileBarChart className="h-5 w-5" />, title: "Laporan", description: "Laba Rugi, Neraca, Arus Kas, Jurnal Umum, Catatan.", ready: true },
 ];
 
 export default function AccountingHomePage() {
@@ -25,9 +26,7 @@ export default function AccountingHomePage() {
     <div className="max-w-5xl">
       <div className="mb-7">
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Accounting</h1>
-        <p className="text-muted-foreground mt-1.5 text-sm">
-          Pembukuan double-entry Crackling. Modul dibangun bertahap - yang belum siap ditandai &quot;Segera&quot;.
-        </p>
+        <p className="text-muted-foreground mt-1.5 text-sm">Pembukuan double-entry Crackling - semua modul posting ke satu buku besar.</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {MODULES.map((m) =>

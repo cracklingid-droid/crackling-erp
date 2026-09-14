@@ -2,8 +2,9 @@
 // dari database Crackling Warehouse (Tahap 1 rencana penggabungan ERP,
 // 2026-09-12). JANGAN JALANKAN `prisma migrate`/`db push` dgn --schema
 // file ini - Warehouse py migration lifecycle sendiri, di repo terpisah.
-// Model di sini cuma subset yang benar-benar dipakai laporan Cost Center,
-// field & tipe disalin persis dari crackling-warehouse/prisma/schema.prisma.
+// Model di sini cuma subset yang benar-benar dipakai laporan Cost Center &
+// modul Accounting (Product/COGS), field & tipe disalin persis dari
+// crackling-warehouse/prisma/schema.prisma.
 generator warehouseClient {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/warehouse-client"
@@ -22,10 +23,47 @@ model Outlet {
   isActive Boolean
 }
 
-model Item {
+model Unit {
   id   Int    @id
-  sku  String
+  code String
   name String
+
+  items Item[]
+}
+
+// Diperluas 2026-09-14 (modul Product Accounting, permintaan Kevin: "list
+// produk skunya apa saja dan harga FIFO ketika berbelanja") - sebelumnya
+// cuma id/sku/name utk label rincian Cost Center.
+model Item {
+  id                   Int      @id
+  sku                  String
+  name                 String
+  categoryCode         String
+  baseUnitId           Int
+  baseUnit             Unit     @relation(fields: [baseUnitId], references: [id])
+  purchaseUnitName     String?
+  purchaseToBaseFactor Decimal
+  standardCost         Decimal?
+  isActive             Boolean
+
+  stockBatches StockBatch[]
+}
+
+// Batch FIFO Warehouse - dipakai modul Product utk tampilkan harga FIFO
+// (rata-rata tertimbang unitCost batch yang masih ada sisa) & harga beli
+// terakhir per item. BACA SAJA.
+model StockBatch {
+  id           Int      @id
+  itemId       Int
+  item         Item     @relation(fields: [itemId], references: [id])
+  outletId     Int
+  areaId       Int?
+  qtyIn        Decimal
+  qtyRemaining Decimal
+  unitCost     Decimal
+  receivedAt   DateTime
+  sourceType   String
+  sourceId     Int
 }
 
 // qty/totalCost negatif = pemakaian/keluar, positif = masuk - sama definisi

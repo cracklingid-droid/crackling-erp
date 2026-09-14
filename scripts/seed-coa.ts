@@ -28,9 +28,21 @@ const ACCOUNTS: SeedAccount[] = [
   { code: "3-1000", name: "Modal Pemilik", type: "EQUITY", parentCode: "3-0000" },
   { code: "3-2000", name: "Laba Ditahan", type: "EQUITY", parentCode: "3-0000" },
 
+  // Piutang & Pendapatan PER OUTLET - contoh eksplisit dari Kevin 2026-09-14
+  // ("AR - Crackling Serpong" / "Sales - Crackling Serpong"): jurnal Record
+  // Sales harian = Dr AR outlet, Cr Sales outlet; waktu uang masuk bank
+  // (rekonsiliasi) = Dr Bank, Cr AR outlet. Nama outlet ikut nama HR
+  // (lib/payroll-config.ts OUTLET_NAMES) supaya konsisten dgn Cost Center.
+  { code: "1-1100-01", name: "AR - Crackling Serpong", type: "ASSET", subType: "Aset Lancar", parentCode: "1-1100" },
+  { code: "1-1100-02", name: "AR - Crackling Kelapa Gading", type: "ASSET", subType: "Aset Lancar", parentCode: "1-1100" },
+  { code: "1-1100-03", name: "AR - Crackling Fatgai", type: "ASSET", subType: "Aset Lancar", parentCode: "1-1100" },
+
   // PENDAPATAN
   { code: "4-0000", name: "PENDAPATAN", type: "REVENUE" },
   { code: "4-1000", name: "Pendapatan Penjualan", type: "REVENUE", parentCode: "4-0000" },
+  { code: "4-1000-01", name: "Sales - Crackling Serpong", type: "REVENUE", parentCode: "4-1000" },
+  { code: "4-1000-02", name: "Sales - Crackling Kelapa Gading", type: "REVENUE", parentCode: "4-1000" },
+  { code: "4-1000-03", name: "Sales - Crackling Fatgai", type: "REVENUE", parentCode: "4-1000" },
 
   // BEBAN POKOK PENJUALAN
   { code: "5-0000", name: "BEBAN POKOK PENJUALAN", type: "EXPENSE" },

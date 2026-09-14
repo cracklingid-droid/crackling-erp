@@ -708,24 +708,58 @@ model Contact {
   @@index([type])
 }
 
-// Dokumen sumber Direct Expense - posting ke JournalEntry (Dr akun beban, Cr
-// akun Kas/Bank) lewat lib/accounting-ledger.ts. v1 asumsi lunas saat itu
-// juga (belum ada status Utang Usaha/AP menunggu bayar - keterbatasan v1
-// yang disengaja, lihat plan).
+// Dokumen sumber Direct Expense (1 bon/nota = 1 record, bisa beberapa baris
+// item ke akun beban berbeda) - posting ke JournalEntry (Dr tiap akun beban
+// baris, Cr akun Kas/Bank pembayaran) lewat lib/accounting-ledger.ts.
+// Foto bon dibaca OCR Claude (pola sama spt scan-bon Belanja Warehouse,
+// permintaan Kevin 2026-09-14) lalu disimpan sbg receiptUrl (Vercel Blob)
+// utk jejak audit. v1 asumsi lunas saat itu juga (belum ada status Utang
+// Usaha/AP menunggu bayar - keterbatasan v1 yang disengaja, lihat plan).
 model DirectExpense {
   id               Int      @id @default(autoincrement())
   date             DateTime
   contactId        Int?
   contact          Contact? @relation(fields: [contactId], references: [id])
   outletName       String?
-  accountId        Int // akun beban yang didebit
   paymentAccountId Int // akun Kas/Bank yang dikredit
-  amount           Int
+  amount           Int // total semua baris
   description      String?
+  receiptUrl       String?
   journalEntryId   Int?     @unique
   createdById      Int?
   createdBy        HrUser?  @relation(fields: [createdById], references: [id])
   createdAt        DateTime @default(now())
+
+  lines DirectExpenseLine[]
+}
+
+model DirectExpenseLine {
+  id              Int           @id @default(autoincrement())
+  directExpenseId Int
+  directExpense   DirectExpense @relation(fields: [directExpenseId], references: [id], onDelete: Cascade)
+  description     String
+  amount          Int
+  accountId       Int // akun beban yang didebit utk baris ini
+}
+
+// Foto item katalog Warehouse - disimpan di sisi ERP (bukan nulis ke tabel
+// Item Warehouse, jembatan ke sana BACA SAJA) keyed by id Item Warehouse.
+// Permintaan Kevin 2026-09-14 ("upload foto agar bisa mengetahui dengan
+// jelas barang yang dimaksud apa").
+model ProductPhoto {
+  id              Int      @id @default(autoincrement())
+  warehouseItemId Int      @unique
+  url             String
+  createdAt       DateTime @default(now())
+}
+
+// Catatan atas Laporan Keuangan (CALK) - v1 teks bebas per periode bulan,
+// ditulis manual (bukan auto-generate), lihat plan.
+model AccountingNote {
+  id        Int      @id @default(autoincrement())
+  yearMonth String   @unique // "2026-09"
+  content   String
+  updatedAt DateTime @updatedAt
 }
 
 // Depresiasi garis lurus (straight-line) saja utk v1 - keputusan Kevin
@@ -800,6 +834,7 @@ model SalesRecord {
   date           DateTime
   outletName     String
   source         String   @default("SHEET_IMPORT") // SHEET_IMPORT | MANUAL
+  total          Int      @default(0) // total omzet hari itu (dari tab "daily" sheet POS) - dasar jurnal Dr AR / Cr Sales
   journalEntryId Int?     @unique
   createdAt      DateTime @default(now())
 
