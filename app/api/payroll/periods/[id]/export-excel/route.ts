@@ -168,7 +168,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     totalRow.getCell(sheet1Header.length).font = { bold: true };
 
     const noteRow = sheet1.addRow([
-      "Catatan: BPJS, PPh21, Kasbon, Bayar/Kembali Deposit, Bonus, Service Charge & Penyesuaian Lain tidak tercatat per tanggal kejadian - lihat Sheet 2 (Rekap Bulanan).",
+      "Catatan: BPJS, Kasbon, Bayar/Kembali Deposit, Bonus, Service Charge & Penyesuaian Lain tidak tercatat per tanggal kejadian - lihat Sheet 2 (Rekap Bulanan).",
     ]);
     sheet1.mergeCells(noteRow.number, 1, noteRow.number, sheet1Header.length);
     noteRow.font = { italic: true, size: 9, color: { argb: "FF6B7280" } };

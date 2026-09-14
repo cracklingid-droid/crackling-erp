@@ -17,13 +17,18 @@ export type FieldDef = { key: string; label: string };
 // ditampilkan/diedit lagi. Payroll Kantor punya mekanisme BPJS SENDIRI
 // (bpjsAllowance/bpjsEmployerObligation/bpjsRemittance di KANTOR_FIELDS) -
 // TIDAK terpengaruh perubahan ini.
+//
+// "PPh21" JUGA SENGAJA TIDAK ADA di sini - keputusan Kevin 2026-09-14:
+// karyawan resto/outlet tidak kena pajak PPh21 sama sekali. Field
+// pph21Deduction tetap ada di DB (selalu 0 utk item Outlet) tapi tidak
+// ditampilkan/diedit lagi di Payroll Outlet. Payroll Kantor TETAP punya
+// PPh21 (lihat pph21Deduction di KANTOR_BASE_FIELDS) - TIDAK terpengaruh.
 export const BASE_FIELDS: FieldDef[] = [
   { key: "baseSalary", label: "Gaji Pokok" },
   { key: "partTimePay", label: "Gaji Part Time" },
   { key: "mealAllowance", label: "Uang Makan" },
   { key: "transportReimbursement", label: "Reimb. Transport" },
   { key: "attendanceDeduction", label: "Potongan Absensi" },
-  { key: "pph21Deduction", label: "PPh21" },
   { key: "loanDeduction", label: "Kasbon" },
 ];
 

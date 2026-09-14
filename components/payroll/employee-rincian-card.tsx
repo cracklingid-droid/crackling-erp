@@ -254,7 +254,7 @@ export function EmployeeRincianCard({
             </table>
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5">
-            BPJS, PPh21, Kasbon, Bayar/Kembali Deposit, Bonus, Service Charge &amp; Penyesuaian Lain tidak tercatat per
+            BPJS, Kasbon, Bayar/Kembali Deposit, Bonus, Service Charge &amp; Penyesuaian Lain tidak tercatat per
             tanggal kejadian - tetap dihitung sebagai komponen bulanan di tabel Jenis di atas / Rekap Bulanan.
           </p>
         </div>

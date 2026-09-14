@@ -4,12 +4,14 @@ import { useEffect, useState, use as usePromise } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ArrowLeft, Lock, Unlock, FileText, RefreshCw, FileSpreadsheet, Printer } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, FileText, RefreshCw, FileSpreadsheet, Printer, Pencil } from "lucide-react";
 import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
 import { KANTOR_LOCKED_FIELD_KEYS } from "@/lib/payroll-kantor-calc";
 import { fieldsForCategory, infoFieldsForCategory, DEDUCTION_FIELD_KEYS, TAIL_FIELDS, computeNetPay, type FieldDef } from "@/lib/payroll-fields";
@@ -90,6 +92,59 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// 1 baris label+input di dialog "Edit lewat form" - kotak lebih besar &
+// disusun vertikal (bukan kolom tabel yang sempit & butuh scroll ke
+// samping). Permintaan Kevin 2026-09-14 ("UI nya sulit untuk edit").
+function FieldRow({
+  label,
+  value,
+  editable,
+  colorClass,
+  isMoney,
+  hint,
+  onChange,
+  onBlur,
+}: {
+  label: string;
+  value: number;
+  editable: boolean;
+  colorClass?: string;
+  isMoney: boolean;
+  hint?: string;
+  onChange: (v: number) => void;
+  onBlur: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <Label className="w-40 shrink-0 text-sm font-normal text-muted-foreground">{label}</Label>
+      {editable ? (
+        isMoney ? (
+          <Input
+            type="text"
+            inputMode="numeric"
+            className={`h-10 flex-1 text-base tabular-nums text-right ${colorClass ?? ""}`}
+            value={formatRupiah(value)}
+            onChange={(e) => onChange(parseRupiahInput(e.target.value))}
+            onBlur={onBlur}
+          />
+        ) : (
+          <Input
+            type="number"
+            className="h-10 flex-1 text-base tabular-nums text-right"
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value) || 0)}
+            onBlur={onBlur}
+          />
+        )
+      ) : (
+        <span className={`flex-1 text-right text-sm tabular-nums ${colorClass ?? "text-muted-foreground"}`} title={hint}>
+          {isMoney ? `Rp ${formatRupiah(value)}` : value}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ category: string; periodId: string }> }) {
   const { category, periodId } = usePromise(params);
   const [period, setPeriod] = useState<Period | null>(null);
@@ -101,6 +156,10 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   const [recalculating, setRecalculating] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [dailySearch, setDailySearch] = useState("");
+  // Form edit 1 karyawan dalam dialog (semua field vertikal, kotak lebih
+  // besar, tanpa scroll ke samping) - alternatif utk tabel yang lebar
+  // & susah diedit di banyak kolom sekaligus. Permintaan Kevin 2026-09-14.
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   function load() {
     setLoading(true);
@@ -179,6 +238,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
   const totalNetPay = items.reduce((sum, it) => sum + netPay(it, editableFields), 0);
   const dailyItems = items.filter((it) => it.employee.name.toLowerCase().includes(dailySearch.toLowerCase()));
+  const editingItem = items.find((it) => it.id === editingId) ?? null;
 
   function toggleSelect(itemId: number) {
     setSelectedIds((prev) => {
@@ -392,8 +452,23 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                     />
                   </TableCell>
                   <TableCell className="sticky left-0 bg-card border-r font-medium whitespace-nowrap">
-                    <Link href={`/hr/karyawan/${item.employeeId}`} className="hover:underline">{item.employee.name}</Link>
-                    <p className="text-xs text-muted-foreground font-normal">{item.employee.position || "-"}</p>
+                    <div className="flex items-center gap-1">
+                      <div>
+                        <Link href={`/hr/karyawan/${item.employeeId}`} className="hover:underline">{item.employee.name}</Link>
+                        <p className="text-xs text-muted-foreground font-normal">{item.employee.position || "-"}</p>
+                      </div>
+                      {!isFinal && !readOnly && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="ml-auto shrink-0"
+                          onClick={() => setEditingId(item.id)}
+                          title="Edit lewat form (tanpa scroll ke samping)"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground tabular-nums text-right">{item.daysPresent}</TableCell>
                   {infoFields.map((f) => {
@@ -555,6 +630,99 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
         </TabsPanel>
         )}
       </Tabs>
+
+      <Dialog open={editingId !== null} onOpenChange={(open) => !open && setEditingId(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          {editingItem && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{editingItem.employee.name}</DialogTitle>
+                <DialogDescription>
+                  {editingItem.employee.position || "-"} &middot; edit semua komponen gaji satu per satu, tanpa scroll ke samping.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3">
+                {infoFields.map((f) => {
+                  const record = editingItem as unknown as Record<string, number>;
+                  const isLocked = lockedFieldKeys.has(f.key);
+                  return (
+                    <FieldRow
+                      key={f.key}
+                      label={f.label}
+                      value={record[f.key]}
+                      editable={!isLocked && !isFinal && !readOnly}
+                      isMoney={false}
+                      hint={isLocked ? "Dihitung otomatis dari data absensi" : undefined}
+                      onChange={(v) => updateLocal(editingItem.id, f.key, v)}
+                      onBlur={() => saveItem(editingItem.id)}
+                    />
+                  );
+                })}
+                {editableFields.map((f) => {
+                  const record = editingItem as unknown as Record<string, number>;
+                  const isDeduction = DEDUCTION_FIELD_KEYS.has(f.key);
+                  const isTail = TAIL_FIELDS.some((t) => t.key === f.key);
+                  const value = record[f.key];
+                  const colorClass = isTail
+                    ? value > 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : value < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : ""
+                    : isDeduction
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-emerald-600 dark:text-emerald-400";
+                  const isLocked = lockedFieldKeys.has(f.key);
+                  return (
+                    <FieldRow
+                      key={f.key}
+                      label={f.label}
+                      value={value}
+                      editable={!isLocked && !isFinal && !readOnly}
+                      isMoney
+                      colorClass={colorClass}
+                      hint={isLocked ? "Dihitung otomatis dari data absensi - tidak bisa diedit manual" : undefined}
+                      onChange={(v) => updateLocal(editingItem.id, f.key, v)}
+                      onBlur={() => saveItem(editingItem.id)}
+                    />
+                  );
+                })}
+                {category === "kantor" && (
+                  <div className="flex items-center gap-3">
+                    <Label className="w-40 shrink-0 text-sm font-normal text-muted-foreground">Reimburse Bensin</Label>
+                    {isFinal || readOnly ? (
+                      <span className="flex-1 text-right text-sm tabular-nums">
+                        {editingItem.fuelKm > 0 ? `${editingItem.fuelKm} KM = Rp ${formatRupiah(editingItem.fuelReimbursement)}` : "-"}
+                      </span>
+                    ) : (
+                      <div className="flex flex-1 items-center justify-end gap-1.5">
+                        <Input
+                          type="number"
+                          className="h-10 w-20 text-base tabular-nums"
+                          value={editingItem.fuelKm}
+                          onChange={(e) => updateLocal(editingItem.id, "fuelKm", Number(e.target.value) || 0)}
+                          onBlur={() => saveItem(editingItem.id)}
+                          title="KM ditempuh bulan ini"
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          = Rp {formatRupiah(editingItem.fuelReimbursement)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t pt-3 mt-1 font-medium">
+                  <span>Gaji Bersih</span>
+                  <span className="tabular-nums">Rp {formatRupiah(netPay(editingItem, editableFields))}</span>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setEditingId(null)}>Selesai</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
