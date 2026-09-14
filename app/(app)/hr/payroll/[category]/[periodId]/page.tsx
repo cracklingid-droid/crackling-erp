@@ -273,10 +273,10 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             </p>
             {category === "outlet" && (
               <p className="text-xs text-muted-foreground mt-1">
-                Gaji Pokok, Uang Makan, Reimb. Transport &amp; BPJS dihitung otomatis dari absensi - kunci ikon di
+                Gaji Pokok, Uang Makan &amp; Reimb. Transport dihitung otomatis dari absensi - kunci ikon di
                 sebelah kolomnya menandakan tidak bisa diedit manual, otomatis diperbarui begitu absensi diupload ulang
                 (atau klik &quot;Refresh dari Absensi&quot; kapan saja tanpa perlu upload ulang). Lembur tidak dihitung
-                otomatis - shift resto 12 jam tetap, bukan patokan 8 jam.
+                otomatis - shift resto 12 jam tetap, bukan patokan 8 jam. Karyawan resto tidak dikenakan BPJS.
               </p>
             )}
           </div>

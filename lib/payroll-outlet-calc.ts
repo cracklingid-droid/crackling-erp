@@ -1,24 +1,24 @@
-import {
-  calcOutletBaseSalary,
-  calcOutletMealAllowance,
-  calcOutletTransportAllowance,
-  calcBpjsKesehatan,
-  calcBpjsKetenagakerjaan,
-} from "./payroll-config";
+import { calcOutletBaseSalary, calcOutletMealAllowance, calcOutletTransportAllowance } from "./payroll-config";
 
 // Field PayrollItem Outlet yang SEMUANYA berasal dari data absensi/konfigurasi
 // karyawan (bukan input manual HR) - dikunci (read-only) di halaman detail
 // periode & ditolak endpoint PATCH-nya, supaya tidak ada ruang HR salah
 // ketik/salah edit. Dihitung ulang otomatis tiap kali absensi diupload utk
 // periode yang masih draft. Keputusan Kevin 2026-09-12.
+//
+// bpjsKesehatanDeduction/bpjsKetenagakerjaanDeduction SENGAJA TIDAK ADA di
+// sini lagi - keputusan Kevin 2026-09-14: "karyawan resto tidak ada yang
+// dikenakan BPJS sama sekali" - bukan kasus per-karyawan, tapi kebijakan
+// resto secara keseluruhan. Field tetap ada di DB (selalu 0) tapi tidak
+// dihitung/ditampilkan lagi (beda dari Payroll Kantor yang punya mekanisme
+// BPJS sendiri - bpjsAllowance/bpjsEmployerObligation/bpjsRemittance,
+// TIDAK disentuh oleh perubahan ini).
 export const OUTLET_LOCKED_FIELD_KEYS = new Set([
   "baseSalary",
   "partTimePay",
   "mealAllowance",
   "transportReimbursement",
   "overtimePay",
-  "bpjsKesehatanDeduction",
-  "bpjsKetenagakerjaanDeduction",
 ]);
 
 export type OutletEmployeeInput = {
@@ -48,7 +48,9 @@ export function computeOutletPayrollFields(emp: OutletEmployeeInput, daysPresent
     mealAllowance: calcOutletMealAllowance(dailyMealRate, daysPresent),
     transportReimbursement: calcOutletTransportAllowance(dailyTransportRate, daysPresent),
     overtimePay: 0,
-    bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
-    bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
+    // BPJS TIDAK dikenakan ke karyawan resto sama sekali - keputusan Kevin
+    // 2026-09-14 (lihat catatan OUTLET_LOCKED_FIELD_KEYS di atas).
+    bpjsKesehatanDeduction: 0,
+    bpjsKetenagakerjaanDeduction: 0,
   };
 }

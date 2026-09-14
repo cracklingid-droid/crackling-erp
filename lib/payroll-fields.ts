@@ -9,14 +9,20 @@ export type FieldDef = { key: string; label: string };
 // 12 jam tetap, tidak ada acuan lembur yang bisa diturunkan dari absensi.
 // Field overtimePay tetap ada di DB (locked, selalu 0) tapi tidak
 // ditampilkan/diedit di mana pun sampai ada keputusan lebih lanjut.
+//
+// "BPJS Kesehatan"/"BPJS Ketenagakerjaan" JUGA SENGAJA TIDAK ADA - keputusan
+// Kevin 2026-09-14: karyawan resto tidak pernah dikenakan BPJS sama sekali
+// (kebijakan resto, bukan kasus per-karyawan). Field bpjsKesehatanDeduction/
+// bpjsKetenagakerjaanDeduction tetap ada di DB (selalu 0) tapi tidak
+// ditampilkan/diedit lagi. Payroll Kantor punya mekanisme BPJS SENDIRI
+// (bpjsAllowance/bpjsEmployerObligation/bpjsRemittance di KANTOR_FIELDS) -
+// TIDAK terpengaruh perubahan ini.
 export const BASE_FIELDS: FieldDef[] = [
   { key: "baseSalary", label: "Gaji Pokok" },
   { key: "partTimePay", label: "Gaji Part Time" },
   { key: "mealAllowance", label: "Uang Makan" },
   { key: "transportReimbursement", label: "Reimb. Transport" },
   { key: "attendanceDeduction", label: "Potongan Absensi" },
-  { key: "bpjsKesehatanDeduction", label: "BPJS Kesehatan" },
-  { key: "bpjsKetenagakerjaanDeduction", label: "BPJS Ketenagakerjaan" },
   { key: "pph21Deduction", label: "PPh21" },
   { key: "loanDeduction", label: "Kasbon" },
 ];
