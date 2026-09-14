@@ -46,6 +46,16 @@ export function canViewOvertimeRequests(user: { role: string }): boolean {
   return hasFullAccess(user) || user.role === "manager" || hasHrWriteAccess(user);
 }
 
+// Modul Accounting (double-entry, permintaan Kevin 2026-09-14) - data
+// finansial formal pertama di sistem, v1 SENGAJA dibatasi owner/developer
+// saja (paling aman utk dibuka lebar dulu). Fungsi terpisah (bukan langsung
+// hasFullAccess) supaya gampang diperluas ke role staff akuntansi/bookkeeper
+// khusus nanti tanpa ganti semua pemanggilnya - pola sama spt
+// canAccessCostCenter utk role "manager".
+export function canAccessAccounting(user: { role: string }): boolean {
+  return hasFullAccess(user);
+}
+
 export function canDecideOvertimeStage(user: { role: string }, status: string): boolean {
   // Cek status DULU, sebelum cek role - bug ditemukan lewat verifikasi live
   // 2026-09-14: hasFullAccess yang di-cek duluan bikin owner/developer bisa

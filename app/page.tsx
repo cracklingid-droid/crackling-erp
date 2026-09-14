@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, Warehouse, PiggyBank, ArrowRight, LucideIcon } from "lucide-react";
+import { Users, Warehouse, PiggyBank, Calculator, ArrowRight, LucideIcon } from "lucide-react";
 
 const cardClass =
   "group block h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5";
@@ -67,6 +67,17 @@ export default function Home() {
               title="Cost Center"
               desc="Biaya gaji, pemakaian stok, dan Gross Profit per outlet."
               tile="icon-tile-3"
+            />
+          </Link>
+          {/* Akses: owner/developer (lib/roles.ts canAccessAccounting) -
+              halaman itu sendiri yang menolak role lain (403), pola sama spt
+              kartu Cost Center. Permintaan Kevin 2026-09-14. */}
+          <Link href="/accounting" className={cardClass}>
+            <ModuleCard
+              icon={Calculator}
+              title="Accounting"
+              desc="Pembukuan double-entry: COA, jurnal, dan laporan keuangan."
+              tile="icon-tile-4"
             />
           </Link>
         </div>
