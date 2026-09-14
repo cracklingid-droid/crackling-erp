@@ -16,7 +16,7 @@ const MODULES: {
   { href: "/accounting/fixed-assets", icon: <Landmark className="h-5 w-5" />, title: "Fixed Asset", description: "Daftar aset tetap & depresiasi garis lurus.", ready: false },
   { href: "/accounting/sales", icon: <ShoppingCart className="h-5 w-5" />, title: "Record Sales", description: "Omzet harian per produk (dari POS).", ready: false },
   { href: "/accounting/expenses", icon: <Receipt className="h-5 w-5" />, title: "Direct Expense", description: "Pencatatan beban langsung.", ready: false },
-  { href: "/accounting/reconciliation", icon: <Scale className="h-5 w-5" />, title: "Rekonsiliasi", description: "Cocokkan mutasi bank vs jurnal.", ready: false },
+  { href: "/accounting/reconciliation", icon: <Scale className="h-5 w-5" />, title: "Rekonsiliasi", description: "Mutasi bank per akun - 15 akun, ribuan baris.", ready: true },
   { href: "/accounting/reports", icon: <FileBarChart className="h-5 w-5" />, title: "Laporan", description: "P&L, Neraca, Arus Kas & Notes.", ready: false },
 ];
 

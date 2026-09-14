@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# data dumps - repo ini PUBLIC di GitHub, jangan pernah commit data
+# mentah/PII/finansial nyata (mis. hasil ekstrak rekening koran) - kodenya
+# (script import) tetap boleh di-commit, hasil datanya tidak.
+/scripts/bank-import-data/

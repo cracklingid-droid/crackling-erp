@@ -784,6 +784,7 @@ model BankStatementLine {
   date                 DateTime
   description          String
   amount               Int // + masuk, - keluar
+  balance              Int? // saldo berjalan per baris, APA ADANYA dari sumber (rekening koran) - referensi, bukan dihitung ulang
   matchedJournalLineId Int?        @unique
   createdAt            DateTime    @default(now())
 }
