@@ -28,3 +28,32 @@ export function canAccessCostCenter(user: { role: string }): boolean {
 export function hasHrWriteAccess(user: { role: string }): boolean {
   return user.role === "owner" || user.role === "developer" || user.role === "hr_manager" || user.role === "hr_staff";
 }
+
+// Deteksi otomatis posisi SPV dari string jabatan (bukan field baru di
+// Employee) - dipakai utk buka menu "Lembur" di Portal Karyawan. Permintaan
+// Kevin 2026-09-14: "jika posisi spv ada menu bisa mengajukan lembur".
+export function isSpvPosition(position: string | null | undefined): boolean {
+  return !!position && position.toLowerCase().includes("spv");
+}
+
+// Fitur Pengajuan Lembur SPV (permintaan Kevin 2026-09-14) - approval 2
+// tahap: "manager" memutuskan tahap pending_manager, HR (hr_manager/hr_staff)
+// memutuskan tahap pending_hr. owner/developer (hasFullAccess) boleh
+// memutuskan di kedua tahap krn mereka sudah akses penuh ke semua modul HR.
+// Ditaruh di sini (bukan lib/hr-access.ts) krn logikanya murni dari
+// user.role/status - aman dipakai di client component (tombol approve/tolak).
+export function canViewOvertimeRequests(user: { role: string }): boolean {
+  return hasFullAccess(user) || user.role === "manager" || hasHrWriteAccess(user);
+}
+
+export function canDecideOvertimeStage(user: { role: string }, status: string): boolean {
+  // Cek status DULU, sebelum cek role - bug ditemukan lewat verifikasi live
+  // 2026-09-14: hasFullAccess yang di-cek duluan bikin owner/developer bisa
+  // "memutuskan ulang" request yang statusnya sudah "approved"/"rejected"
+  // (bahkan membalik "rejected" jadi "approved" krn else-branch di route
+  // decide menganggap status apa pun selain "pending_manager" = tahap HR).
+  if (status !== "pending_manager" && status !== "pending_hr") return false;
+  if (hasFullAccess(user)) return true;
+  if (status === "pending_manager") return user.role === "manager";
+  return hasHrWriteAccess(user);
+}

@@ -7,6 +7,7 @@ import { usePortalAuth, type PortalEmployee } from "../components/usePortalAuth"
 import { EmployeeAvatar } from "../components/EmployeeAvatar";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import { isSpvPosition } from "@/lib/roles";
 
 const PortalCtx = createContext<{ employee: PortalEmployee | null; logout: () => void }>({
   employee: null,
@@ -17,12 +18,18 @@ export function usePortalContext() {
   return useContext(PortalCtx);
 }
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { href: "/portal", label: "Beranda" },
   { href: "/portal/profil", label: "Profil" },
   { href: "/portal/roster", label: "Roster" },
   { href: "/portal/slip-gaji", label: "Slip Gaji" },
 ];
+
+// Menu "Lembur" cuma muncul utk posisi SPV - permintaan Kevin 2026-09-14.
+function navItemsFor(employee: PortalEmployee | null) {
+  if (!isSpvPosition(employee?.position)) return BASE_NAV_ITEMS;
+  return [...BASE_NAV_ITEMS, { href: "/portal/lembur", label: "Lembur" }];
+}
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -35,6 +42,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     return <div className="flex items-center justify-center min-h-screen text-sm text-muted-foreground">Memuat...</div>;
   }
 
+  const navItems = navItemsFor(employee);
+
   return (
     <PortalCtx.Provider value={{ employee, logout }}>
       <div className="flex min-h-screen flex-col overflow-x-hidden">
@@ -46,7 +55,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             <span className="font-heading font-semibold text-sm tracking-wide hidden sm:inline">Portal Karyawan</span>
           </div>
           <nav className="ml-4 hidden sm:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -67,7 +76,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
         </header>
         <nav className="flex sm:hidden items-center gap-1 border-b px-2 py-1.5 overflow-x-auto">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

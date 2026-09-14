@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "./current-user";
 import { hasHrWriteAccess } from "./roles";
+export { canViewOvertimeRequests, canDecideOvertimeStage } from "./roles";
 
 // Guard endpoint yang MENULIS (create/update/delete) - dipakai di awal tiap
 // route Rekrutmen/Roster/Payroll/Karyawan selain GET murni. "manager"
@@ -35,3 +36,4 @@ export function canViewCategory(user: { role: string }, category: string): boole
   if (user.role === "manager") return category === "outlet";
   return false;
 }
+

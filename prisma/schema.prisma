@@ -35,6 +35,8 @@ model HrUser {
   rosterEntriesCreated     RosterEntry[]
   payrollEventNotesCreated PayrollEventNote[]
   attendanceNameAliasesCreated AttendanceNameAlias[]
+  overtimeManagerDecisions OvertimeRequest[] @relation("OvertimeManagerDecision")
+  overtimeHrDecisions      OvertimeRequest[] @relation("OvertimeHrDecision")
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -278,6 +280,7 @@ model Employee {
   rosterEntries         RosterEntry[]
   payrollEventNotes     PayrollEventNote[]
   attendanceNameAliases AttendanceNameAlias[]
+  overtimeRequests      OvertimeRequest[]
 }
 
 // Riwayat perubahan jabatan/outlet/status kepegawaian/gaji - dicatat
@@ -318,6 +321,47 @@ model EmployeeDocument {
   fileName   String?
   expiryDate DateTime? // opsional - dipakai reminder "Segera Jatuh Tempo" (mis. kontrak kerja, SIM)
   uploadedAt DateTime @default(now())
+}
+
+// Pengajuan lembur - HANYA utk karyawan posisi SPV (deteksi otomatis dari
+// kata "SPV" di Employee.position, permintaan Kevin 2026-09-14), diajukan
+// sendiri lewat Portal Karyawan. Foto lampiran WAJIB (bukti/alasan
+// pekerjaan yang perlu dikerjakan lembur) - tanpa foto tidak bisa
+// disubmit. Approval 2 tahap berurutan: role "manager" dulu (akun global
+// yang sama dgn manager Cost Center/Warehouse), baru HR (owner/developer/
+// hr_manager/hr_staff) - kalau salah satu tolak, langsung berhenti di situ
+// (tidak lanjut ke tahap berikutnya). SENGAJA TIDAK mempengaruhi
+// perhitungan gaji lembur - itu tetap otomatis dari data absensi asli
+// (lib/payroll-outlet-calc.ts / lib/payroll-kantor-calc.ts) - pengajuan
+// ini murni syarat administratif/izin sebelum boleh lembur, bukan sumber
+// angka jam lembur yang dibayar (keputusan Kevin 2026-09-14).
+model OvertimeRequest {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  date     DateTime // tanggal rencana lembur
+  reason   String // keterangan alasan perlu lembur
+  photoUrl String // wajib - foto pekerjaan yang jadi alasan lembur
+
+  status String @default("pending_manager") // pending_manager | pending_hr | approved | rejected
+
+  managerDecision     String? // "approved" | "rejected"
+  managerDecisionAt   DateTime?
+  managerDecisionById Int?
+  managerDecisionBy   HrUser? @relation("OvertimeManagerDecision", fields: [managerDecisionById], references: [id])
+  managerNote         String?
+
+  hrDecision     String? // "approved" | "rejected"
+  hrDecisionAt   DateTime?
+  hrDecisionById Int?
+  hrDecisionBy   HrUser? @relation("OvertimeHrDecision", fields: [hrDecisionById], references: [id])
+  hrNote         String?
+
+  createdAt DateTime @default(now())
+
+  @@index([employeeId, date])
+  @@index([status])
 }
 
 model PsychTestSubmission {
