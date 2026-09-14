@@ -1,10 +1,5 @@
 import { prisma } from "./db";
-import {
-  OUTLET_PRORATE_STANDARD_DAYS,
-  calcOutletMealAllowance,
-  calcOutletTransportAllowance,
-  calcOutletOvertimePay,
-} from "./payroll-config";
+import { OUTLET_PRORATE_STANDARD_DAYS, calcOutletMealAllowance, calcOutletTransportAllowance } from "./payroll-config";
 
 export type DailyEmployeeCost = {
   employeeId: number;
@@ -32,8 +27,9 @@ function dateKey(d: Date): string {
 //   OUTLET_PRORATE_STANDARD_DAYS) - tarif "1 hari kerja standar", SAMA utk
 //   setiap hari dia hadir (bukan dibagi rata ke SEMUA hari kalender
 //   periode termasuk hari dia tidak masuk).
-// - Lembur = dihitung dari jam kerja aktual HARI ITU SAJA (clockIn/
-//   clockOut record itu), bukan dari total lembur 1 periode.
+// - Lembur SENGAJA SELALU 0 - tidak dihitung otomatis dari jam clock-in/out
+//   (shift resto 12 jam tetap, bukan patokan 8 jam - keputusan Kevin
+//   2026-09-14, lihat catatan lib/attendance-summary.ts).
 // - Karyawan part time (dailyBaseRate) = tarif harian penuh.
 // Perbaikan permintaan Kevin 2026-09-12: sebelumnya biaya gaji harian =
 // total gaji 1 periode dibagi rata jumlah HARI KALENDER periode, jadi
@@ -60,19 +56,17 @@ export async function getPayrollCostByDate(startDate: Date, endDate: Date, outle
 
     const dailyMealRate = emp.dailyMealRate ?? 0;
     const dailyTransportRate = emp.dailyTransportRate ?? 0;
-    const overtimeMinutes =
-      r.clockIn && r.clockOut ? Math.max(0, Math.round((r.clockOut.getTime() - r.clockIn.getTime()) / 60000 - 8 * 60)) : 0;
 
     const entry: DailyEmployeeCost = {
       employeeId: emp.id,
       employeeName: emp.name,
       outletName: emp.outlet ?? "(Tanpa Outlet)",
-      overtimeMinutes,
+      overtimeMinutes: 0,
       baseSalary: emp.baseSalary ? Math.round(emp.baseSalary / OUTLET_PRORATE_STANDARD_DAYS) : 0,
       partTimePay: emp.dailyBaseRate ?? 0,
       mealAllowance: calcOutletMealAllowance(dailyMealRate, 1),
       transportReimbursement: calcOutletTransportAllowance(dailyTransportRate, 1),
-      overtimePay: calcOutletOvertimePay(dailyMealRate, overtimeMinutes),
+      overtimePay: 0,
       cost: 0,
     };
     entry.cost = entry.baseSalary + entry.partTimePay + entry.mealAllowance + entry.transportReimbursement + entry.overtimePay;

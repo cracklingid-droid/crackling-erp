@@ -86,12 +86,6 @@ function parseRupiahInput(s: string): number {
   return digits ? Number(digits) : 0;
 }
 
-function formatMinutes(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${h}j ${m}m`;
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -279,9 +273,10 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             </p>
             {category === "outlet" && (
               <p className="text-xs text-muted-foreground mt-1">
-                Gaji Pokok, Uang Makan, Reimb. Transport, Lembur &amp; BPJS dihitung otomatis dari absensi - kunci ikon di
+                Gaji Pokok, Uang Makan, Reimb. Transport &amp; BPJS dihitung otomatis dari absensi - kunci ikon di
                 sebelah kolomnya menandakan tidak bisa diedit manual, otomatis diperbarui begitu absensi diupload ulang
-                (atau klik &quot;Refresh dari Absensi&quot; kapan saja tanpa perlu upload ulang).
+                (atau klik &quot;Refresh dari Absensi&quot; kapan saja tanpa perlu upload ulang). Lembur tidak dihitung
+                otomatis - shift resto 12 jam tetap, bukan patokan 8 jam.
               </p>
             )}
           </div>
@@ -361,7 +356,6 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                     ketiban/tertutup kolom Karyawan). */}
                 <TableHead className="sticky left-0 bg-card border-r">Karyawan</TableHead>
                 <TableHead className="text-right">Hadir</TableHead>
-                <TableHead className="text-right">Lembur</TableHead>
                 {infoFields.map((f) => (
                   <TableHead key={f.key} className="whitespace-nowrap text-right">{f.label}</TableHead>
                 ))}
@@ -382,7 +376,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
             <TableBody>
               {items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6 + infoFields.length + editableFields.length + (category === "kantor" ? 1 : 0)} className="text-muted-foreground">
+                  <TableCell colSpan={5 + infoFields.length + editableFields.length + (category === "kantor" ? 1 : 0)} className="text-muted-foreground">
                     Tidak ada karyawan aktif di kategori ini.
                   </TableCell>
                 </TableRow>
@@ -402,9 +396,6 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                     <p className="text-xs text-muted-foreground font-normal">{item.employee.position || "-"}</p>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground tabular-nums text-right">{item.daysPresent}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground tabular-nums whitespace-nowrap text-right">
-                    {formatMinutes(item.overtimeMinutes)}
-                  </TableCell>
                   {infoFields.map((f) => {
                     const record = item as unknown as Record<string, number>;
                     const isLocked = lockedFieldKeys.has(f.key);

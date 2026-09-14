@@ -103,12 +103,11 @@ export default function RekapAbsensiPage() {
                       <TableHead>Hari Hadir</TableHead>
                       <TableHead>Terlambat</TableHead>
                       <TableHead>Total Jam Kerja</TableHead>
-                      <TableHead>Jam Lembur</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {tabRows?.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-muted-foreground">Tidak ada karyawan aktif di kategori ini.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-muted-foreground">Tidak ada karyawan aktif di kategori ini.</TableCell></TableRow>
                     )}
                     {tabRows?.map((r) => (
                       <TableRow key={r.id}>
@@ -125,7 +124,6 @@ export default function RekapAbsensiPage() {
                           {r.workSchedule ? `${r.lateCount} kali` : "-"}
                         </TableCell>
                         <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
-                        <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.overtimeMinutes)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

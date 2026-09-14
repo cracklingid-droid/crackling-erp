@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Trash2, Plus } from "lucide-react";
-import { calcOutletOvertimeRate, calcOutletLateRate } from "@/lib/payroll-config";
+import { calcOutletLateRate } from "@/lib/payroll-config";
 import { EVENT_NOTE_CATEGORIES } from "@/lib/payroll-event-notes";
 import { computeEmployeeDailyDetail, type DailyDetailAttendance } from "@/lib/payroll-daily-detail";
 
@@ -45,12 +45,6 @@ function formatRupiah(n: number): string {
 function formatDateShort(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }
-function formatMinutes(min: number): string {
-  if (min <= 0) return "-";
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${h}j ${m}m`;
-}
 function dateKeyFromISO(iso: string) {
   return iso.slice(0, 10);
 }
@@ -77,7 +71,6 @@ export function EmployeeRincianCard({
   const [saving, setSaving] = useState(false);
 
   const dailyMealRate = item.employee.dailyMealRate ?? 0;
-  const overtimeRate = calcOutletOvertimeRate(dailyMealRate);
   const lateRate = calcOutletLateRate(dailyMealRate);
   const isPartTime = item.employee.dailyBaseRate != null;
 
@@ -88,7 +81,6 @@ export function EmployeeRincianCard({
       : null,
     { label: "Uang Transport", rate: item.employee.dailyTransportRate, count: `${item.daysPresent} hari`, total: (item.transportReimbursement as number) ?? 0 },
     { label: "Uang Makan", rate: item.employee.dailyMealRate, count: `${item.daysPresent} hari`, total: (item.mealAllowance as number) ?? 0 },
-    { label: "Lembur", rate: Math.round(overtimeRate), count: formatMinutes(item.overtimeMinutes), total: (item.overtimePay as number) ?? 0 },
     { label: "Keterlambatan", rate: Math.round(lateRate), count: `${(item.lateCount as number) ?? 0} kali`, total: (item.lateDeduction as number) ?? 0 },
     { label: "Pengurangan Dari Kejadian", rate: null, count: `${notes.filter((n) => n.category === "kejadian").length} kejadian`, total: (item.incidentDeduction as number) ?? 0 },
     { label: "Pemotongan SP", rate: null, count: `${notes.filter((n) => n.category === "sp").length} kali`, total: (item.warningLetterDeduction as number) ?? 0 },
@@ -206,7 +198,6 @@ export function EmployeeRincianCard({
                   {isPartTime && <th className="py-1.5 pr-2 font-medium text-right whitespace-nowrap">Part Time</th>}
                   <th className="py-1.5 pr-2 font-medium text-right whitespace-nowrap">Uang Makan</th>
                   <th className="py-1.5 pr-2 font-medium text-right whitespace-nowrap">Transport</th>
-                  <th className="py-1.5 pr-2 font-medium text-right whitespace-nowrap">Lembur</th>
                   <th className="py-1.5 pr-2 font-medium text-right whitespace-nowrap">Potongan</th>
                   <th className="py-1.5 pr-2 font-medium">Keterangan</th>
                   <th className="py-1.5 pr-2 font-medium text-right whitespace-nowrap">Total Hari Ini</th>
@@ -225,16 +216,6 @@ export function EmployeeRincianCard({
                       {isPartTime && <td className="py-1 pr-2 tabular-nums text-right">{r.hadir ? formatRupiah(r.gajiPartTime) : "-"}</td>}
                       <td className="py-1 pr-2 tabular-nums text-right">{r.hadir ? formatRupiah(r.uangMakan) : "-"}</td>
                       <td className="py-1 pr-2 tabular-nums text-right">{r.hadir ? formatRupiah(r.uangTransport) : "-"}</td>
-                      <td className="py-1 pr-2 tabular-nums text-right">
-                        {r.lembur > 0 ? (
-                          <>
-                            {formatRupiah(r.lembur)}
-                            <span className="block text-[10px] text-muted-foreground">{formatMinutes(r.overtimeMinutes)}</span>
-                          </>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
                       <td className={`py-1 pr-2 tabular-nums text-right ${potongan > 0 ? "text-destructive" : ""}`}>
                         {potongan > 0 ? `-${formatRupiah(potongan)}` : "-"}
                       </td>
@@ -260,12 +241,12 @@ export function EmployeeRincianCard({
                 <tfoot>
                   {daily.adjustments.map((a, i) => (
                     <tr key={i} className="border-t text-xs text-muted-foreground">
-                      <td colSpan={isPartTime ? 10 : 9} className="py-1 pr-2">{a.label}</td>
+                      <td colSpan={isPartTime ? 9 : 8} className="py-1 pr-2">{a.label}</td>
                       <td className={`py-1 pr-2 tabular-nums text-right ${a.amount < 0 ? "text-destructive" : ""}`}>{formatRupiah(a.amount)}</td>
                     </tr>
                   ))}
                   <tr className="border-t font-medium">
-                    <td colSpan={isPartTime ? 10 : 9} className="py-1.5 pr-2">Total dari Detail Harian</td>
+                    <td colSpan={isPartTime ? 9 : 8} className="py-1.5 pr-2">Total dari Detail Harian</td>
                     <td className="py-1.5 pr-2 tabular-nums text-right">{formatRupiah(daily.totalFromDaily)}</td>
                   </tr>
                 </tfoot>

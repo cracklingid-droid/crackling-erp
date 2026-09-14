@@ -22,11 +22,21 @@ function parseScheduleStart(workSchedule: string | null | undefined): { h: numbe
   return { h: Number(m[1]), m: Number(m[2]) };
 }
 
-// Hitung ringkasan absensi (hari hadir, total jam kerja, jam lembur,
-// jumlah kali terlambat) per karyawan dalam satu rentang tanggal - dipakai
-// baik saat generate periode gaji maupun di halaman Rekap Absensi. Lembur =
-// kelebihan dari 8 jam/hari (simplifikasi, lihat catatan di
-// lib/payroll-config.ts). Parameter `schedules` opsional - kalau diisi,
+// Hitung ringkasan absensi (hari hadir, total jam kerja, jumlah kali
+// terlambat) per karyawan dalam satu rentang tanggal - dipakai baik saat
+// generate periode gaji maupun di halaman Rekap Absensi.
+//
+// overtimeMinutes SENGAJA SELALU 0 (bukan dihapus dari tipe - biar tidak
+// bongkar ulang semua pemanggil) - dulu dihitung "kelebihan dari 8 jam/hari"
+// tapi itu SALAH TOTAL utk shift resto Crackling yang memang 12 jam tetap
+// (outlet 10:00-22:00, Joglo 08:00-20:00): setiap shift normal otomatis
+// kehitung "lembur 4 jam", ditambah lagi kalau karyawan clock-in lebih awal
+// cuma numpang wifi (bukan benar-benar mulai kerja lebih awal). Keputusan
+// Kevin 2026-09-14: TIDAK ADA penghitungan lembur otomatis dari jam
+// clock-in/out sama sekali, utk semua kategori (Outlet & Kantor) - kalau
+// nanti ada lembur beneran, dicatat manual oleh HR (mis. berdasar Pengajuan
+// Lembur SPV yang sudah disetujui), bukan diturunkan dari data absensi.
+// Parameter `schedules` opsional - kalau diisi,
 // lateCount dihitung dari jam masuk aktual vs jadwal (Employee.workSchedule)
 // per karyawan; kalau tidak diisi (mis. dipanggil dari alur Payroll Outlet
 // yang sudah punya potongan telat manual sendiri), lateCount selalu 0.
@@ -53,7 +63,6 @@ export async function computeAttendanceSummaries(
     if (r.clockIn && r.clockOut) {
       const worked = (r.clockOut.getTime() - r.clockIn.getTime()) / 60000;
       s.totalMinutes += worked;
-      s.overtimeMinutes += Math.max(0, Math.round(worked - 8 * 60));
     }
     if (!r.clockIn) s.incompleteClockInCount++;
     if (!r.clockOut) s.incompleteClockOutCount++;

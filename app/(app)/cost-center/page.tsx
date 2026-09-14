@@ -72,12 +72,6 @@ function fmtDate(iso: string) {
 function fmtQty(n: number) {
   return n.toLocaleString("id-ID", { maximumFractionDigits: 2 });
 }
-function formatMinutes(min: number) {
-  if (min <= 0) return "-";
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${h}j ${m}m`;
-}
 function fmtDayLong(iso: string) {
   return new Date(`${iso}T00:00:00.000Z`).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }
@@ -501,7 +495,7 @@ export default function CostCenterPage() {
           {!detailLoading && detailData && detailTab === "payroll" && (
             <div className="grid gap-2">
               <p className="text-xs text-muted-foreground">
-                Karyawan yang benar-benar tercatat hadir pada tanggal ini saja, dengan biaya hari itu (uang makan/transport tarif harian penuh, gaji pokok dipecah rata per hari kerja standar, lembur dari jam kerja aktual hari itu).
+                Karyawan yang benar-benar tercatat hadir pada tanggal ini saja, dengan biaya hari itu (uang makan/transport tarif harian penuh, gaji pokok dipecah rata per hari kerja standar). Tidak termasuk lembur - tidak dihitung otomatis dari absensi.
               </p>
               {!detailData.payroll || detailData.payroll.employees.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Tidak ada karyawan yang tercatat hadir pada tanggal ini.</p>
@@ -512,7 +506,6 @@ export default function CostCenterPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Karyawan</TableHead>
-                          <TableHead className="text-right">Lembur</TableHead>
                           <TableHead className="text-right">Biaya Hari Ini</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -525,7 +518,6 @@ export default function CostCenterPage() {
                                 <p className="text-xs text-muted-foreground font-normal">{e.outletName}</p>
                               )}
                             </TableCell>
-                            <TableCell className="tabular-nums text-right whitespace-nowrap">{formatMinutes(e.overtimeMinutes)}</TableCell>
                             <TableCell className="tabular-nums text-right whitespace-nowrap font-medium">{fmtRupiah(e.cost)}</TableCell>
                           </TableRow>
                         ))}

@@ -90,8 +90,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     ...(isOutletPartTimeAny ? ["Gaji Part Time"] : []),
     "Uang Makan",
     "Uang Transport",
-    "Lembur (menit)",
-    "Lembur (Rp)",
     "Potongan Kejadian",
     "Potongan SP",
     "Potongan Telat",
@@ -139,8 +137,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         ...(isOutletPartTimeAny ? [r.hadir ? r.gajiPartTime : 0] : []),
         r.hadir ? r.uangMakan : 0,
         r.hadir ? r.uangTransport : 0,
-        r.overtimeMinutes || 0,
-        r.lembur || 0,
         r.potonganKejadian || 0,
         r.potonganSP || 0,
         r.potonganTelat || 0,
@@ -198,7 +194,6 @@ function addRekapSheetAndRespond(workbook: ExcelJS.Workbook, period: any, editab
     "Posisi",
     "Outlet",
     "Hadir",
-    "Lembur (menit)",
     ...infoFields.map((f) => f.label),
     ...editableFields.map((f) => f.label),
     "Gaji Bersih",
@@ -220,7 +215,6 @@ function addRekapSheetAndRespond(workbook: ExcelJS.Workbook, period: any, editab
       item.employee.position ?? "-",
       item.employee.outlet ?? "-",
       record.daysPresent,
-      record.overtimeMinutes,
       ...infoFields.map((f) => record[f.key] ?? 0),
       ...editableFields.map((f) => {
         const v = record[f.key] ?? 0;
@@ -228,12 +222,12 @@ function addRekapSheetAndRespond(workbook: ExcelJS.Workbook, period: any, editab
       }),
       netPay,
     ]);
-    for (let c = 6 + infoFields.length; c <= sheet2Header.length; c++) {
+    for (let c = 5 + infoFields.length; c <= sheet2Header.length; c++) {
       row.getCell(c).numFmt = RUPIAH_FORMAT;
     }
   }
 
-  const totalRow2 = sheet2.addRow(["Total", "", "", "", "", ...infoFields.map(() => ""), ...editableFields.map(() => ""), totalNetPay]);
+  const totalRow2 = sheet2.addRow(["Total", "", "", "", ...infoFields.map(() => ""), ...editableFields.map(() => ""), totalNetPay]);
   totalRow2.font = { bold: true };
   totalRow2.getCell(sheet2Header.length).numFmt = RUPIAH_FORMAT;
 

@@ -1,4 +1,4 @@
-import { OUTLET_PRORATE_STANDARD_DAYS, calcOutletOvertimeRate } from "./payroll-config";
+import { OUTLET_PRORATE_STANDARD_DAYS } from "./payroll-config";
 import { labelForCategory } from "./payroll-event-notes";
 
 // Pecah 1 PayrollItem (kategori outlet) jadi baris per-tanggal - "Sheet 1"
@@ -95,7 +95,6 @@ export function computeEmployeeDailyDetail(
   const dailyTransportRate = item.employee.dailyTransportRate ?? 0;
   const dailyBaseRate = item.employee.dailyBaseRate ?? 0;
   const rawDailyBaseSalary = (item.employee.baseSalary ?? 0) / OUTLET_PRORATE_STANDARD_DAYS;
-  const overtimeRate = calcOutletOvertimeRate(dailyMealRate);
 
   let sumRoundedBase = 0;
   let sumRoundedOvertime = 0;
@@ -114,8 +113,11 @@ export function computeEmployeeDailyDetail(
     sumSP += sp;
     sumTelat += telat;
 
-    let overtimeMinutes = 0;
-    let rawLembur = 0;
+    // overtimeMinutes/rawLembur SENGAJA SELALU 0 - Lembur tidak dihitung
+    // otomatis dari jam clock-in/out (keputusan Kevin 2026-09-14, lihat
+    // catatan lib/attendance-summary.ts).
+    const overtimeMinutes = 0;
+    const rawLembur = 0;
     let gajiPokok = 0;
     let gajiPartTime = 0;
     let uangMakan = 0;
@@ -126,12 +128,6 @@ export function computeEmployeeDailyDetail(
       gajiPartTime = dailyBaseRate;
       uangMakan = dailyMealRate;
       uangTransport = dailyTransportRate;
-      if (record?.clockIn && record?.clockOut) {
-        const inMs = new Date(record.clockIn).getTime();
-        const outMs = new Date(record.clockOut).getTime();
-        overtimeMinutes = Math.max(0, Math.round((outMs - inMs) / 60000 - 8 * 60));
-      }
-      rawLembur = overtimeRate * (overtimeMinutes / 60);
     }
 
     // Akumulasi dari nilai yang SUDAH dibulatkan per hari (bukan dari

@@ -2,7 +2,6 @@ import {
   calcOutletBaseSalary,
   calcOutletMealAllowance,
   calcOutletTransportAllowance,
-  calcOutletOvertimePay,
   calcBpjsKesehatan,
   calcBpjsKetenagakerjaan,
 } from "./payroll-config";
@@ -41,12 +40,14 @@ export function computeOutletPayrollFields(emp: OutletEmployeeInput, daysPresent
 
   return {
     daysPresent,
+    // overtimeMinutes selalu 0 (lihat lib/attendance-summary.ts) - Lembur
+    // TIDAK dihitung otomatis dari absensi. Keputusan Kevin 2026-09-14.
     overtimeMinutes,
     baseSalary: proratedBaseSalary,
     partTimePay,
     mealAllowance: calcOutletMealAllowance(dailyMealRate, daysPresent),
     transportReimbursement: calcOutletTransportAllowance(dailyTransportRate, daysPresent),
-    overtimePay: calcOutletOvertimePay(dailyMealRate, overtimeMinutes),
+    overtimePay: 0,
     bpjsKesehatanDeduction: calcBpjsKesehatan(baseSalary),
     bpjsKetenagakerjaanDeduction: calcBpjsKetenagakerjaan(baseSalary),
   };

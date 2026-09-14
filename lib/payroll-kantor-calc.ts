@@ -1,5 +1,4 @@
 import {
-  calcKantorOvertimePay,
   calcKantorLateDeduction,
   calcKantorIncompleteClockDeduction,
 } from "./payroll-config";
@@ -45,16 +44,17 @@ export type KantorAttendanceInput = {
 };
 
 export function computeKantorPayrollFields(emp: KantorEmployeeInput, att: KantorAttendanceInput) {
-  const overtimeRate = emp.kantorOvertimeRate ?? 0;
   const lateRate = emp.kantorLateRate ?? 0;
   const incompleteRate = emp.kantorIncompleteClockRate ?? 0;
 
   return {
     daysPresent: att.daysPresent,
+    // overtimeMinutes selalu 0 (lihat lib/attendance-summary.ts) - Lembur
+    // TIDAK dihitung otomatis dari absensi. Keputusan Kevin 2026-09-14.
     overtimeMinutes: att.overtimeMinutes,
     baseSalary: emp.baseSalary ?? 0, // TIDAK diprorata - beda dari Outlet
     mealAllowance: (emp.dailyMealRate ?? 0) * att.daysPresent,
-    overtimePay: calcKantorOvertimePay(overtimeRate, att.overtimeMinutes),
+    overtimePay: 0,
     lateCount: att.lateCount,
     lateDeduction: calcKantorLateDeduction(lateRate, att.lateCount),
     incompleteClockInCount: att.incompleteClockInCount,

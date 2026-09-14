@@ -4,12 +4,16 @@
 // tempat (permintaan Kevin 2026-09-11 saat menambah fitur slip gaji).
 export type FieldDef = { key: string; label: string };
 
+// "Lembur (Rp)" SENGAJA TIDAK ADA di sini - Kevin 2026-09-14 minta
+// dihapus total (bukan cuma dimatikan otomatisnya): shift resto Crackling
+// 12 jam tetap, tidak ada acuan lembur yang bisa diturunkan dari absensi.
+// Field overtimePay tetap ada di DB (locked, selalu 0) tapi tidak
+// ditampilkan/diedit di mana pun sampai ada keputusan lebih lanjut.
 export const BASE_FIELDS: FieldDef[] = [
   { key: "baseSalary", label: "Gaji Pokok" },
   { key: "partTimePay", label: "Gaji Part Time" },
   { key: "mealAllowance", label: "Uang Makan" },
   { key: "transportReimbursement", label: "Reimb. Transport" },
-  { key: "overtimePay", label: "Lembur (Rp)" },
   { key: "attendanceDeduction", label: "Potongan Absensi" },
   { key: "bpjsKesehatanDeduction", label: "BPJS Kesehatan" },
   { key: "bpjsKetenagakerjaanDeduction", label: "BPJS Ketenagakerjaan" },
@@ -37,7 +41,6 @@ export const OUTLET_FIELDS: FieldDef[] = [
 export const KANTOR_BASE_FIELDS: FieldDef[] = [
   { key: "bonus", label: "Bonus" },
   { key: "baseSalary", label: "Gaji Pokok" },
-  { key: "overtimePay", label: "Lembur (Rp)" },
   { key: "mealAllowance", label: "Uang Makan" },
   { key: "pph21Deduction", label: "PPh21" },
   { key: "lateDeduction", label: "Potongan Telat" },
