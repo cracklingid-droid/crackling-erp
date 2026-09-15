@@ -42,6 +42,64 @@ export async function GET(req: Request) {
     });
   }
 
+  // Laba Rugi side-by-side (permintaan Kevin 2026-09-15): mode=period ->
+  // 1 kolom per bulan (periods=2026-07,2026-08,...), mode=outlet -> 1 kolom
+  // per outlet + Konsolidasi utk rentang start..end. Persentase (% dari
+  // pendapatan kolom itu) dihitung di client dari totals.
+  if (type === "pl_compare") {
+    const mode = searchParams.get("mode") === "outlet" ? "outlet" : "period";
+    const columns: { key: string; label: string; start: Date; end: Date; outlet: string | null }[] = [];
+    if (mode === "period") {
+      const periods = (searchParams.get("periods") ?? "").split(",").map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}$/.test(s)).slice(0, 12);
+      if (periods.length === 0) return NextResponse.json({ error: "periods wajib diisi (YYYY-MM,...)" }, { status: 400 });
+      for (const ym of periods) {
+        const [y, m] = ym.split("-").map(Number);
+        const s = new Date(Date.UTC(y, m - 1, 1));
+        const e = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
+        columns.push({ key: ym, label: s.toLocaleDateString("id-ID", { month: "short", year: "numeric", timeZone: "UTC" }), start: s, end: e, outlet });
+      }
+    } else {
+      const outlets = ["Gading Serpong", "Kelapa Gading", "Fatgai", "Joglo (Central Kitchen)"];
+      for (const o of outlets) columns.push({ key: o, label: o, start, end: endOfDay(end), outlet: o });
+      columns.push({ key: "__all", label: "Konsolidasi", start, end: endOfDay(end), outlet: null });
+    }
+
+    const perColumn = await Promise.all(columns.map((c) => getAccountBalances({ start: c.start, end: c.end, outletName: c.outlet })));
+    type CmpRow = { code: string; name: string; values: number[] };
+    const rowsByCode = new Map<string, CmpRow & { type: string }>();
+    perColumn.forEach((balances, ci) => {
+      for (const b of balances) {
+        if (b.type !== "REVENUE" && b.type !== "EXPENSE") continue;
+        const row = rowsByCode.get(b.code) ?? { code: b.code, name: b.name, type: b.type, values: new Array(columns.length).fill(0) };
+        row.values[ci] = b.balance;
+        rowsByCode.set(b.code, row);
+      }
+    });
+    const rows = Array.from(rowsByCode.values()).filter((r) => r.values.some((v) => v !== 0)).sort((a, b) => a.code.localeCompare(b.code));
+    const pick = (pred: (r: (typeof rows)[number]) => boolean) => rows.filter(pred).map(({ code, name, values }) => ({ code, name, values }));
+    const revenue = pick((r) => r.type === "REVENUE");
+    const cogs = pick((r) => r.type === "EXPENSE" && r.code.startsWith("5-"));
+    const expenses = pick((r) => r.type === "EXPENSE" && !r.code.startsWith("5-"));
+    const sum = (rs: CmpRow[]) => columns.map((_, ci) => rs.reduce((s, r) => s + r.values[ci], 0));
+    const tRev = sum(revenue);
+    const tCogs = sum(cogs);
+    const tExp = sum(expenses);
+    return NextResponse.json({
+      type,
+      mode,
+      columns: columns.map((c) => ({ key: c.key, label: c.label, start: c.start.toISOString().slice(0, 10), end: c.end.toISOString().slice(0, 10) })),
+      sections: { revenue, cogs, expenses },
+      totals: {
+        revenue: tRev,
+        cogs: tCogs,
+        grossProfit: tRev.map((v, i) => v - tCogs[i]),
+        expenses: tExp,
+        netIncome: tRev.map((v, i) => v - tCogs[i] - tExp[i]),
+      },
+      ledgerStart: firstEntry?.date ?? null,
+    });
+  }
+
   if (type === "bs") {
     const balances = await getAccountBalances({ start: null, end: endOfDay(end), outletName: outlet });
     const income = netIncome(balances);

@@ -38,10 +38,11 @@ function thisMonth() {
 
 // Jurnal yang boleh dihapus dari Jurnal Umum (tanpa dokumen sumber di modul
 // lain) - sama dgn DELETABLE_SOURCES di app/api/accounting/journal/[id].
-const DELETABLE = new Set(["MANUAL", "BANK_ADJUSTMENT", "AR_RECEIPT", "OPENING_BALANCE"]);
+const DELETABLE = new Set(["MANUAL", "BANK_ADJUSTMENT", "BANK_TRANSFER", "AR_RECEIPT", "OPENING_BALANCE"]);
 
 const SOURCE_LABEL: Record<string, string> = {
   RECORD_SALES: "Record Sales",
+  BANK_TRANSFER: "Transfer Bank",
   COGS_SYNC: "HPP",
   DIRECT_EXPENSE: "Direct Expense",
   DEPRECIATION: "Penyusutan",
@@ -125,6 +126,10 @@ function useReport<T>(params: Record<string, string>) {
   const [error, setError] = useState<string | null>(null);
   const key = JSON.stringify(params);
   useEffect(() => {
+    // Guard respons basi: ganti filter cepat (mis. dari-bulan lalu sampai-
+    // bulan) bikin 2 request beruntun - yang lebih lambat tidak boleh
+    // menimpa hasil filter terakhir.
+    let cancelled = false;
     setData(null);
     setError(null);
     fetch(`/api/accounting/reports?${new URLSearchParams(params)}`)
@@ -132,14 +137,29 @@ function useReport<T>(params: Record<string, string>) {
         if (!r.ok) throw new Error((await r.json()).error ?? "Gagal memuat laporan");
         return r.json();
       })
-      .then(setData)
-      .catch((e) => setError(e.message));
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return { data, error };
 }
 
-function SectionTable({ title, section, negate }: { title: string; section: Section; negate?: boolean }) {
+// pctBase (opsional) = total pendapatan -> tampilkan % tiap akun terhadap
+// pendapatan (analisa vertikal Laba Rugi). Neraca tidak memakainya.
+function SectionTable({ title, section, negate, pctBase }: { title: string; section: Section; negate?: boolean; pctBase?: number }) {
+  const Amt = ({ v, bold }: { v: number; bold?: boolean }) => (
+    <TableCell className={`text-right tabular-nums whitespace-nowrap ${bold ? "font-medium" : ""}`}>
+      {fmtRp(v)}
+      {pctBase !== undefined && <span className="ml-2 text-[11px] text-muted-foreground font-normal">{pct(v, pctBase)}</span>}
+    </TableCell>
+  );
   return (
     <>
       <TableRow className="bg-muted/40">
@@ -156,12 +176,12 @@ function SectionTable({ title, section, negate }: { title: string; section: Sect
             <span className="font-mono text-xs text-muted-foreground mr-2">{r.code}</span>
             {r.name}
           </TableCell>
-          <TableCell className="text-right tabular-nums">{fmtRp(negate ? -r.balance : r.balance)}</TableCell>
+          <Amt v={negate ? -r.balance : r.balance} />
         </TableRow>
       ))}
       <TableRow>
         <TableCell className="pl-6 font-medium">Total {title}</TableCell>
-        <TableCell className="text-right tabular-nums font-medium">{fmtRp(negate ? -section.total : section.total)}</TableCell>
+        <Amt v={negate ? -section.total : section.total} bold />
       </TableRow>
     </>
   );
@@ -179,18 +199,244 @@ function LedgerStartNote({ ledgerStart, hasOpening }: { ledgerStart: string | nu
   );
 }
 
+// Laba Rugi: 1 periode (tabel biasa) ATAU side-by-side - bandingkan
+// beberapa bulan, atau bandingkan antar outlet utk 1 rentang - tiap angka
+// disertai % dari pendapatan kolomnya. Permintaan Kevin 2026-09-15.
+type PlMode = "single" | "period" | "outlet";
+type PlPreset = "vs_last" | "3m" | "6m" | "ytd" | "custom";
+
+function monthsBack(n: number): string[] {
+  const out: string[] = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    out.push(d.toISOString().slice(0, 7));
+  }
+  return out;
+}
+function monthRangeList(from: string, to: string): string[] {
+  const [fy, fm] = from.split("-").map(Number);
+  const [ty, tm] = to.split("-").map(Number);
+  const out: string[] = [];
+  let y = fy;
+  let m = fm;
+  while (y < ty || (y === ty && m <= tm)) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+function pct(v: number, base: number): string {
+  if (!base) return "-";
+  return `${((v / base) * 100).toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`;
+}
+function delta(cur: number, prev: number): string {
+  if (!prev) return "-";
+  const d = ((cur - prev) / Math.abs(prev)) * 100;
+  return `${d > 0 ? "+" : ""}${d.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`;
+}
+
 function ProfitLoss({ start, end, outlet }: { start: string; end: string; outlet: string }) {
+  const [mode, setMode] = useState<PlMode>("single");
+  const [preset, setPreset] = useState<PlPreset>("vs_last");
+  const [fromMonth, setFromMonth] = useState(monthsBack(3)[0]);
+  const [toMonth, setToMonth] = useState(thisMonth());
+  const [showPct, setShowPct] = useState(true);
+
+  const periods =
+    preset === "vs_last" ? monthsBack(2) : preset === "3m" ? monthsBack(3) : preset === "6m" ? monthsBack(6) : preset === "ytd" ? monthRangeList(`${thisMonth().slice(0, 4)}-01`, thisMonth()) : monthRangeList(fromMonth, toMonth);
+
+  const controls = (
+    <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:items-end print:hidden">
+      <div className="grid gap-1.5">
+        <Label>Tampilan</Label>
+        <Select value={mode} onValueChange={(v) => setMode((v as PlMode) ?? "single")}>
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue>{() => ({ single: "Satu periode", period: "Bandingkan per bulan", outlet: "Bandingkan antar outlet" })[mode]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="single">Satu periode</SelectItem>
+            <SelectItem value="period">Bandingkan per bulan</SelectItem>
+            <SelectItem value="outlet">Bandingkan antar outlet</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {mode === "period" && (
+        <>
+          <div className="grid gap-1.5">
+            <Label>Periode</Label>
+            <Select value={preset} onValueChange={(v) => setPreset((v as PlPreset) ?? "vs_last")}>
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue>{() => ({ vs_last: "Bulan ini vs bulan lalu", "3m": "3 bulan terakhir", "6m": "6 bulan terakhir", ytd: "Tahun ini per bulan", custom: "Kustom (pilih bulan)" })[preset]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vs_last">Bulan ini vs bulan lalu</SelectItem>
+                <SelectItem value="3m">3 bulan terakhir</SelectItem>
+                <SelectItem value="6m">6 bulan terakhir</SelectItem>
+                <SelectItem value="ytd">Tahun ini per bulan</SelectItem>
+                <SelectItem value="custom">Kustom (pilih bulan)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {preset === "custom" && (
+            <>
+              <div className="grid gap-1.5">
+                <Label>Dari bulan</Label>
+                <Input type="month" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} className="w-full sm:w-40" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Sampai bulan</Label>
+                <Input type="month" value={toMonth} onChange={(e) => setToMonth(e.target.value)} className="w-full sm:w-40" />
+              </div>
+            </>
+          )}
+        </>
+      )}
+      <label className="flex items-center gap-2 text-sm cursor-pointer select-none sm:ml-auto sm:pb-2">
+        <input type="checkbox" checked={showPct} onChange={(e) => setShowPct(e.target.checked)} /> Tampilkan % dari pendapatan
+      </label>
+    </div>
+  );
+
+  if (mode !== "single") {
+    return (
+      <div className="grid gap-4">
+        {controls}
+        <ProfitLossCompare mode={mode} periods={periods} start={start} end={end} outlet={outlet} showPct={showPct} />
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-4">
+      {controls}
+      <ProfitLossSingle start={start} end={end} outlet={outlet} showPct={showPct} />
+    </div>
+  );
+}
+
+function ProfitLossCompare({ mode, periods, start, end, outlet, showPct }: { mode: PlMode; periods: string[]; start: string; end: string; outlet: string; showPct: boolean }) {
+  type CmpRow = { code: string; name: string; values: number[] };
+  type CMP = {
+    columns: { key: string; label: string; start: string; end: string }[];
+    sections: { revenue: CmpRow[]; cogs: CmpRow[]; expenses: CmpRow[] };
+    totals: { revenue: number[]; cogs: number[]; grossProfit: number[]; expenses: number[]; netIncome: number[] };
+    ledgerStart: string | null;
+  };
+  const params: Record<string, string> = mode === "period" ? { type: "pl_compare", mode: "period", periods: periods.join(",") } : { type: "pl_compare", mode: "outlet", start, end };
+  if (mode === "period" && outlet) params.outlet = outlet;
+  const { data, error } = useReport<CMP>(params);
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (!data) return <p className="text-sm text-muted-foreground">Menghitung...</p>;
+  const cols = data.columns;
+  const n = cols.length;
+  const showDelta = mode === "period" && n >= 2;
+  const rev = data.totals.revenue;
+
+  const Cell = ({ v, ci, bold }: { v: number; ci: number; bold?: boolean }) => (
+    <TableCell className={`text-right tabular-nums whitespace-nowrap ${bold ? "font-semibold" : ""}`}>
+      <div>{fmtRp(v)}</div>
+      {showPct && <div className="text-[11px] text-muted-foreground">{pct(v, rev[ci])}</div>}
+    </TableCell>
+  );
+  const DeltaCell = ({ values }: { values: number[] }) => {
+    if (!showDelta) return null;
+    const cur = values[n - 1];
+    const prev = values[n - 2];
+    const d = delta(cur, prev);
+    const tone = d === "-" ? "text-muted-foreground" : d.startsWith("+") ? "text-emerald-700" : d.startsWith("-") ? "text-red-600" : "text-muted-foreground";
+    return <TableCell className={`text-right tabular-nums whitespace-nowrap text-sm ${tone}`}>{d}</TableCell>;
+  };
+  const SectionRows = ({ title, rows, totals, negate }: { title: string; rows: CmpRow[]; totals: number[]; negate?: boolean }) => (
+    <>
+      <TableRow className="bg-muted/40">
+        <TableCell colSpan={n + 1 + (showDelta ? 1 : 0)} className="font-semibold sticky left-0 bg-muted/40">{title}</TableCell>
+      </TableRow>
+      {rows.map((r) => (
+        <TableRow key={r.code}>
+          <TableCell className="sticky left-0 bg-card pl-6 whitespace-nowrap">
+            <span className="font-mono text-xs text-muted-foreground mr-2">{r.code}</span>
+            {r.name}
+          </TableCell>
+          {r.values.map((v, ci) => <Cell key={ci} v={negate ? -v : v} ci={ci} />)}
+          <DeltaCell values={r.values} />
+        </TableRow>
+      ))}
+      <TableRow>
+        <TableCell className="sticky left-0 bg-card pl-6 font-medium whitespace-nowrap">Total {title}</TableCell>
+        {totals.map((v, ci) => <Cell key={ci} v={negate ? -v : v} ci={ci} bold />)}
+        <DeltaCell values={totals} />
+      </TableRow>
+    </>
+  );
+  const TotalRow = ({ label, values, colorize }: { label: string; values: number[]; colorize?: boolean }) => (
+    <TableRow className="bg-muted/60">
+      <TableCell className="sticky left-0 bg-muted/60 font-semibold whitespace-nowrap">{label}</TableCell>
+      {values.map((v, ci) => (
+        <TableCell key={ci} className={`text-right tabular-nums whitespace-nowrap font-semibold ${colorize ? (v < 0 ? "text-red-600" : "text-emerald-700") : ""}`}>
+          <div>{fmtRp(v)}</div>
+          {showPct && <div className="text-[11px] text-muted-foreground font-normal">{pct(v, rev[ci])}</div>}
+        </TableCell>
+      ))}
+      <DeltaCell values={values} />
+    </TableRow>
+  );
+
+  return (
+    <Card className="min-w-0">
+      <CardContent className="pt-6 grid gap-4 min-w-0">
+        <div>
+          <h2 className="font-heading font-semibold text-lg">Laporan Laba Rugi - {mode === "period" ? "Perbandingan per Bulan" : "Perbandingan antar Outlet"}</h2>
+          <p className="text-sm text-muted-foreground">
+            {mode === "period" ? `${cols[0]?.label} - ${cols[n - 1]?.label} · ${outlet || "Konsolidasi"}` : `${fmtDate(start)} - ${fmtDate(end)} · per outlet`}
+            {showPct && " · % = terhadap total pendapatan kolom itu"}
+            {showDelta && " · Δ = kolom terakhir vs sebelumnya"}
+          </p>
+        </div>
+        <div className="overflow-x-auto -mx-6 px-6 min-w-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="sticky left-0 bg-card">Akun</TableHead>
+                {cols.map((c) => (
+                  <TableHead key={c.key} className="text-right whitespace-nowrap">{c.label}</TableHead>
+                ))}
+                {showDelta && <TableHead className="text-right whitespace-nowrap">Δ</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <SectionRows title="Pendapatan" rows={data.sections.revenue} totals={data.totals.revenue} />
+              <SectionRows title="Beban Pokok Penjualan (HPP)" rows={data.sections.cogs} totals={data.totals.cogs} />
+              <TotalRow label="Laba Kotor" values={data.totals.grossProfit} colorize />
+              <SectionRows title="Beban Operasional" rows={data.sections.expenses} totals={data.totals.expenses} />
+              <TotalRow label="Laba Bersih" values={data.totals.netIncome} colorize />
+            </TableBody>
+          </Table>
+        </div>
+        <LedgerStartNote ledgerStart={data.ledgerStart} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfitLossSingle({ start, end, outlet, showPct }: { start: string; end: string; outlet: string; showPct: boolean }) {
   type PL = { revenue: Section; cogs: Section; expenses: Section; netIncome: number; ledgerStart: string | null };
   const { data, error } = useReport<PL>({ type: "pl", start, end, ...(outlet ? { outlet } : {}) });
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!data) return <p className="text-sm text-muted-foreground">Menghitung...</p>;
   const gross = data.revenue.total - data.cogs.total;
+  const base = data.revenue.total;
+  const P = ({ v }: { v: number }) => (showPct ? <span className="ml-2 text-[11px] text-muted-foreground">{pct(v, base)}</span> : null);
   return (
     <Card className="min-w-0">
       <CardContent className="pt-6 grid gap-4 min-w-0">
         <div>
           <h2 className="font-heading font-semibold text-lg">Laporan Laba Rugi</h2>
-          <p className="text-sm text-muted-foreground">{fmtDate(start)} - {fmtDate(end)} &middot; {outlet || "Konsolidasi"}</p>
+          <p className="text-sm text-muted-foreground">{fmtDate(start)} - {fmtDate(end)} &middot; {outlet || "Konsolidasi"}{showPct && " · % = terhadap total pendapatan"}</p>
         </div>
         <div className="overflow-x-auto -mx-6 px-6 min-w-0">
           <Table>
@@ -201,16 +447,16 @@ function ProfitLoss({ start, end, outlet }: { start: string; end: string; outlet
               </TableRow>
             </TableHeader>
             <TableBody>
-              <SectionTable title="Pendapatan" section={data.revenue} />
-              <SectionTable title="Beban Pokok Penjualan (HPP)" section={data.cogs} />
+              <SectionTable title="Pendapatan" section={data.revenue} pctBase={showPct ? base : undefined} />
+              <SectionTable title="Beban Pokok Penjualan (HPP)" section={data.cogs} pctBase={showPct ? base : undefined} />
               <TableRow className="bg-muted/60">
                 <TableCell className="font-semibold">Laba Kotor</TableCell>
-                <TableCell className="text-right tabular-nums font-semibold">{fmtRp(gross)}</TableCell>
+                <TableCell className="text-right tabular-nums font-semibold whitespace-nowrap">{fmtRp(gross)}<P v={gross} /></TableCell>
               </TableRow>
-              <SectionTable title="Beban Operasional" section={data.expenses} />
+              <SectionTable title="Beban Operasional" section={data.expenses} pctBase={showPct ? base : undefined} />
               <TableRow className="bg-muted/60">
                 <TableCell className="font-semibold">Laba Bersih</TableCell>
-                <TableCell className={`text-right tabular-nums font-semibold ${data.netIncome < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmtRp(data.netIncome)}</TableCell>
+                <TableCell className={`text-right tabular-nums font-semibold whitespace-nowrap ${data.netIncome < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmtRp(data.netIncome)}<P v={data.netIncome} /></TableCell>
               </TableRow>
             </TableBody>
           </Table>

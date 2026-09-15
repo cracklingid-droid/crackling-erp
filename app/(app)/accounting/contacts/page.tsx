@@ -157,9 +157,27 @@ export default function ContactsPage() {
             Customer, vendor, karyawan &amp; kontak lain yang dipakai di transaksi Accounting.
           </p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="h-3.5 w-3.5" /> Tambah Kontak
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              // Tarik semua karyawan HR jadi kontak tipe Karyawan, status
+              // ikut status kerja (resigned = nonaktif) - permintaan Kevin
+              // 2026-09-15.
+              const res = await fetch("/api/accounting/contacts/sync-employees", { method: "POST" });
+              const d = await res.json();
+              if (!res.ok) return toast.error(d.error ?? "Gagal sync karyawan.");
+              toast.success(`Sync karyawan selesai: ${d.total} karyawan (${d.created} baru, ${d.updated} diperbarui) - ${d.active} aktif, ${d.inactive} nonaktif.`);
+              load();
+            }}
+          >
+            Sync dari Database Karyawan
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" /> Tambah Kontak
+          </Button>
+        </div>
       </div>
 
       <Card className="min-w-0">

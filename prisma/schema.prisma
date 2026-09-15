@@ -696,6 +696,11 @@ model Contact {
   id        Int      @id @default(autoincrement())
   name      String
   type      String // CUSTOMER | VENDOR | EMPLOYEE | OTHER
+  // Kontak tipe EMPLOYEE disinkron dari tabel Employee HR (permintaan Kevin
+  // 2026-09-15: "masukan semua daftar kontak karyawan, ikuti statusnya") -
+  // employeeId jadi kunci idempoten sync (nama boleh berubah, tetap 1
+  // kontak). isActive ikut Employee.status (resigned = nonaktif).
+  employeeId Int?    @unique
   phone     String?
   email     String?
   address   String?

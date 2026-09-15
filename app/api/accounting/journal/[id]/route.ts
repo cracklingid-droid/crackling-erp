@@ -9,7 +9,7 @@ import { reconciledLineIdsForEntry } from "@/lib/accounting-reports";
 // sendiri supaya dokumen sumbernya ikut konsisten. Aturan Jurnal.id
 // (permintaan Kevin 2026-09-14): sudah recon atau periode terkunci ->
 // tidak bisa dihapus sebelum unrecon/unlock.
-const DELETABLE_SOURCES = new Set(["MANUAL", "BANK_ADJUSTMENT", "AR_RECEIPT", "OPENING_BALANCE"]);
+const DELETABLE_SOURCES = new Set(["MANUAL", "BANK_ADJUSTMENT", "BANK_TRANSFER", "AR_RECEIPT", "OPENING_BALANCE"]);
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();

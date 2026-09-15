@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Scale, Search, ChevronLeft, ChevronRight, ArrowLeft, Link2, Unlink, PlusCircle, X } from "lucide-react";
+import { Scale, Search, ChevronLeft, ChevronRight, ArrowLeft, Link2, Unlink, PlusCircle, X, Upload } from "lucide-react";
 import { SELLING_OUTLET_NAMES, OUTLET_ACCOUNTS } from "@/lib/accounting-outlets";
 
 type BankAccountSummary = {
@@ -52,6 +52,7 @@ type Account = { id: number; code: string; name: string; type: string; isActive:
 
 const SOURCE_LABEL: Record<string, string> = {
   RECORD_SALES: "Record Sales",
+  BANK_TRANSFER: "Transfer Bank",
   COGS_SYNC: "HPP",
   DIRECT_EXPENSE: "Direct Expense",
   DEPRECIATION: "Penyusutan",
@@ -108,6 +109,8 @@ export default function ReconciliationPage() {
         </p>
       </div>
 
+      <TransferSuggestions onRecorded={load} />
+
       <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -158,6 +161,140 @@ export default function ReconciliationPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Rekomendasi transfer antar bank / top-up petty cash (permintaan Kevin
+// 2026-09-15): pasangan mutasi keluar-masuk dgn nominal sama di 2 akun
+// berbeda, selisih <= 3 hari. Sekali klik -> 1 jurnal transfer (Dr bank
+// tujuan / Cr bank asal) & kedua mutasi langsung reconciled.
+type Suggestion = {
+  fromLineId: number;
+  toLineId: number;
+  amount: number;
+  date: string;
+  dayDiff: number;
+  confidence: "tinggi" | "sedang" | "rendah";
+  from: { bankAccountId: number; bankName: string; date: string; description: string };
+  to: { bankAccountId: number; bankName: string; date: string; description: string };
+};
+
+function TransferSuggestions({ onRecorded, bankAccountId }: { onRecorded: () => void; bankAccountId?: number }) {
+  const [data, setData] = useState<{ total: number; suggestions: Suggestion[] } | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [busy, setBusy] = useState<number | null>(null);
+  const [minConf, setMinConf] = useState<"tinggi" | "sedang" | "rendah">("sedang");
+
+  function load() {
+    const params = new URLSearchParams({ limit: "300" });
+    if (bankAccountId) params.set("bankAccountId", String(bankAccountId));
+    fetch(`/api/accounting/reconciliation/suggestions?${params}`)
+      .then((r) => r.json())
+      .then(setData);
+  }
+  useEffect(load, [bankAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function record(s: Suggestion) {
+    setBusy(s.fromLineId);
+    try {
+      const res = await fetch("/api/accounting/reconciliation/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromLineId: s.fromLineId, toLineId: s.toLineId }),
+      });
+      if (!res.ok) return toast.error(await friendlyError(res));
+      toast.success(`Transfer ${fmtRp(s.amount)} dicatat & kedua mutasi reconciled.`);
+      load();
+      onRecorded();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const rank = { tinggi: 3, sedang: 2, rendah: 1 };
+  const shown = (data?.suggestions ?? []).filter((s) => rank[s.confidence] >= rank[minConf]);
+  const visible = expanded ? shown : shown.slice(0, 8);
+
+  return (
+    <Card className="min-w-0 border-primary/30">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+          <Link2 className="h-4 w-4" /> Rekomendasi transfer antar bank / top-up petty cash
+          {data && <Badge variant="outline" className="tabular-nums">{shown.length}</Badge>}
+          <div className="ml-auto flex items-center gap-2 text-xs font-normal">
+            <span className="text-muted-foreground">Keyakinan min.</span>
+            <Select value={minConf} onValueChange={(v) => setMinConf((v as typeof minConf) ?? "sedang")}>
+              <SelectTrigger className="h-8 w-28">
+                <SelectValue>{() => ({ tinggi: "Tinggi", sedang: "Sedang", rendah: "Semua" })[minConf]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tinggi">Tinggi</SelectItem>
+                <SelectItem value="sedang">Sedang</SelectItem>
+                <SelectItem value="rendah">Semua</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="min-w-0 grid gap-3">
+        <p className="text-xs text-muted-foreground">
+          Pasangan mutasi keluar &amp; masuk dgn nominal sama di dua akun berbeda (selisih maks 3 hari). Klik &quot;Catat transfer&quot; -&gt; 1 jurnal
+          Dr bank tujuan / Cr bank asal, kedua mutasi langsung reconciled. Ini saran - cek keterangannya dulu.
+        </p>
+        {!data && <p className="text-sm text-muted-foreground">Mencari pasangan...</p>}
+        {data && shown.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada rekomendasi dgn tingkat keyakinan ini.</p>}
+        {visible.length > 0 && (
+          <div className="overflow-x-auto -mx-6 px-6 min-w-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Dari (keluar)</TableHead>
+                  <TableHead>Ke (masuk)</TableHead>
+                  <TableHead className="text-right">Jumlah</TableHead>
+                  <TableHead>Keyakinan</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visible.map((s) => (
+                  <TableRow key={`${s.fromLineId}-${s.toLineId}`}>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {fmtDate(s.from.date)}
+                      {s.dayDiff > 0 && <span className="block text-[11px] text-muted-foreground">masuk {fmtDate(s.to.date)}</span>}
+                    </TableCell>
+                    <TableCell className="whitespace-normal min-w-56 text-sm">
+                      <p className="font-medium">{s.from.bankName}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{s.from.description}</p>
+                    </TableCell>
+                    <TableCell className="whitespace-normal min-w-56 text-sm">
+                      <p className="font-medium">{s.to.bankName}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{s.to.description}</p>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap font-medium">{fmtRp(s.amount)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={s.confidence === "tinggi" ? "text-emerald-700 border-emerald-300" : s.confidence === "sedang" ? "text-amber-700 border-amber-300" : "text-muted-foreground"}>
+                        {s.confidence}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Button size="sm" variant="outline" disabled={busy === s.fromLineId} onClick={() => record(s)}>
+                        <Link2 className="h-3.5 w-3.5" /> Catat transfer
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {shown.length > 8 && (
+          <Button variant="ghost" size="sm" className="justify-self-start" onClick={() => setExpanded((e) => !e)}>
+            {expanded ? "Tampilkan lebih sedikit" : `Tampilkan semua (${shown.length})`}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -323,6 +460,7 @@ function StatementTab({ account, refreshKey, onChanged }: { account: BankAccount
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   useEffect(() => {
     setLines(null);
@@ -363,6 +501,10 @@ function StatementTab({ account, refreshKey, onChanged }: { account: BankAccount
             <Input className="pl-8" placeholder="Cari keterangan mutasi..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
           </div>
           <span className="text-sm text-muted-foreground sm:ml-auto self-center">{total.toLocaleString("id-ID")} mutasi</span>
+          <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
+            <Upload className="h-3.5 w-3.5" /> Upload Mutasi
+          </Button>
+          {uploadOpen && <UploadStatementDialog account={account} onClose={() => setUploadOpen(false)} onDone={() => { setUploadOpen(false); onChanged(); }} />}
         </div>
         {!lines && <p className="text-sm text-muted-foreground">Memuat...</p>}
         {lines && lines.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada mutasi yang cocok.</p>}
@@ -414,6 +556,174 @@ function StatementTab({ account, refreshKey, onChanged }: { account: BankAccount
   );
 }
 
+// Upload mutasi bank (CSV/XLSX) - 2 langkah: preview (deteksi kolom, tanda
+// duplikat) lalu impor. Permintaan Kevin 2026-09-15.
+function UploadStatementDialog({ account, onClose, onDone }: { account: BankAccountSummary; onClose: () => void; onDone: () => void }) {
+  type PreviewRow = { date: string; description: string; amount: number; balance: number | null; duplicate: boolean };
+  type Preview = { headers: string[]; mapping: Record<string, string | undefined>; total: number; skipped: number; duplicates: number; rows: PreviewRow[] };
+  const [file, setFile] = useState<File | null>(null);
+  const [dateFormat, setDateFormat] = useState<"auto" | "dmy" | "mdy">("auto");
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [headersOnly, setHeadersOnly] = useState<string[] | null>(null);
+  const [manual, setManual] = useState<{ date: string; description: string; amount: string; credit: string; debit: string; balance: string }>({ date: "", description: "", amount: "", credit: "", debit: "", balance: "" });
+
+  async function runPreview(withManual: boolean) {
+    if (!file) return toast.error("Pilih file dulu.");
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("dateFormat", dateFormat);
+      if (withManual) {
+        const m: Record<string, string> = {};
+        for (const [k, v] of Object.entries(manual)) if (v) m[k] = v;
+        form.append("mapping", JSON.stringify(m));
+      }
+      const res = await fetch(`/api/accounting/bank-accounts/${account.id}/import`, { method: "POST", body: form });
+      const d = await res.json();
+      if (res.status === 422 && d.headers) {
+        setHeadersOnly(d.headers);
+        setPreview(null);
+        return toast.error(d.error);
+      }
+      if (!res.ok) return toast.error(d.error ?? "Gagal membaca file.");
+      setHeadersOnly(null);
+      setPreview(d);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmImport() {
+    if (!preview) return;
+    setBusy(true);
+    try {
+      const rows = preview.rows.filter((r) => !r.duplicate).map(({ date, description, amount, balance }) => ({ date, description, amount, balance }));
+      const res = await fetch(`/api/accounting/bank-accounts/${account.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows }) });
+      const d = await res.json();
+      if (!res.ok) return toast.error(d.error ?? "Gagal mengimpor.");
+      const dupes = (preview.duplicates ?? 0) + (d.skippedDuplicates ?? 0);
+      toast.success(`${d.inserted} mutasi diimpor${dupes ? `, ${dupes} duplikat dilewati` : ""}.`);
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const colSelect = (key: keyof typeof manual, label: string) => (
+    <div className="grid gap-1">
+      <Label className="text-xs">{label}</Label>
+      <Select value={manual[key] || "none"} onValueChange={(v) => setManual((m) => ({ ...m, [key]: v === "none" ? "" : v ?? "" }))}>
+        <SelectTrigger className="h-9 w-full">
+          <SelectValue>{() => manual[key] || "-"}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">-</SelectItem>
+          {(headersOnly ?? []).map((h) => (
+            <SelectItem key={h} value={h}>{h}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Upload Mutasi - {account.name}</DialogTitle>
+          <DialogDescription>
+            CSV atau Excel (.xlsx) export bank / sheet mutasi. Kolom tanggal, keterangan, nominal (atau kredit/debit terpisah) &amp; saldo dideteksi otomatis. Baris yang sudah ada (tanggal + nominal + keterangan sama) dilewati.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_12rem_auto] items-end">
+            <div className="grid gap-1.5">
+              <Label>File</Label>
+              <Input type="file" accept=".csv,.xlsx,.xlsm,text/csv" className="h-10" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); setHeadersOnly(null); }} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Format tanggal</Label>
+              <Select value={dateFormat} onValueChange={(v) => setDateFormat((v as typeof dateFormat) ?? "auto")}>
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue>{() => ({ auto: "Otomatis", dmy: "DD/MM/YYYY", mdy: "MM/DD/YYYY" })[dateFormat]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Otomatis</SelectItem>
+                  <SelectItem value="dmy">DD/MM/YYYY (Indonesia)</SelectItem>
+                  <SelectItem value="mdy">MM/DD/YYYY (AS)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={() => runPreview(false)} disabled={!file || busy} className="h-10">{busy ? "Membaca..." : "Baca & Preview"}</Button>
+          </div>
+
+          {headersOnly && (
+            <div className="rounded-md border border-amber-300/60 bg-amber-50 p-3 grid gap-2 dark:bg-amber-950/20">
+              <p className="text-sm">Kolom tidak terdeteksi otomatis - pilih manual dari header file:</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {colSelect("date", "Tanggal")}
+                {colSelect("description", "Keterangan")}
+                {colSelect("amount", "Nominal (+/-)")}
+                {colSelect("credit", "Kredit / masuk")}
+                {colSelect("debit", "Debit / keluar")}
+                {colSelect("balance", "Saldo (opsional)")}
+              </div>
+              <Button size="sm" onClick={() => runPreview(true)} disabled={busy} className="justify-self-start">Baca ulang dgn kolom ini</Button>
+            </div>
+          )}
+
+          {preview && (
+            <>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <Badge variant="outline">{preview.total} baris terbaca</Badge>
+                {preview.duplicates > 0 && <Badge variant="outline" className="text-amber-700 border-amber-300">{preview.duplicates} duplikat (dilewati)</Badge>}
+                {preview.skipped > 0 && <Badge variant="outline" className="text-muted-foreground">{preview.skipped} baris tanpa tanggal/nominal diabaikan</Badge>}
+                <span className="text-xs text-muted-foreground self-center">
+                  Kolom: tanggal={preview.mapping.date}, keterangan={preview.mapping.description}, {preview.mapping.amount ? `nominal=${preview.mapping.amount}` : `kredit=${preview.mapping.credit ?? "-"}, debit=${preview.mapping.debit ?? "-"}`}
+                  {preview.mapping.balance && `, saldo=${preview.mapping.balance}`}
+                </span>
+              </div>
+              <div className="overflow-x-auto -mx-4 px-4 min-w-0 max-h-72 overflow-y-auto border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Keterangan</TableHead>
+                      <TableHead className="text-right">Jumlah</TableHead>
+                      <TableHead className="text-right">Saldo</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {preview.rows.slice(0, 200).map((r, i) => (
+                      <TableRow key={i} className={r.duplicate ? "opacity-50" : ""}>
+                        <TableCell className="whitespace-nowrap text-sm">{fmtDate(r.date)}</TableCell>
+                        <TableCell className="whitespace-normal min-w-56 text-xs text-muted-foreground">{r.description}</TableCell>
+                        <TableCell className={`text-right tabular-nums whitespace-nowrap text-sm ${r.amount < 0 ? "text-red-600" : "text-emerald-600"}`}>{fmtRp(r.amount)}</TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap text-sm">{fmtRp(r.balance)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{r.duplicate ? "duplikat" : ""}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {preview.rows.length > 200 && <p className="text-xs text-muted-foreground p-2">Menampilkan 200 dari {preview.rows.length} baris.</p>}
+              </div>
+            </>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Batal</Button>
+          <Button onClick={confirmImport} disabled={!preview || busy || preview.total - preview.duplicates === 0}>
+            {busy ? "Mengimpor..." : `Impor ${preview ? preview.total - preview.duplicates : 0} mutasi`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ReconTab({ account, refreshKey, onChanged }: { account: BankAccountSummary; refreshKey: number; onChanged: () => void }) {
   const [lines, setLines] = useState<StatementLine[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -435,6 +745,8 @@ function ReconTab({ account, refreshKey, onChanged }: { account: BankAccountSumm
   }, [account.id, page, search, refreshKey]);
 
   return (
+    <div className="grid gap-4">
+    <TransferSuggestions bankAccountId={account.id} onRecorded={onChanged} />
     <Card className="min-w-0">
       <CardContent className="pt-6 grid gap-4 min-w-0">
         <p className="text-sm text-muted-foreground">
@@ -492,6 +804,7 @@ function ReconTab({ account, refreshKey, onChanged }: { account: BankAccountSumm
         <RecordDialog account={account} line={recordTarget} onClose={() => setRecordTarget(null)} onDone={() => { setRecordTarget(null); onChanged(); }} />
       )}
     </Card>
+    </div>
   );
 }
 
