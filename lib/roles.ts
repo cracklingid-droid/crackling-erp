@@ -66,6 +66,15 @@ export function canAccessAccounting(user: { role: string }): boolean {
   return user.role === "owner" || user.role === "developer";
 }
 
+// Modul Invoicing (permintaan Kevin 2026-09-15) - invoice manual ke customer
+// (menu ESB, QRIS dinamis, kirim WhatsApp). Fungsi terpisah dari
+// canAccessAccounting (walau kebetulan sama persis owner/developer sekarang)
+// krn keduanya dijaga independen: kalau salah satu nanti dibuka ke role lain
+// (mis. kasir per cabang), yang lain TIDAK ikut berubah otomatis.
+export function canAccessInvoicing(user: { role: string }): boolean {
+  return user.role === "owner" || user.role === "developer";
+}
+
 export function canDecideOvertimeStage(user: { role: string }, status: string): boolean {
   // Cek status DULU, sebelum cek role - bug ditemukan lewat verifikasi live
   // 2026-09-14: hasFullAccess yang di-cek duluan bikin owner/developer bisa

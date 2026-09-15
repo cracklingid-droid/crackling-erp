@@ -37,12 +37,31 @@ const ACCOUNTS: SeedAccount[] = [
   { code: "1-1100-02", name: "AR - Crackling Kelapa Gading", type: "ASSET", subType: "Aset Lancar", parentCode: "1-1100" },
   { code: "1-1100-03", name: "AR - Crackling Fatgai", type: "ASSET", subType: "Aset Lancar", parentCode: "1-1100" },
 
+  // AR per cabang KHUSUS modul Invoicing (permintaan Kevin 2026-09-15) - 04
+  // Joglo (Central Kitchen) & 05 Kantor, dua lokasi yang TIDAK ada di
+  // OUTLET_ACCOUNTS/Record Sales (bukan titik jual POS harian) tapi Kevin
+  // tetap mau bisa terbitkan invoice dari sana (mis. penjualan korporat/
+  // partai besar dari Kantor, atau langsung dari Joglo). Lihat
+  // lib/invoicing-config.ts.
+  { code: "1-1100-04", name: "AR - Invoicing Joglo (Central Kitchen)", type: "ASSET", subType: "Aset Lancar", parentCode: "1-1100" },
+  { code: "1-1100-05", name: "AR - Invoicing Kantor", type: "ASSET", subType: "Aset Lancar", parentCode: "1-1100" },
+
+  // Akun kliring pembayaran QRIS dinamis (Midtrans, modul Invoicing) - dana
+  // yang sudah dikonfirmasi lunas oleh notifikasi/webhook Midtrans tapi
+  // BELUM dicairkan/masuk ke rekening bank sungguhan. Begitu settlement asli
+  // terlihat di rekening koran, saldo di sini dipindah ke akun Bank lewat
+  // rekonsiliasi (jurnal manual/BANK_ADJUSTMENT) - pola umum akun kliring
+  // payment gateway.
+  { code: "1-1015", name: "Piutang Midtrans (Belum Cair)", type: "ASSET", subType: "Aset Lancar", parentCode: "1-0000" },
+
   // PENDAPATAN
   { code: "4-0000", name: "PENDAPATAN", type: "REVENUE" },
   { code: "4-1000", name: "Pendapatan Penjualan", type: "REVENUE", parentCode: "4-0000" },
   { code: "4-1000-01", name: "Sales - Crackling Serpong", type: "REVENUE", parentCode: "4-1000" },
   { code: "4-1000-02", name: "Sales - Crackling Kelapa Gading", type: "REVENUE", parentCode: "4-1000" },
   { code: "4-1000-03", name: "Sales - Crackling Fatgai", type: "REVENUE", parentCode: "4-1000" },
+  { code: "4-1000-04", name: "Sales - Invoicing Joglo (Central Kitchen)", type: "REVENUE", parentCode: "4-1000" },
+  { code: "4-1000-05", name: "Sales - Invoicing Kantor", type: "REVENUE", parentCode: "4-1000" },
 
   // BEBAN POKOK PENJUALAN
   { code: "5-0000", name: "BEBAN POKOK PENJUALAN", type: "EXPENSE" },

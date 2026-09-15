@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, Warehouse, PiggyBank, Calculator, ArrowRight, LucideIcon } from "lucide-react";
+import { Users, Warehouse, PiggyBank, Calculator, FileText, ArrowRight, LucideIcon } from "lucide-react";
 
 const cardClass =
   "group block h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5";
@@ -78,6 +78,17 @@ export default function Home() {
               title="Accounting"
               desc="Pembukuan double-entry: COA, jurnal, dan laporan keuangan."
               tile="icon-tile-4"
+            />
+          </Link>
+          {/* Akses: owner/developer (lib/roles.ts canAccessInvoicing) - halaman
+              itu sendiri yang menolak role lain, pola sama spt Accounting.
+              Permintaan Kevin 2026-09-15. */}
+          <Link href="/invoicing" className={cardClass}>
+            <ModuleCard
+              icon={FileText}
+              title="Invoicing"
+              desc="Buat invoice per cabang, kirim ke WhatsApp customer, bayar via QRIS."
+              tile="icon-tile-5"
             />
           </Link>
         </div>

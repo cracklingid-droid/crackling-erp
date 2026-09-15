@@ -35,13 +35,14 @@ import {
   Scale,
   FileBarChart,
   Warehouse,
+  FileText,
   LogOut,
   ChevronsUpDown,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import { useAuthContext } from "./AuthContext";
-import { canAccessCostCenter, canAccessAccounting, canViewOvertimeRequests, hasFullAccess } from "@/lib/roles";
+import { canAccessCostCenter, canAccessAccounting, canAccessInvoicing, canViewOvertimeRequests, hasFullAccess } from "@/lib/roles";
 
 // Sidebar kiri ERP - pola SAMA dgn Crackling Warehouse (Sidebar
 // collapsible="icon": bisa diciutkan jadi rail ikon spy ruang kerja lebih
@@ -96,6 +97,10 @@ function buildGroups(role: string | undefined): NavGroup[] {
         { href: "/accounting/fixed-assets", label: "Fixed Asset", icon: Landmark },
       ],
     });
+  }
+
+  if (canAccessInvoicing(user)) {
+    groups.push({ label: "Invoicing", items: [{ href: "/invoicing", label: "Invoice", icon: FileText }] });
   }
 
   if (full) {

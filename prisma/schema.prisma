@@ -26,19 +26,22 @@ model HrUser {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  jobPostingsCreated       JobPosting[]
-  candidatesCreated        Candidate[]
-  stageEvents              CandidateStageEvent[]
-  employeesCreated         Employee[]
-  payrollPeriodsCreated    PayrollPeriod[]
-  employeeHistoryEntries   EmployeeHistoryEntry[]
-  rosterEntriesCreated     RosterEntry[]
-  payrollEventNotesCreated PayrollEventNote[]
+  jobPostingsCreated           JobPosting[]
+  candidatesCreated            Candidate[]
+  stageEvents                  CandidateStageEvent[]
+  employeesCreated             Employee[]
+  payrollPeriodsCreated        PayrollPeriod[]
+  employeeHistoryEntries       EmployeeHistoryEntry[]
+  rosterEntriesCreated         RosterEntry[]
+  payrollEventNotesCreated     PayrollEventNote[]
   attendanceNameAliasesCreated AttendanceNameAlias[]
-  overtimeManagerDecisions OvertimeRequest[] @relation("OvertimeManagerDecision")
-  overtimeHrDecisions      OvertimeRequest[] @relation("OvertimeHrDecision")
-  journalEntriesCreated    JournalEntry[]
-  directExpensesCreated    DirectExpense[]
+  overtimeManagerDecisions     OvertimeRequest[]      @relation("OvertimeManagerDecision")
+  overtimeHrDecisions          OvertimeRequest[]      @relation("OvertimeHrDecision")
+  journalEntriesCreated        JournalEntry[]
+  directExpensesCreated        DirectExpense[]
+  invoicesCreated              Invoice[]              @relation("InvoiceCreatedBy")
+  invoicesPaid                 Invoice[]              @relation("InvoicePaidBy")
+  invoicePricesUpdated         InvoiceItemPrice[]     @relation("InvoicePriceUpdatedBy")
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -315,14 +318,14 @@ model EmployeeHistoryEntry {
 // menyesuaikan kebutuhan tiap karyawan, sama pola-nya dengan cvUrl di
 // Candidate tapi mendukung banyak file.
 model EmployeeDocument {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   employeeId Int
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   type       String // ktp | ijazah | kontrak_kerja | lainnya
   fileUrl    String
   fileName   String?
   expiryDate DateTime? // opsional - dipakai reminder "Segera Jatuh Tempo" (mis. kontrak kerja, SIM)
-  uploadedAt DateTime @default(now())
+  uploadedAt DateTime  @default(now())
 }
 
 // Pengajuan lembur - HANYA utk karyawan posisi SPV (deteksi otomatis dari
@@ -351,13 +354,13 @@ model OvertimeRequest {
   managerDecision     String? // "approved" | "rejected"
   managerDecisionAt   DateTime?
   managerDecisionById Int?
-  managerDecisionBy   HrUser? @relation("OvertimeManagerDecision", fields: [managerDecisionById], references: [id])
+  managerDecisionBy   HrUser?   @relation("OvertimeManagerDecision", fields: [managerDecisionById], references: [id])
   managerNote         String?
 
   hrDecision     String? // "approved" | "rejected"
   hrDecisionAt   DateTime?
   hrDecisionById Int?
-  hrDecisionBy   HrUser? @relation("OvertimeHrDecision", fields: [hrDecisionById], references: [id])
+  hrDecisionBy   HrUser?   @relation("OvertimeHrDecision", fields: [hrDecisionById], references: [id])
   hrNote         String?
 
   createdAt DateTime @default(now())
@@ -573,16 +576,16 @@ model PayrollItem {
   // dihitung dari fuelKm x rate karyawan tapi SENGAJA TIDAK ikut Take Home
   // Pay (dibayar terpisah - sesuai sheet Recap Kevin, kolom "Reimburse"
   // berdiri sendiri di luar Total Penghasilan/Pengurang).
-  bonusSales                   Int @default(0) // Bonus Atas Penjualan (kantor, manual per periode)
-  incompleteClockInCount       Int @default(0) // jumlah hari absen tidak lengkap Clock In (kantor, dari absensi)
-  incompleteClockInDeduction   Int @default(0) // = incompleteClockInCount x Employee.kantorIncompleteClockRate
-  incompleteClockOutCount      Int @default(0)
-  incompleteClockOutDeduction  Int @default(0)
-  bpjsAllowance                Int @default(0) // Tunjangan BPJS Kar (kantor, penambah) - saran dari Employee.kantorBpjsAllowance
-  bpjsEmployerObligation       Int @default(0) // Kewajiban BPJS Ktr (kantor, penambah) - saran dari Employee.kantorBpjsEmployerObligation
-  bpjsRemittance               Int @default(0) // Setoran ke BPJS (kantor, pengurang) - saran dari Employee.kantorBpjsRemittance
-  fuelKm                       Int @default(0) // KM ditempuh bulan ini (kantor, input manual - tidak ada sumber data GPS/mileage)
-  fuelReimbursement            Int @default(0) // = fuelKm x Employee.kantorFuelRatePerKm - DI LUAR Take Home Pay
+  bonusSales                  Int @default(0) // Bonus Atas Penjualan (kantor, manual per periode)
+  incompleteClockInCount      Int @default(0) // jumlah hari absen tidak lengkap Clock In (kantor, dari absensi)
+  incompleteClockInDeduction  Int @default(0) // = incompleteClockInCount x Employee.kantorIncompleteClockRate
+  incompleteClockOutCount     Int @default(0)
+  incompleteClockOutDeduction Int @default(0)
+  bpjsAllowance               Int @default(0) // Tunjangan BPJS Kar (kantor, penambah) - saran dari Employee.kantorBpjsAllowance
+  bpjsEmployerObligation      Int @default(0) // Kewajiban BPJS Ktr (kantor, penambah) - saran dari Employee.kantorBpjsEmployerObligation
+  bpjsRemittance              Int @default(0) // Setoran ke BPJS (kantor, pengurang) - saran dari Employee.kantorBpjsRemittance
+  fuelKm                      Int @default(0) // KM ditempuh bulan ini (kantor, input manual - tidak ada sumber data GPS/mileage)
+  fuelReimbursement           Int @default(0) // = fuelKm x Employee.kantorFuelRatePerKm - DI LUAR Take Home Pay
 
   @@unique([periodId, employeeId])
 }
@@ -623,8 +626,8 @@ model DailySales {
 // sungguhan ke situ.
 
 model Account {
-  id        Int      @id @default(autoincrement())
-  code      String   @unique // mis. "1-1000", urutan tampil ikut kode ini
+  id        Int       @id @default(autoincrement())
+  code      String    @unique // mis. "1-1000", urutan tampil ikut kode ini
   name      String
   type      String // ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE
   subType   String? // mis. "Aset Lancar", "HPP", "Beban Operasional" - label pengelompokan laporan
@@ -646,19 +649,19 @@ model Account {
 // transaksi, TIDAK PERNAH numpuk dobel entry utk sumber+tanggal yang sama
 // (pola sama spt tombol "Sync Sekarang" Cost Center yang sudah ada).
 model JournalEntry {
-  id           Int      @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
   date         DateTime
   memo         String
   sourceType   String // RECORD_SALES | COGS_SYNC | DIRECT_EXPENSE | DEPRECIATION | BANK_ADJUSTMENT | OPENING_BALANCE | MANUAL
   sourceId     String? // mis. "GS-2026-09-14" - kunci idempoten per sourceType
   outletName   String? // null = lintas outlet/konsolidasi
   createdById  Int?
-  createdBy    HrUser?       @relation(fields: [createdById], references: [id])
-  isLocked     Boolean       @default(false) // true kalau AccountingPeriod tanggal ini sudah dikunci
+  createdBy    HrUser?        @relation(fields: [createdById], references: [id])
+  isLocked     Boolean        @default(false) // true kalau AccountingPeriod tanggal ini sudah dikunci
   reversalOfId Int?
-  reversalOf   JournalEntry? @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversalOf   JournalEntry?  @relation("JournalReversal", fields: [reversalOfId], references: [id])
   reversals    JournalEntry[] @relation("JournalReversal")
-  createdAt    DateTime      @default(now())
+  createdAt    DateTime       @default(now())
 
   lines JournalLine[]
 
@@ -693,19 +696,19 @@ model AccountingPeriod {
 }
 
 model Contact {
-  id        Int      @id @default(autoincrement())
-  name      String
-  type      String // CUSTOMER | VENDOR | EMPLOYEE | OTHER
+  id         Int      @id @default(autoincrement())
+  name       String
+  type       String // CUSTOMER | VENDOR | EMPLOYEE | OTHER
   // Kontak tipe EMPLOYEE disinkron dari tabel Employee HR (permintaan Kevin
   // 2026-09-15: "masukan semua daftar kontak karyawan, ikuti statusnya") -
   // employeeId jadi kunci idempoten sync (nama boleh berubah, tetap 1
   // kontak). isActive ikut Employee.status (resigned = nonaktif).
-  employeeId Int?    @unique
-  phone     String?
-  email     String?
-  address   String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  employeeId Int?     @unique
+  phone      String?
+  email      String?
+  address    String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   journalLines   JournalLine[]
   directExpenses DirectExpense[]
@@ -773,18 +776,18 @@ model AccountingNote {
 // menunjuk ke Account (COA) yang relevan - divalidasi di UI (bukan foreign
 // key bertipe, supaya 1 aset bisa pilih akun beda2 kalau perlu).
 model FixedAsset {
-  id                            Int      @id @default(autoincrement())
-  name                          String
-  category                      String
-  acquisitionDate               DateTime
-  acquisitionCost               Int
-  usefulLifeMonths              Int
-  residualValue                 Int      @default(0)
-  assetAccountId                Int
-  accumDepreciationAccountId    Int
-  depreciationExpenseAccountId  Int
-  isActive                      Boolean  @default(true)
-  createdAt                     DateTime @default(now())
+  id                           Int      @id @default(autoincrement())
+  name                         String
+  category                     String
+  acquisitionDate              DateTime
+  acquisitionCost              Int
+  usefulLifeMonths             Int
+  residualValue                Int      @default(0)
+  assetAccountId               Int
+  accumDepreciationAccountId   Int
+  depreciationExpenseAccountId Int
+  isActive                     Boolean  @default(true)
+  createdAt                    DateTime @default(now())
 
   depreciationEntries FixedAssetDepreciation[]
 }
@@ -804,14 +807,15 @@ model FixedAssetDepreciation {
 }
 
 model BankAccount {
-  id            Int      @id @default(autoincrement())
+  id            Int     @id @default(autoincrement())
   name          String
   accountId     Int // akun Kas/Bank terkait di COA
   bankName      String?
   accountNumber String?
-  isActive      Boolean  @default(true)
+  isActive      Boolean @default(true)
 
-  statementLines BankStatementLine[]
+  statementLines  BankStatementLine[]
+  invoicesPaidVia Invoice[]
 }
 
 // Baris mutasi rekening koran (impor CSV atau input manual) - dicocokkan
@@ -858,4 +862,106 @@ model SalesRecordLine {
   subtotal      Int
   serviceCharge Int         @default(0)
   total         Int
+}
+
+// ==================== Modul Invoicing (permintaan Kevin 2026-09-15) ====================
+// Invoice manual per cabang, dikirim ke WhatsApp customer, dibayar via QRIS
+// dinamis (Midtrans Core API - lihat lib/midtrans.ts). Item yang bisa dijual = SEMUA item
+// Warehouse dgn SKU berawalan "ESB" (keputusan Kevin), dibaca live lewat
+// jembatan lib/warehouse-db.ts (sama pola dgn modul Product Accounting) -
+// TIDAK ada tabel produk lokal, cuma snapshot sku/nama/satuan per baris
+// invoice (InvoiceLine) supaya riwayat invoice lama tidak berubah kalau item
+// Warehouse-nya diedit belakangan. Akses owner/developer saja
+// (lib/roles.ts canAccessInvoicing) - modul finansial customer-facing,
+// sama level sensitifnya dgn Accounting.
+
+// Harga JUAL ke customer per item ESB - SENGAJA TERPISAH dari
+// standardCost/FIFO Warehouse (itu harga POKOK/modal, bukan harga jual).
+// Diatur manual di halaman Invoicing > Harga Jual Menu, key = Item.id
+// Warehouse.
+model InvoiceItemPrice {
+  id              Int      @id @default(autoincrement())
+  warehouseItemId Int      @unique
+  sku             String // snapshot referensi cepat, bukan sumber kebenaran (Warehouse tetap sumbernya)
+  price           Int
+  updatedById     Int?
+  updatedBy       HrUser?  @relation("InvoicePriceUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt       DateTime @updatedAt
+}
+
+// Nomor urut invoice per cabang per bulan (reset tiap bulan) - key
+// `${branchCode}:${yyMM}`, mis. "GS:2609". Increment atomik dlm transaksi
+// saat invoice dibuat (lib/invoice-numbering.ts) supaya tidak pernah
+// tabrakan nomor walau 2 invoice dibuat bersamaan.
+model InvoiceCounter {
+  key     String @id
+  lastSeq Int    @default(0)
+}
+
+model Invoice {
+  id          Int      @id @default(autoincrement())
+  number      String   @unique // format: INV/<branchCode>/<yyMM>/<seq 4 digit>, mis. INV/GS/2609/0001
+  branchCode  String // GS | KG | FTG | JGL | KTR - lihat lib/invoicing-config.ts
+  invoiceDate DateTime // default hari ini saat dibuat, bisa diubah
+
+  customerName    String
+  customerPhone   String // nomor WA customer, format bebas - dinormalisasi saat kirim (lib/whatsapp.ts)
+  customerAddress String?
+  notes           String?
+
+  subtotal Int
+  discount Int @default(0)
+  total    Int
+
+  status String @default("unpaid") // unpaid | paid | cancelled
+
+  // Token akses halaman publik /invoice/[token] (dikirim ke WhatsApp
+  // customer) - tanpa login, sama pola dgn Candidate.publicToken.
+  publicToken String @unique @default(uuid())
+
+  // QRIS dinamis (Midtrans Core API, charge payment_type "qris") - null
+  // selama belum digenerate / MIDTRANS_SERVER_KEY belum diset di server.
+  // order_id yang dikirim ke Midtrans = "INV-<Invoice.id>" (bukan `number`,
+  // krn `number` pakai "/" yang tidak valid utk order_id Midtrans).
+  midtransOrderId    String? // "INV-<id>" - dipakai jg utk cocokkan webhook masuk
+  midtransQrString   String? // raw EMV QR string dari response Midtrans (backup/referensi)
+  midtransQrImageUrl String? // URL gambar QR yang di-hosting Midtrans (actions[].url "generate-qr-code") - ditampilkan langsung via <img>
+  midtransQrExpiresAt DateTime?
+
+  paidAt            DateTime?
+  paidMethod        String? // "midtrans_qris" | "manual"
+  paidBankAccountId Int?
+  paidBankAccount   BankAccount? @relation(fields: [paidBankAccountId], references: [id])
+  paidById          Int?
+  paidBy            HrUser?      @relation("InvoicePaidBy", fields: [paidById], references: [id])
+
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  // Dr AR-cabang / Cr Sales-cabang, dibuat saat invoice diterbitkan.
+  journalEntryId        Int? @unique
+  // Dr Bank(atau akun kliring Midtrans) / Cr AR-cabang, dibuat saat status jadi "paid".
+  paymentJournalEntryId Int? @unique
+
+  createdById Int?
+  createdBy   HrUser?  @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  lines InvoiceLine[]
+
+  @@index([branchCode, invoiceDate])
+  @@index([status])
+}
+
+model InvoiceLine {
+  id              Int     @id @default(autoincrement())
+  invoiceId       Int
+  invoice         Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  warehouseItemId Int
+  sku             String
+  name            String
+  unit            String
+  qty             Int
+  unitPrice       Int
+  subtotal        Int
 }
