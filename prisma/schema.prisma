@@ -35,13 +35,15 @@ model HrUser {
   rosterEntriesCreated         RosterEntry[]
   payrollEventNotesCreated     PayrollEventNote[]
   attendanceNameAliasesCreated AttendanceNameAlias[]
-  overtimeManagerDecisions     OvertimeRequest[]      @relation("OvertimeManagerDecision")
-  overtimeHrDecisions          OvertimeRequest[]      @relation("OvertimeHrDecision")
+  attendanceManualEntries      AttendanceRecord[]          @relation("AttendanceManualEntry")
+  attendanceIssueResolutions   AttendanceIssueResolution[]
+  overtimeManagerDecisions     OvertimeRequest[]           @relation("OvertimeManagerDecision")
+  overtimeHrDecisions          OvertimeRequest[]           @relation("OvertimeHrDecision")
   journalEntriesCreated        JournalEntry[]
   directExpensesCreated        DirectExpense[]
-  invoicesCreated              Invoice[]              @relation("InvoiceCreatedBy")
-  invoicesPaid                 Invoice[]              @relation("InvoicePaidBy")
-  invoicePricesUpdated         InvoiceItemPrice[]     @relation("InvoicePriceUpdatedBy")
+  invoicesCreated              Invoice[]                   @relation("InvoiceCreatedBy")
+  invoicesPaid                 Invoice[]                   @relation("InvoicePaidBy")
+  invoicePricesUpdated         InvoiceItemPrice[]          @relation("InvoicePriceUpdatedBy")
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -278,14 +280,15 @@ model Employee {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  documents             EmployeeDocument[]
-  attendanceRecords     AttendanceRecord[]
-  payrollItems          PayrollItem[]
-  historyEntries        EmployeeHistoryEntry[]
-  rosterEntries         RosterEntry[]
-  payrollEventNotes     PayrollEventNote[]
-  attendanceNameAliases AttendanceNameAlias[]
-  overtimeRequests      OvertimeRequest[]
+  documents                  EmployeeDocument[]
+  attendanceRecords          AttendanceRecord[]
+  payrollItems               PayrollItem[]
+  historyEntries             EmployeeHistoryEntry[]
+  rosterEntries              RosterEntry[]
+  payrollEventNotes          PayrollEventNote[]
+  attendanceNameAliases      AttendanceNameAlias[]
+  overtimeRequests           OvertimeRequest[]
+  attendanceIssueResolutions AttendanceIssueResolution[]
 }
 
 // Riwayat perubahan jabatan/outlet/status kepegawaian/gaji - dicatat
@@ -435,7 +438,38 @@ model AttendanceRecord {
   clockOut   DateTime?
   createdAt  DateTime  @default(now())
 
+  // Terisi kalau jam masuk/pulang diisi/dikoreksi manual oleh HR dari
+  // halaman Absen Perlu Dicek (karyawan lupa tap in/out atau tidak scan) -
+  // permintaan 2026-09-15. Baris manual TIDAK ditimpa saat file mesin yang
+  // sama diupload ulang (lihat import route).
+  manualById Int?
+  manualBy   HrUser?   @relation("AttendanceManualEntry", fields: [manualById], references: [id])
+  manualNote String?
+  manualAt   DateTime?
+
   @@unique([employeeId, date])
+}
+
+// Tanda HR bahwa 1 masalah absen (lupa tap in/out, tidak absen menurut
+// Roster) BUKAN diselesaikan dgn isi jam manual, mis. karyawan memang izin/
+// sakit/cuti, atau sengaja diabaikan - masalah hilang dari lonceng tapi
+// tetap bisa dilihat & dibatalkan di halaman Absen Perlu Dicek. Masalahnya
+// sendiri tidak disimpan (dihitung ulang dari AttendanceRecord + RosterEntry
+// tiap kali dibuka), cuma keputusan HR-nya. Permintaan 2026-09-15.
+model AttendanceIssueResolution {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date         DateTime // tengah malam (tanpa jam)
+  issueType    String // lupa_tap_in | lupa_tap_out | tidak_absen
+  status       String // izin | sakit | cuti | diabaikan
+  note         String?
+  resolvedById Int?
+  resolvedBy   HrUser?  @relation(fields: [resolvedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([employeeId, date, issueType])
+  @@index([date])
 }
 
 // Alias nama mesin absensi -> karyawan - dibuat otomatis begitu HR

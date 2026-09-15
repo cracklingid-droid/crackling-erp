@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { AuthProvider } from "../components/AuthContext";
 import { AppSidebar } from "../components/AppSidebar";
+import { AttendanceIssuesBell } from "../components/AttendanceIssuesBell";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 
@@ -24,6 +25,9 @@ function Header() {
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4" />
       <span className="text-sm font-medium text-muted-foreground">{moduleTitle(pathname ?? "")}</span>
+      <div className="ml-auto">
+        <AttendanceIssuesBell />
+      </div>
     </header>
   );
 }

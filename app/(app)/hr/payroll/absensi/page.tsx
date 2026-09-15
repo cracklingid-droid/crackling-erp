@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, AlertTriangle, CheckCircle2, Sparkles, Check, HelpCircle } from "lucide-react";
+import { notifyAttendanceIssuesChanged } from "@/lib/attendance-issue-types";
 
 type ImportResult = {
   totalRows: number;
@@ -16,6 +17,10 @@ type ImportResult = {
   groupsFound: number;
   imported: number;
   unmatchedNames: string[];
+  keptManual?: number;
+  issueCount?: number;
+  issueRangeStart?: string | null;
+  issueRangeEnd?: string | null;
 };
 
 type AttendanceGroup = { employeeName: string; date: string; clockIn: string; clockOut: string };
@@ -192,6 +197,7 @@ export default function UploadAbsensiPage() {
       return;
     }
     setResult(data);
+    notifyAttendanceIssuesChanged();
     toast.success(`${data.imported} rekap absensi berhasil disimpan.`);
     if (data.recalculatedPeriods?.length > 0) {
       toast.success(`Gaji Outlet otomatis dihitung ulang: ${data.recalculatedPeriods.join(", ")}.`);
@@ -240,6 +246,7 @@ export default function UploadAbsensiPage() {
       return;
     }
     setResult(data);
+    notifyAttendanceIssuesChanged();
     toast.success(`${data.imported} rekap absensi berhasil disimpan.`);
     if (data.recalculatedPeriods?.length > 0) {
       toast.success(`Gaji Outlet otomatis dihitung ulang: ${data.recalculatedPeriods.join(", ")}.`);
@@ -260,9 +267,14 @@ export default function UploadAbsensiPage() {
               dari Database Karyawan (mis. nama panggilan), sistem akan menawarkan saran pencocokan sebelum diimport.
             </p>
           </div>
-          <Link href="/hr/payroll/absensi/alias" className="shrink-0 text-sm text-primary hover:underline whitespace-nowrap">
-            Kelola Alias Nama
-          </Link>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Link href="/hr/payroll/absensi/masalah" className="text-sm text-primary hover:underline whitespace-nowrap">
+              Absen Perlu Dicek
+            </Link>
+            <Link href="/hr/payroll/absensi/alias" className="text-sm text-primary hover:underline whitespace-nowrap">
+              Kelola Alias Nama
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -501,6 +513,29 @@ export default function UploadAbsensiPage() {
             {result.skippedRows > 0 && (
               <p className="text-muted-foreground">{result.skippedRows} baris dilewati karena tanggal/jamnya tidak bisa dibaca.</p>
             )}
+            {!!result.keptManual && (
+              <p className="text-muted-foreground">
+                {result.keptManual} absen tidak ditimpa karena sudah diisi/dikoreksi manual oleh HR.
+              </p>
+            )}
+            {result.issueCount ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+                <span className="font-medium">{result.issueCount} absen perlu dicek</span>
+                <span className="text-muted-foreground">(lupa tap in/out atau tidak absen)</span>
+                <Link
+                  href={`/hr/payroll/absensi/masalah?start=${result.issueRangeStart ?? ""}&end=${result.issueRangeEnd ?? ""}`}
+                  className="ml-auto whitespace-nowrap text-primary hover:underline"
+                >
+                  Cek &amp; isi manual →
+                </Link>
+              </div>
+            ) : result.imported > 0 ? (
+              <p className="flex items-center gap-1.5 text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Tidak ada absen bermasalah di
+                rentang tanggal file ini.
+              </p>
+            ) : null}
             {result.unmatchedNames.length > 0 && (
               <div>
                 <p className="text-destructive font-medium">

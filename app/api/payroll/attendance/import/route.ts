@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireHrWriteUser } from "@/lib/hr-access";
 import { buildAttendanceGroups, type AttendanceGroup, type AttendanceMapping } from "@/lib/attendance-parse";
-import { recalcOutletPeriod } from "@/lib/payroll-outlet-recalc";
+import { recalcOverlappingOutletPeriods } from "@/lib/attendance-recalc";
+import { findAttendanceIssues } from "@/lib/attendance-issues";
 import { normalizeName } from "@/lib/attendance-name-match";
 
 export async function POST(req: Request) {
@@ -49,8 +50,27 @@ export async function POST(req: Request) {
   // 2026-09-12.
   const aliasByName = new Map(aliases.map((a) => [a.machineName, a.employeeId]));
 
+  const dates = groups.map((g) => new Date(g.date));
+  const times = dates.map((d) => d.getTime());
+  const minDate = dates.length > 0 ? new Date(Math.min(...times)) : null;
+  const maxDate = dates.length > 0 ? new Date(Math.max(...times)) : null;
+
+  // Absen yang sudah dikoreksi manual HR (halaman Absen Perlu Dicek) tidak
+  // ditimpa lagi oleh file mesin - kalau tidak, upload ulang file yang sama
+  // bakal mengembalikan scan tunggal & masalahnya muncul lagi. Permintaan
+  // 2026-09-15.
+  const manualKeys = new Set<string>();
+  if (minDate && maxDate) {
+    const manualRecords = await prisma.attendanceRecord.findMany({
+      where: { manualAt: { not: null }, date: { gte: minDate, lte: maxDate } },
+      select: { employeeId: true, date: true },
+    });
+    for (const r of manualRecords) manualKeys.add(`${r.employeeId}|${r.date.toISOString().slice(0, 10)}`);
+  }
+
   const unmatched = new Set<string>();
   let imported = 0;
+  let keptManual = 0;
 
   for (const g of groups) {
     const normalizedName = normalizeName(g.employeeName);
@@ -59,46 +79,35 @@ export async function POST(req: Request) {
       unmatched.add(g.employeeName);
       continue;
     }
+    const date = new Date(g.date);
+    if (manualKeys.has(`${employeeId}|${date.toISOString().slice(0, 10)}`)) {
+      keptManual++;
+      continue;
+    }
     await prisma.attendanceRecord.upsert({
-      where: { employeeId_date: { employeeId, date: new Date(g.date) } },
+      where: { employeeId_date: { employeeId, date } },
       update: { clockIn: g.clockIn, clockOut: g.clockOut },
-      create: { employeeId, date: new Date(g.date), clockIn: g.clockIn, clockOut: g.clockOut },
+      create: { employeeId, date, clockIn: g.clockIn, clockOut: g.clockOut },
     });
     imported++;
   }
 
-  const recalculatedPeriods = imported > 0 ? await recalcOverlappingOutletPeriods(groups) : [];
+  const recalculatedPeriods = imported > 0 ? await recalcOverlappingOutletPeriods(dates) : [];
+
+  // Langsung kasih tahu HR berapa absen bermasalah (lupa tap in/out, tidak
+  // absen menurut Roster) di rentang tanggal file ini - permintaan 2026-09-15.
+  const issueCount = minDate && maxDate ? (await findAttendanceIssues(minDate, maxDate)).length : 0;
 
   return NextResponse.json({
     totalRows,
     skippedRows: skipped,
     groupsFound: groups.length,
     imported,
+    keptManual,
     unmatchedNames: Array.from(unmatched),
     recalculatedPeriods,
+    issueCount,
+    issueRangeStart: minDate ? minDate.toISOString().slice(0, 10) : null,
+    issueRangeEnd: maxDate ? maxDate.toISOString().slice(0, 10) : null,
   });
-}
-
-// Begitu absensi diupload, langsung hitung ulang gaji Outlet utk periode
-// (draft) manapun yang tanggalnya kena rentang absensi ini - supaya HR
-// tidak perlu ingat urutan "upload absen dulu baru bikin periode" atau
-// takut lupa update manual. Periode yang sudah "final" TIDAK disentuh
-// (gaji yang sudah difinalisasi/dibayar tidak boleh berubah sendiri).
-// Cuma memperbarui baris karyawan yang SUDAH ada di periode itu (tidak
-// menambah baris baru utk karyawan yang belum ada saat periode dibuat).
-// Keputusan Kevin 2026-09-12.
-async function recalcOverlappingOutletPeriods(groups: AttendanceGroup[]): Promise<string[]> {
-  const dates = groups.map((g) => new Date(g.date).getTime());
-  const minDate = new Date(Math.min(...dates));
-  const maxDate = new Date(Math.max(...dates));
-
-  const periods = await prisma.payrollPeriod.findMany({
-    where: { category: "outlet", status: "draft", startDate: { lte: maxDate }, endDate: { gte: minDate } },
-    select: { id: true, label: true },
-  });
-
-  for (const period of periods) {
-    await recalcOutletPeriod(period.id);
-  }
-  return periods.map((p) => p.label);
 }
