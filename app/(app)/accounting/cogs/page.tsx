@@ -68,7 +68,7 @@ export default function CogsPage() {
   }
 
   return (
-    <div className="max-w-5xl grid gap-6">
+    <div className="w-full grid gap-6">
       <div>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">COGS (HPP)</h1>
         <p className="text-muted-foreground mt-0.5 text-sm">

@@ -99,7 +99,7 @@ export default function ReconciliationPage() {
   const totalUnrec = accounts?.reduce((s, a) => s + a.unreconciledCount, 0) ?? 0;
 
   return (
-    <div className="max-w-5xl grid gap-6">
+    <div className="w-full grid gap-6">
       <div>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Rekonsiliasi Bank</h1>
         <p className="text-muted-foreground mt-0.5 text-sm">
@@ -325,7 +325,7 @@ function BankAccountDetail({ account, onBack, onChanged }: { account: BankAccoun
   };
 
   return (
-    <div className="max-w-6xl grid gap-6">
+    <div className="w-full grid gap-6">
       <div>
         <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Daftar Akun Bank
