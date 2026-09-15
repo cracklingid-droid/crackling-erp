@@ -3,9 +3,17 @@
 // perlu krn lib/current-user.ts import next/headers (lewat lib/session.ts),
 // yang bikin build error kalau di-import langsung dari "use client".
 
-// owner & developer selalu akses penuh ke semua modul HR.
+// Role dgn akses penuh ke SEMUA modul KECUALI Accounting - owner & developer
+// (akun asli) + "developer2" (akun developer kedua, permintaan Kevin
+// 2026-09-15: "akses developer 2 yang tidak bisa sama sekali mengakses
+// modul accounting"). "developer2" SENGAJA di-exclude cuma di
+// canAccessAccounting di bawah, bukan di sini - di semua tempat lain
+// (HR/Cost Center/sidebar "Pilih Modul"/link Warehouse/keputusan Lembur)
+// dia harus tetap dianggap akses penuh spt developer biasa.
+const FULL_ACCESS_ROLES = new Set(["owner", "developer", "developer2"]);
+
 export function hasFullAccess(user: { role: string }): boolean {
-  return user.role === "owner" || user.role === "developer";
+  return FULL_ACCESS_ROLES.has(user.role);
 }
 
 // Role "manager" (Cost Center, permintaan Kevin 2026-09-12) - namanya
@@ -15,7 +23,7 @@ export function hasFullAccess(user: { role: string }): boolean {
 // modul HR lain (Rekrutmen/Karyawan/Payroll/Roster) - lihat guard di
 // app/(app)/hr/layout.tsx.
 export function canAccessCostCenter(user: { role: string }): boolean {
-  return user.role === "owner" || user.role === "developer" || user.role === "manager";
+  return hasFullAccess(user) || user.role === "manager";
 }
 
 // Role yang boleh MENULIS apapun di modul HR (Rekrutmen/Karyawan/Payroll/
@@ -26,7 +34,7 @@ export function canAccessCostCenter(user: { role: string }): boolean {
 // cek login, siapa pun role-nya bisa menulis lewat panggilan API langsung
 // (curl/devtools), bukan cuma lewat tampilan.
 export function hasHrWriteAccess(user: { role: string }): boolean {
-  return user.role === "owner" || user.role === "developer" || user.role === "hr_manager" || user.role === "hr_staff";
+  return hasFullAccess(user) || user.role === "hr_manager" || user.role === "hr_staff";
 }
 
 // Deteksi otomatis posisi SPV dari string jabatan (bukan field baru di
@@ -48,12 +56,14 @@ export function canViewOvertimeRequests(user: { role: string }): boolean {
 
 // Modul Accounting (double-entry, permintaan Kevin 2026-09-14) - data
 // finansial formal pertama di sistem, v1 SENGAJA dibatasi owner/developer
-// saja (paling aman utk dibuka lebar dulu). Fungsi terpisah (bukan langsung
-// hasFullAccess) supaya gampang diperluas ke role staff akuntansi/bookkeeper
-// khusus nanti tanpa ganti semua pemanggilnya - pola sama spt
-// canAccessCostCenter utk role "manager".
+// saja (paling aman utk dibuka lebar dulu). SENGAJA TIDAK reuse
+// hasFullAccess lagi (walau dulu sama persis) - keputusan Kevin 2026-09-15
+// saat bikin akun "developer2": role itu akses penuh ke SEMUA modul lain
+// TAPI "tidak bisa sama sekali mengakses modul accounting", jadi daftar
+// role di sini HARUS terus dijaga persis owner+developer, TIDAK ikut
+// otomatis kalau FULL_ACCESS_ROLES nanti nambah role baru lagi.
 export function canAccessAccounting(user: { role: string }): boolean {
-  return hasFullAccess(user);
+  return user.role === "owner" || user.role === "developer";
 }
 
 export function canDecideOvertimeStage(user: { role: string }, status: string): boolean {
