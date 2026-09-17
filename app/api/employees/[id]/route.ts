@@ -114,6 +114,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   for (const f of OFFBOARDING_FIELDS) {
     if (typeof body[f] === "boolean") data[f] = body[f];
   }
+  // HR cuma boleh RESET foto acuan wajah (null) - biar karyawan bisa daftar
+  // ulang sendiri lewat Portal. Tidak boleh diisi nilai baru lewat sini
+  // (harus lewat pendaftaran mandiri karyawan sendiri, bukan diisi HR),
+  // supaya foto acuan selalu benar-benar selfie langsung dari orangnya.
+  // Permintaan Kevin 2026-09-17.
+  if ("faceReferenceUrl" in body && body.faceReferenceUrl === null) {
+    data.faceReferenceUrl = null;
+    data.faceReferenceUpdatedAt = null;
+  }
 
   const current = await prisma.employee.findUnique({
     where: { id: employeeId },

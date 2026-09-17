@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Camera, MapPin, CheckCircle2, LogIn, LogOut, Loader2, RefreshCw } from "lucide-react";
+import { Camera, MapPin, CheckCircle2, LogIn, LogOut, Loader2, RefreshCw, ScanFace } from "lucide-react";
 
 type AttendanceRecord = {
   id: number;
@@ -22,6 +22,7 @@ type AttendanceData = {
   outlet: string | null;
   hasLocationConfigured: boolean;
   radiusMeters: number | null;
+  hasFaceReference: boolean;
 };
 
 function fmtTime(iso: string) {
@@ -50,7 +51,7 @@ function getPosition(): Promise<GeolocationPosition> {
 export default function PortalAbsensiPage() {
   const [data, setData] = useState<AttendanceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dialogType, setDialogType] = useState<"in" | "out" | null>(null);
+  const [dialogType, setDialogType] = useState<"in" | "out" | "enroll" | null>(null);
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoError, setGeoError] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -101,14 +102,20 @@ export default function PortalAbsensiPage() {
     }
   }
 
-  function openDialog(type: "in" | "out") {
+  function openDialog(type: "in" | "out" | "enroll") {
     setDialogType(type);
     setCapturedBlob(null);
     setCapturedPreview(null);
     setCoords(null);
+    startCamera();
+    // Pendaftaran wajah tidak butuh lokasi GPS - cuma cek wajah jelas & tanpa
+    // masker, belum absen sungguhan.
+    if (type === "enroll") {
+      setGeoStatus("idle");
+      return;
+    }
     setGeoStatus("loading");
     setGeoError("");
-    startCamera();
     getPosition()
       .then((pos) => {
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
@@ -154,7 +161,8 @@ export default function PortalAbsensiPage() {
   }
 
   async function handleSubmit() {
-    if (!dialogType || !capturedBlob || !coords) return;
+    if (!dialogType || !capturedBlob) return;
+    if (dialogType !== "enroll" && !coords) return;
     setSubmitting(true);
     try {
       const file = new File([capturedBlob], `selfie-${dialogType}-${Date.now()}.jpg`, { type: "image/jpeg" });
@@ -162,10 +170,28 @@ export default function PortalAbsensiPage() {
         access: "public",
         handleUploadUrl: "/api/portal/attendance-upload",
       });
+
+      if (dialogType === "enroll") {
+        const res = await fetch("/api/portal/attendance/face-reference", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ selfieUrl: blob.url }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          toast.success("Wajah berhasil didaftarkan - sekarang Anda bisa absen.");
+          setDialogType(null);
+          load();
+        } else {
+          toast.error(json.error || "Gagal mendaftarkan wajah");
+        }
+        return;
+      }
+
       const res = await fetch("/api/portal/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: dialogType, selfieUrl: blob.url, lat: coords.lat, lng: coords.lng }),
+        body: JSON.stringify({ type: dialogType, selfieUrl: blob.url, lat: coords!.lat, lng: coords!.lng }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -182,7 +208,7 @@ export default function PortalAbsensiPage() {
     }
   }
 
-  const canSubmit = !!capturedBlob && geoStatus === "ok" && !submitting;
+  const canSubmit = !!capturedBlob && !submitting && (dialogType === "enroll" || geoStatus === "ok");
 
   return (
     <div className="max-w-2xl grid gap-6">
@@ -201,6 +227,24 @@ export default function PortalAbsensiPage() {
         <Card className="border-destructive/40">
           <CardContent className="py-3 text-sm text-destructive">
             Titik lokasi untuk outlet Anda belum diatur HR/Admin - absen mandiri belum bisa dipakai. Hubungi HR.
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && data && !data.hasFaceReference && (
+        <Card className="border-primary/40">
+          <CardContent className="py-4 grid gap-2">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <ScanFace className="h-4 w-4 text-primary" /> Daftarkan Wajah Dulu
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Sebelum bisa absen, daftarkan wajah Anda sekali (tanpa masker, pencahayaan jelas) - dipakai sistem utk
+              mencocokkan selfie absen berikutnya, mencegah orang lain absen menggantikan Anda. Setelah terdaftar, tidak
+              bisa diganti sendiri - hubungi HR kalau perlu daftar ulang.
+            </p>
+            <Button onClick={() => openDialog("enroll")} className="w-fit">
+              <ScanFace className="h-3.5 w-3.5" /> Daftarkan Wajah Sekarang
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -224,14 +268,14 @@ export default function PortalAbsensiPage() {
               <div className="flex gap-2 flex-wrap">
                 <Button
                   onClick={() => openDialog("in")}
-                  disabled={!data?.hasLocationConfigured || !!data?.today?.clockIn}
+                  disabled={!data?.hasLocationConfigured || !data?.hasFaceReference || !!data?.today?.clockIn}
                 >
                   <LogIn className="h-3.5 w-3.5" /> Absen Masuk
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => openDialog("out")}
-                  disabled={!data?.hasLocationConfigured || !data?.today?.clockIn || !!data?.today?.clockOut}
+                  disabled={!data?.hasLocationConfigured || !data?.hasFaceReference || !data?.today?.clockIn || !!data?.today?.clockOut}
                 >
                   <LogOut className="h-3.5 w-3.5" /> Absen Pulang
                 </Button>
@@ -264,15 +308,22 @@ export default function PortalAbsensiPage() {
       <Dialog open={!!dialogType} onOpenChange={(v) => !v && closeDialog()}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{dialogType === "in" ? "Absen Masuk" : "Absen Pulang"}</DialogTitle>
+            <DialogTitle>{dialogType === "enroll" ? "Daftarkan Wajah" : dialogType === "in" ? "Absen Masuk" : "Absen Pulang"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className={`h-4 w-4 shrink-0 ${geoStatus === "ok" ? "text-primary" : geoStatus === "error" ? "text-destructive" : "text-muted-foreground"}`} />
-              {geoStatus === "loading" && <span className="text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Mengambil lokasi GPS...</span>}
-              {geoStatus === "ok" && <span className="text-primary">Lokasi GPS didapat.</span>}
-              {geoStatus === "error" && <span className="text-destructive">{geoError}</span>}
-            </div>
+            {dialogType !== "enroll" && (
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className={`h-4 w-4 shrink-0 ${geoStatus === "ok" ? "text-primary" : geoStatus === "error" ? "text-destructive" : "text-muted-foreground"}`} />
+                {geoStatus === "loading" && <span className="text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Mengambil lokasi GPS...</span>}
+                {geoStatus === "ok" && <span className="text-primary">Lokasi GPS didapat.</span>}
+                {geoStatus === "error" && <span className="text-destructive">{geoError}</span>}
+              </div>
+            )}
+            {dialogType === "enroll" && (
+              <p className="text-xs text-muted-foreground">
+                Pastikan wajah terlihat jelas, pencahayaan cukup, dan tidak memakai masker.
+              </p>
+            )}
 
             <div className="grid gap-2">
               <label className="text-sm font-medium">Foto Selfie</label>
@@ -318,7 +369,13 @@ export default function PortalAbsensiPage() {
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={closeDialog} disabled={submitting}>Batal</Button>
             <Button type="button" onClick={handleSubmit} disabled={!canSubmit}>
-              {submitting ? "Mengirim..." : dialogType === "in" ? "Kirim Absen Masuk" : "Kirim Absen Pulang"}
+              {submitting
+                ? "Mengirim..."
+                : dialogType === "enroll"
+                  ? "Daftarkan Wajah"
+                  : dialogType === "in"
+                    ? "Kirim Absen Masuk"
+                    : "Kirim Absen Pulang"}
             </Button>
           </DialogFooter>
         </DialogContent>

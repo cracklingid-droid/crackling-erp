@@ -266,6 +266,15 @@ model Employee {
 
   photoUrl String? // foto profil (Vercel Blob) - permintaan Kevin 2026-09-12
 
+  // Foto acuan wajah utk verifikasi absen mandiri (cegah titip absen) -
+  // karyawan daftarkan sendiri sekali lewat Portal Karyawan pas pertama kali
+  // pakai fitur Absensi (bukan diisi HR, beda dari photoUrl di atas). Setelah
+  // terisi, TIDAK bisa diganti sendiri oleh karyawan (cegah orang lain
+  // "daftar ulang" pura-pura jadi dia) - HR yang bisa reset dari Database
+  // Karyawan kalau perlu daftar ulang. Permintaan Kevin 2026-09-17.
+  faceReferenceUrl       String?
+  faceReferenceUpdatedAt DateTime?
+
   // Tanggal akhir kontrak/PKWT yang berlaku saat ini - dipakai reminder
   // "Segera Jatuh Tempo" di Database Karyawan (H-30). Beda dari resignDate
   // (itu tanggal karyawan benar-benar keluar). Permintaan Kevin 2026-09-12.

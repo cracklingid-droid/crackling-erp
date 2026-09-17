@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle, Wand2, Copy, KeyRound } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle, Wand2, Copy, KeyRound, ScanFace, RotateCcw } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { REQUIRED_ONBOARDING_FIELDS, getMissingOnboardingFields } from "@/lib/employee-onboarding";
 import { computeCompleteness } from "@/lib/employee-completeness";
@@ -142,6 +142,8 @@ type Employee = {
   offboardingExitInterviewDone: boolean;
   offboardingDocumentsComplete: boolean;
   offboardingDepositSettled: boolean;
+  faceReferenceUrl: string | null;
+  faceReferenceUpdatedAt: string | null;
 };
 
 function toDateInput(iso: string | null) {
@@ -180,6 +182,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [generatingCode, setGeneratingCode] = useState(false);
+  const [resettingFace, setResettingFace] = useState(false);
   const [otherEmployees, setOtherEmployees] = useState<EmployeeRef[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -268,6 +271,23 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     } else {
       const err = await res.json();
       toast.error("Gagal: " + err.error);
+    }
+  }
+
+  async function handleResetFaceReference() {
+    if (!confirm("Reset foto acuan wajah karyawan ini? Karyawan perlu daftar ulang wajah lewat Portal sebelum bisa absen mandiri lagi.")) return;
+    setResettingFace(true);
+    const res = await fetch(`/api/employees/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ faceReferenceUrl: null }),
+    });
+    setResettingFace(false);
+    if (res.ok) {
+      toast.success("Foto acuan wajah direset - karyawan bisa daftar ulang lewat Portal.");
+      load();
+    } else {
+      toast.error("Gagal reset foto acuan wajah.");
     }
   }
 
@@ -503,6 +523,41 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           <p className="text-xs text-muted-foreground mt-2">
             Password tetap = ID Karyawan + tahun lahir, tidak berubah kecuali ID Karyawan atau Tanggal Lahir diedit. Karyawan
             login di halaman Portal Karyawan utk lihat profil, roster & riwayat slip gaji sendiri.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ScanFace className="h-4 w-4 text-muted-foreground" /> Verifikasi Wajah Absensi
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {employee.faceReferenceUrl ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm">
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary inline mr-1.5" />
+                Wajah sudah terdaftar
+                {employee.faceReferenceUpdatedAt && (
+                  <span className="text-muted-foreground">
+                    {" "}sejak {new Date(employee.faceReferenceUpdatedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                )}
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={handleResetFaceReference} disabled={resettingFace}>
+                <RotateCcw className="h-3.5 w-3.5" /> {resettingFace ? "Mereset..." : "Reset (utk daftar ulang)"}
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Belum terdaftar - karyawan akan diminta daftar wajah sendiri pas pertama kali buka halaman Absensi di Portal
+              Karyawan.
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground mt-2">
+            Foto acuan dipakai mencocokkan selfie tiap absen mandiri (cegah titip absen) - didaftarkan sendiri oleh
+            karyawan, tidak bisa diisi/diganti HR langsung, cuma bisa direset supaya karyawan daftar ulang sendiri.
           </p>
         </CardContent>
       </Card>
