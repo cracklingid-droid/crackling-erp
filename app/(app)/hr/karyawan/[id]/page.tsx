@@ -652,7 +652,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
             </div>
             {!prefixForOutlet(form.outlet) && (
               <p className="text-xs text-muted-foreground">
-                Kode otomatis tersedia utk Outlet: Gading Serpong (GS), Kelapa Gading (KG), Joglo/Central Kitchen (JO), Fatgai (FG).
+                Kode otomatis tersedia utk Outlet: Gading Serpong (GS), Kelapa Gading (KG), Joglo/Central Kitchen (JO), Fatgai (FG), Kantor (KT).
               </p>
             )}
           </div>

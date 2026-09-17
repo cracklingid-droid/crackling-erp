@@ -6,6 +6,7 @@ export const OUTLET_CODE_PREFIXES: Record<string, string> = {
   "Kelapa Gading": "KG",
   "Joglo (Central Kitchen)": "JO",
   Fatgai: "FG",
+  Kantor: "KT",
 };
 
 export function prefixForOutlet(outlet: string | null | undefined): string | null {
