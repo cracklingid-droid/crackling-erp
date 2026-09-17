@@ -18,10 +18,16 @@ const KELUAR_COLS = [3, 4, 5, 8, 9, 12, 13]; // offset relatif (Pagi/Siang/Lembu
 // berbahasa Inggris ("Employee Attendance Table", format tanggal
 // YYYY-MM-DD) - strukturnya sama persis, cuma labelnya beda. Permintaan
 // Kevin 2026-09-11.
-const DETAIL_SHEET_MARKERS = ["Catatan Kehadiran Karyawan", "Employee Attendance Table"];
+// "Laporan Kehadiran" / "Table Kehadiran" = varian mesin absensi Joglo
+// (dites 2026-09-17, file "joglo.xls") - blok per-karyawan & offset kolom
+// SAMA PERSIS dengan varian di atas, cuma labelnya beda ("Laporan Kehadiran"
+// bukan "Catatan Kehadiran Karyawan", sub-header tabel "Table Kehadiran"
+// bukan "Catatan Kehadiran"/"Time Card") DAN format tanggal periode pakai
+// garis miring (2026/09/01) bukan garis datar - lihat parsePeriodStart.
+const DETAIL_SHEET_MARKERS = ["Catatan Kehadiran Karyawan", "Employee Attendance Table", "Laporan Kehadiran"];
 const NAME_LABELS = ["Nama", "Name"];
 const DATE_LABELS = ["Tanggal", "Date"];
-const TITLE_MARKERS = ["Catatan Kehadiran", "Time Card"];
+const TITLE_MARKERS = ["Catatan Kehadiran", "Time Card", "Table Kehadiran"];
 
 type SheetGrid = unknown[][];
 
@@ -39,9 +45,15 @@ function cellTimeOfDay(v: unknown): { h: number; m: number; s: number } | null {
   return { h: Number(m[1]), m: Number(m[2]), s: Number(m[3] ?? "0") };
 }
 
-// Terima 2 format tanggal - DD-MM-YYYY (laporan berbahasa Indonesia) &
-// YYYY-MM-DD (laporan berbahasa Inggris, mis. Kelapa Gading).
+// Terima format tanggal DD-MM-YYYY & YYYY-MM-DD (garis datar, laporan
+// berbahasa Indonesia/Inggris) DAN YYYY/MM/DD (garis miring, varian Joglo -
+// mis. "2026/09/01 ~ 09/16", dites 2026-09-17).
 function parsePeriodStart(text: string): Date | null {
+  const ymdSlash = text.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (ymdSlash) {
+    const [, y, mo, d] = ymdSlash;
+    return new Date(Number(y), Number(mo) - 1, Number(d));
+  }
   const ymd = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (ymd) {
     const [, y, mo, d] = ymd;
@@ -144,14 +156,24 @@ export function parseAttendanceMachineReport(buffer: Buffer): MachineReportResul
     const grid = sheetToGrid(workbook.Sheets[sheetName]);
     if (!isDetailSheet(grid)) continue;
 
-    const periodMarkers = ["Tanggal Kehadiran:", "Attendance date:"];
+    // "Periode:" (varian Joglo) - label & rentang tanggalnya di SEL TERPISAH
+    // (beda dari "Tanggal Kehadiran:.../Attendance date:..." yang satu sel
+    // gabungan), jadi baris ini digabung dulu jadi 1 teks sebelum di-regex.
+    // Rentang bisa "2026/09/01 ~ 09/16" - akhir cuma MM/DD tanpa tahun,
+    // dianggap tahun sama dgn awal.
+    const periodMarkers = ["Tanggal Kehadiran:", "Attendance date:", "Periode:"];
     const periodTextRow = findRow(grid, 5, (row) => row.some((v) => periodMarkers.some((marker) => cellText(v).includes(marker))));
     if (periodTextRow !== -1) {
-      const text = grid[periodTextRow].map(cellText).find((v) => periodMarkers.some((marker) => v.includes(marker))) ?? "";
-      const m = text.match(/([\d-]{8,10})~([\d-]{8,10})/);
+      const rowText = grid[periodTextRow].map(cellText).filter(Boolean).join(" ");
+      const m = rowText.match(/([\d/-]{8,10})\s*~\s*([\d/-]{2,10})/);
       if (m) {
         const s = parsePeriodStart(m[1]);
-        const e = parsePeriodStart(m[2]);
+        let e = parsePeriodStart(m[2]);
+        if (!e && s) {
+          // Akhir tanpa tahun (mis. "09/16") - pasangkan dgn tahun awal.
+          const partial = m[2].match(/^(\d{1,2})[/-](\d{1,2})$/);
+          if (partial) e = new Date(s.getFullYear(), Number(partial[1]) - 1, Number(partial[2]));
+        }
         if (s) periodStart ??= toLocalDateString(s);
         if (e) periodEnd = toLocalDateString(e);
       }
