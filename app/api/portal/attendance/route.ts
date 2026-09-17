@@ -26,7 +26,7 @@ export async function GET() {
     }),
   ]);
 
-  const location = getOutletLocation(employee.outlet);
+  const location = await getOutletLocation(employee.outlet);
 
   return NextResponse.json({ today: todayRecord, history, outlet: employee.outlet, hasLocationConfigured: !!location, radiusMeters: location?.radiusMeters ?? null });
 }
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Lokasi GPS wajib diaktifkan - browser tidak mengirim koordinat" }, { status: 400 });
   }
 
-  const location = getOutletLocation(employee.outlet);
+  const location = await getOutletLocation(employee.outlet);
   if (!location) {
     return NextResponse.json(
       { error: `Titik lokasi untuk outlet "${employee.outlet ?? "-"}" belum diatur di sistem - hubungi HR/Admin.` },

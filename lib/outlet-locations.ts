@@ -1,26 +1,23 @@
+import { prisma } from "./db";
+import { OUTLET_NAMES } from "./payroll-config";
+
 // Titik lokasi (lat/lng) + radius toleransi tiap outlet - dipakai validasi
 // absen mandiri selfie+lokasi di Portal Karyawan (blokir total kalau HP
-// karyawan di luar radius saat absen). Permintaan Kevin 2026-09-17.
-//
-// !!! KOORDINAT DI BAWAH INI MASIH PLACEHOLDER (BELUM DIISI KEVIN) !!!
-// Ganti value lat/lng tiap outlet dengan titik asli sebelum fitur ini
-// dipakai di lapangan - selama masih placeholder, absen dari lokasi asli
-// outlet kemungkinan besar akan DITOLAK (dianggap di luar radius) karena
-// titiknya belum tepat. Key HARUS persis sama dengan Employee.outlet
-// (termasuk "Kantor" utk karyawan kantor - lihat lib/payroll-config.ts).
+// karyawan di luar radius saat absen). Diatur HR lewat halaman
+// /hr/payroll/absensi/lokasi (model Prisma OutletLocation), BUKAN hardcode -
+// dulu sempat hardcode placeholder di file ini, sekarang HR isi sendiri
+// pakai GPS HP saat berdiri di lokasi outletnya. Permintaan Kevin
+// 2026-09-17.
 export type OutletLocation = { lat: number; lng: number; radiusMeters: number };
 
-const DEFAULT_RADIUS_METERS = 50; // keputusan Kevin 2026-09-17
+// Semua outlet yang butuh titik lokasi absensi - 4 outlet resto (Joglo, GS,
+// KG, Fatgai dari lib/payroll-config.ts) + "Kantor" (karyawan non-outlet).
+// Key HARUS persis sama dgn Employee.outlet.
+export const ATTENDANCE_OUTLETS = [...OUTLET_NAMES, "Kantor"];
 
-export const OUTLET_LOCATIONS: Record<string, OutletLocation> = {
-  "Joglo (Central Kitchen)": { lat: -6.2, lng: 106.78, radiusMeters: DEFAULT_RADIUS_METERS },
-  "Gading Serpong": { lat: -6.2422, lng: 106.628, radiusMeters: DEFAULT_RADIUS_METERS },
-  "Kelapa Gading": { lat: -6.1588, lng: 106.9056, radiusMeters: DEFAULT_RADIUS_METERS },
-  Fatgai: { lat: -6.19, lng: 106.82, radiusMeters: DEFAULT_RADIUS_METERS },
-  Kantor: { lat: -6.2, lng: 106.78, radiusMeters: DEFAULT_RADIUS_METERS },
-};
-
-export function getOutletLocation(outlet: string | null): OutletLocation | null {
+export async function getOutletLocation(outlet: string | null): Promise<OutletLocation | null> {
   if (!outlet) return null;
-  return OUTLET_LOCATIONS[outlet] ?? null;
+  const row = await prisma.outletLocation.findUnique({ where: { outlet } });
+  if (!row) return null;
+  return { lat: row.lat, lng: row.lng, radiusMeters: row.radiusMeters };
 }

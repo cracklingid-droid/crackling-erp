@@ -260,9 +260,14 @@ export default function UploadAbsensiPage() {
               dari Database Karyawan (mis. nama panggilan), sistem akan menawarkan saran pencocokan sebelum diimport.
             </p>
           </div>
-          <Link href="/hr/payroll/absensi/alias" className="shrink-0 text-sm text-primary hover:underline whitespace-nowrap">
-            Kelola Alias Nama
-          </Link>
+          <div className="shrink-0 flex flex-col items-end gap-1">
+            <Link href="/hr/payroll/absensi/alias" className="text-sm text-primary hover:underline whitespace-nowrap">
+              Kelola Alias Nama
+            </Link>
+            <Link href="/hr/payroll/absensi/lokasi" className="text-sm text-primary hover:underline whitespace-nowrap">
+              Lokasi Absensi Mandiri
+            </Link>
+          </div>
         </div>
       </div>
 

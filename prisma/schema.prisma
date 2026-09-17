@@ -42,6 +42,7 @@ model HrUser {
   invoicesCreated              Invoice[]              @relation("InvoiceCreatedBy")
   invoicesPaid                 Invoice[]              @relation("InvoicePaidBy")
   invoicePricesUpdated         InvoiceItemPrice[]     @relation("InvoicePriceUpdatedBy")
+  outletLocationsUpdated       OutletLocation[]
 }
 
 // Posisi kerja (mis. "Waiters", "Kitchen Staff") - dipisah dari JobPosting
@@ -436,6 +437,26 @@ model CandidateStageEvent {
   createdById Int?
   createdBy   HrUser?   @relation(fields: [createdById], references: [id])
   createdAt   DateTime  @default(now())
+}
+
+// Titik lokasi (lat/lng) + radius toleransi tiap outlet, dipakai validasi
+// absen mandiri selfie+lokasi di Portal Karyawan (lib/outlet-locations.ts).
+// Diatur HR lewat halaman /hr/payroll/absensi/lokasi - tombol "Gunakan
+// Lokasi Saat Ini" ambil GPS browser langsung saat HR berdiri di outletnya
+// (tidak perlu cari koordinat manual). `outlet` HARUS persis sama dgn
+// Employee.outlet (termasuk "Kantor" utk karyawan kantor). Radius bisa beda
+// per outlet (permintaan Kevin 2026-09-17 - outlet padat/dalam gedung bisa
+// dikasih radius lebih longgar).
+model OutletLocation {
+  id           Int      @id @default(autoincrement())
+  outlet       String   @unique
+  lat          Float
+  lng          Float
+  radiusMeters Int      @default(50)
+  updatedById  Int?
+  updatedBy    HrUser?  @relation(fields: [updatedById], references: [id])
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
 }
 
 // Rekap absensi harian per karyawan, hasil import dari file export mesin
