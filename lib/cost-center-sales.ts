@@ -1,5 +1,11 @@
 import { prisma } from "./db";
 
+// Outlet penjualan yang dicakup Cost Center - Joglo (Central Kitchen)
+// sengaja tidak ada di sini, sama seperti laporan per-periode (bukan titik
+// jual, tidak ada Omzet). Dipakai bareng oleh Dashboard Harian & Business
+// Dashboard supaya daftarnya selalu sama. Permintaan Kevin 2026-09-12.
+export const SELLING_OUTLETS = ["Gading Serpong", "Kelapa Gading", "Fatgai"];
+
 export type DailyOmzet = { outletName: string; totalOmzet: number };
 
 // Omzet per outlet per tanggal, dari DailySales yang sudah disinkron

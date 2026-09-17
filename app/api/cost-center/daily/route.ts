@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, canAccessCostCenter } from "@/lib/current-user";
-import { getOmzetDailyByOutlet } from "@/lib/cost-center-sales";
+import { getOmzetDailyByOutlet, SELLING_OUTLETS } from "@/lib/cost-center-sales";
 import { getWarehouseUsageCostByOutletDaily } from "@/lib/cost-center-warehouse";
 import { getPayrollCostByDate } from "@/lib/cost-center-hr";
-
-// Outlet penjualan yang dicakup dashboard harian - Joglo (Central Kitchen)
-// sengaja tidak ada di sini, sama seperti laporan per-periode (bukan titik
-// jual). Permintaan Kevin 2026-09-12.
-const SELLING_OUTLETS = ["Gading Serpong", "Kelapa Gading", "Fatgai"];
 
 function dateKey(d: Date): string {
   return d.toISOString().slice(0, 10);

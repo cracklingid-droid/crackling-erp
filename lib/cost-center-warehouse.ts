@@ -61,6 +61,62 @@ export async function getWarehouseUsageCostByOutletDaily(startDate: Date, endDat
   return result;
 }
 
+export type TopUsageItem = { itemName: string; totalCost: number; outletBreakdown: { outletName: string; totalCost: number }[] };
+
+// Item apa saja yang paling banyak makan Biaya Pemakaian dalam 1 rentang
+// tanggal (dijumlah lintas hari & outlet) - dipakai Business Dashboard
+// "Rincian Pengeluaran Terbesar". Definisi "biaya pemakaian" SAMA PERSIS
+// dgn getWarehouseUsageCostByOutletDaily (qty<0, dikurangi
+// EXCLUDED_USAGE_TYPES) supaya totalnya konsisten dgn angka dashboard.
+// Permintaan Kevin 2026-09-17 (dashboard bisnis interaktif).
+export async function getWarehouseUsageTopItems(
+  startDate: Date,
+  endDate: Date,
+  outletHrNames: string[],
+  limit = 10
+): Promise<TopUsageItem[]> {
+  const [outlets, movements] = await Promise.all([
+    warehouseDb.outlet.findMany(),
+    warehouseDb.stockMovement.findMany({
+      where: { moveDate: { gte: startDate, lte: endDate }, qty: { lt: 0 }, type: { notIn: EXCLUDED_USAGE_TYPES } },
+      select: { outletId: true, itemId: true, totalCost: true },
+    }),
+  ]);
+  const outletNameById = new Map(
+    outlets.filter((o) => WAREHOUSE_OUTLET_TO_HR_NAME[o.code]).map((o) => [o.id, WAREHOUSE_OUTLET_TO_HR_NAME[o.code]])
+  );
+  const filtered = movements.filter((m) => {
+    const name = outletNameById.get(m.outletId);
+    return !!name && outletHrNames.includes(name);
+  });
+
+  const itemIds = Array.from(new Set(filtered.map((m) => m.itemId)));
+  const items = itemIds.length > 0 ? await warehouseDb.item.findMany({ where: { id: { in: itemIds } } }) : [];
+  const itemNameById = new Map(items.map((i) => [i.id, i.name]));
+
+  const byItem = new Map<string, { total: number; byOutlet: Map<string, number> }>();
+  for (const m of filtered) {
+    const itemName = itemNameById.get(m.itemId) ?? `Item #${m.itemId}`;
+    const outletName = outletNameById.get(m.outletId)!;
+    const cost = Math.abs(Number(m.totalCost));
+    const entry = byItem.get(itemName) ?? { total: 0, byOutlet: new Map<string, number>() };
+    entry.total += cost;
+    entry.byOutlet.set(outletName, (entry.byOutlet.get(outletName) ?? 0) + cost);
+    byItem.set(itemName, entry);
+  }
+
+  return Array.from(byItem.entries())
+    .map(([itemName, v]) => ({
+      itemName,
+      totalCost: v.total,
+      outletBreakdown: Array.from(v.byOutlet.entries())
+        .map(([outletName, totalCost]) => ({ outletName, totalCost }))
+        .sort((a, b) => b.totalCost - a.totalCost),
+    }))
+    .sort((a, b) => b.totalCost - a.totalCost)
+    .slice(0, limit);
+}
+
 export type UsageDetailLine = { outletName: string; itemName: string; type: string; qty: number; totalCost: number };
 
 // Rincian baris-per-baris di balik 1 angka Biaya Pemakaian (1 tanggal,

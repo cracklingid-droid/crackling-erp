@@ -25,6 +25,7 @@ import {
   CalendarDays,
   Clock3,
   PiggyBank,
+  TrendingUp,
   BookOpen,
   Contact,
   Package,
@@ -79,7 +80,13 @@ function buildGroups(role: string | undefined): NavGroup[] {
   }
 
   if (canAccessCostCenter(user)) {
-    groups.push({ label: "Cost Center", items: [{ href: "/cost-center", label: "Dashboard Harian", icon: PiggyBank }] });
+    groups.push({
+      label: "Cost Center",
+      items: [
+        { href: "/cost-center", label: "Dashboard Harian", icon: PiggyBank },
+        { href: "/cost-center/business-dashboard", label: "Business Dashboard", icon: TrendingUp },
+      ],
+    });
   }
 
   if (canAccessAccounting(user)) {
@@ -110,9 +117,22 @@ function buildGroups(role: string | undefined): NavGroup[] {
   return groups;
 }
 
-function isActivePath(pathname: string, href: string): boolean {
+function matchesPath(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(href + "/");
+}
+
+// Href PALING SPESIFIK (paling panjang) yang cocok yang jadi aktif - bukan
+// "yang manapun cocok" (dulu begitu, jadi 2 item nav sama-sama nyala kalau
+// salah satu href-nya adalah prefix dari yang lain, mis. "/cost-center" vs
+// "/cost-center/business-dashboard" - baris kedua tetap "startsWith" baris
+// pertama). Ditemukan pas nambah "Business Dashboard" sbg sibling
+// "Dashboard Harian" (2026-09-17) - sebelumnya kasus ini belum pernah
+// terjadi krn tidak ada 2 item nav yang hrefnya bertingkat begitu.
+function findBestActiveHref(pathname: string, allHrefs: string[]): string | null {
+  const matches = allHrefs.filter((h) => matchesPath(pathname, h));
+  if (matches.length === 0) return null;
+  return matches.reduce((best, h) => (h.length > best.length ? h : best));
 }
 
 export function AppSidebar() {
@@ -121,6 +141,8 @@ export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const groups = buildGroups(user?.role);
+  const allHrefs = groups.flatMap((g) => g.items.filter((i) => !i.external).map((i) => i.href));
+  const activeHref = findBestActiveHref(pathname, allHrefs);
 
   return (
     <Sidebar collapsible="icon">
@@ -142,7 +164,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       render={item.external ? <a href={item.href} /> : <Link href={item.href} />}
-                      isActive={!item.external && isActivePath(pathname, item.href)}
+                      isActive={!item.external && item.href === activeHref}
                       tooltip={item.label}
                       className="relative transition-all duration-200 ease-out hover:translate-x-0.5 data-[active]:font-medium data-[active]:before:absolute data-[active]:before:-left-2 data-[active]:before:top-1/2 data-[active]:before:h-4 data-[active]:before:-translate-y-1/2 data-[active]:before:rounded-full data-[active]:before:bg-sidebar-primary data-[active]:before:w-1"
                     >

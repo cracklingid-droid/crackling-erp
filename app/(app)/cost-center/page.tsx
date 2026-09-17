@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -140,15 +141,27 @@ function defaultDailyRange() {
   return { start: toDateInput(start), end: toDateInput(end) };
 }
 
+// Baca start/end/outlet dari query string (?start=&end=&outlet=) kalau ada -
+// dipakai Business Dashboard utk "klik utk membuktikan" (link ke sini
+// dgn rentang/outlet yg sama persis dari kartu yg diklik), fallback ke
+// default 7 hari/Semua Outlet kalau dibuka langsung tanpa query. Baca
+// langsung dari window.location (bukan useSearchParams()) - halaman ini
+// "use client" murni, tidak perlu Suspense boundary tambahan cuma utk baca
+// query sekali di awal. Permintaan Kevin 2026-09-17.
+function readQueryParam(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get(key);
+}
+
 export default function CostCenterPage() {
   const { user } = useAuthContext();
   const canSync = !!user && hasFullAccess(user);
   const [syncing, setSyncing] = useState(false);
 
   const initialRange = defaultDailyRange();
-  const [dailyStart, setDailyStart] = useState(initialRange.start);
-  const [dailyEnd, setDailyEnd] = useState(initialRange.end);
-  const [dailyOutlet, setDailyOutlet] = useState(DAILY_OUTLET_ALL);
+  const [dailyStart, setDailyStart] = useState(() => readQueryParam("start") ?? initialRange.start);
+  const [dailyEnd, setDailyEnd] = useState(() => readQueryParam("end") ?? initialRange.end);
+  const [dailyOutlet, setDailyOutlet] = useState(() => readQueryParam("outlet") ?? DAILY_OUTLET_ALL);
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
   const [dailyLoading, setDailyLoading] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
@@ -247,12 +260,19 @@ export default function CostCenterPage() {
             Biaya Gaji &amp; Biaya Pemakaian selalu real-time (dihitung ulang tiap dibuka) - cuma Omzet yang perlu di-sync manual krn sumbernya Google Sheets eksternal.
           </p>
         </div>
-        {canSync && (
-          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing} className="shrink-0">
-            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sinkron..." : "Sync & Refresh Semua"}
-          </Button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          <Link href="/cost-center/business-dashboard">
+            <Button variant="outline" size="sm">
+              <TrendingUp className="h-3.5 w-3.5" /> Business Dashboard
+            </Button>
+          </Link>
+          {canSync && (
+            <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Sinkron..." : "Sync & Refresh Semua"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card className="transition-shadow hover:shadow-sm">
@@ -459,6 +479,30 @@ export default function CostCenterPage() {
               )}
               {detailData.usage.length === 0 && !detailData.warehouseError && (
                 <p className="text-sm text-muted-foreground">Tidak ada transaksi pemakaian stok pada tanggal ini.</p>
+              )}
+              {/* Subtotal per outlet - cuma relevan waktu lihat "Semua Outlet"
+                  (kalau 1 outlet spesifik sudah dipilih, semua baris otomatis
+                  dari outlet itu saja, Total di bawah sudah cukup). Permintaan
+                  Kevin 2026-09-17: "jelas memberikan informasi outlet mana
+                  men-generate biayanya berapa" - dulu cuma keterangan kecil di
+                  tiap baris, harus dijumlah manual sendiri kalau mau tahu per
+                  outlet. */}
+              {dailyOutlet === DAILY_OUTLET_ALL && detailData.usage.length > 0 && (
+                <div className="rounded-lg border border-border bg-muted/30 p-2.5 grid gap-1">
+                  {Object.entries(
+                    detailData.usage.reduce<Record<string, number>>((acc, l) => {
+                      acc[l.outletName] = (acc[l.outletName] ?? 0) + l.totalCost;
+                      return acc;
+                    }, {})
+                  )
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([outletName, subtotal]) => (
+                      <div key={outletName} className="flex items-center justify-between text-sm">
+                        <span>{outletName}</span>
+                        <span className="tabular-nums font-medium">{fmtRupiah(subtotal)}</span>
+                      </div>
+                    ))}
+                </div>
               )}
               {detailData.usage.length > 0 && (
                 <div className="rounded-lg border border-border">
