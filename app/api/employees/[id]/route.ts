@@ -16,10 +16,20 @@ const KANTOR_RATE_FIELDS = [
   "kantorBpjsRemittance",
 ] as const;
 
+// Checklist Offboarding (muncul di UI begitu status "resigned") - dicentang
+// manual oleh HR, tidak menghalangi apa pun. Permintaan Kevin 2026-09-17.
+const OFFBOARDING_FIELDS = [
+  "offboardingAssetReturned",
+  "offboardingPortalDisabled",
+  "offboardingExitInterviewDone",
+  "offboardingDocumentsComplete",
+  "offboardingDepositSettled",
+] as const;
+
 const VALID_STATUS = ["onboarding", "active", "resigned"];
 const STRING_FIELDS = [
   "employeeCode", "ktpNumber", "name", "email", "phone", "birthPlace", "gender", "address",
-  "position", "outlet", "employmentStatus", "workSchedule", "photoUrl",
+  "position", "outlet", "employmentStatus", "scheduleStart", "scheduleEnd", "photoUrl",
   "bankName", "bankAccountNumber", "bankAccountHolder",
   "npwp", "bpjsKesehatanNumber", "bpjsKetenagakerjaanNumber",
 ];
@@ -101,6 +111,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if ("depositInstallmentsPaid" in body) data.depositInstallmentsPaid = Number(body.depositInstallmentsPaid) || 0;
   if ("depositBalance" in body) data.depositBalance = Number(body.depositBalance) || 0;
   if ("defaultOffDays" in body) data.defaultOffDays = Array.isArray(body.defaultOffDays) ? body.defaultOffDays.map(Number) : [];
+  for (const f of OFFBOARDING_FIELDS) {
+    if (typeof body[f] === "boolean") data[f] = body[f];
+  }
 
   const current = await prisma.employee.findUnique({
     where: { id: employeeId },

@@ -17,6 +17,7 @@ import {
 import { formatSlotWIB } from "@/lib/interview-slots";
 import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
 import { OfferChecklistDialog } from "@/app/components/OfferChecklistDialog";
+import { RejectionReasonDialog } from "@/app/components/RejectionReasonDialog";
 import { allowedNextStages } from "@/lib/candidate-stages";
 
 type Posting = {
@@ -62,11 +63,13 @@ const STAGES = [
 const stageLabel = (v: string) => STAGES.find((s) => s.value === v)?.label ?? v;
 
 function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }) {
-  async function handleStageChange(stage: string) {
+  const [rejectOpen, setRejectOpen] = useState(false);
+
+  async function handleStageChange(stage: string, stageNote?: string) {
     const res = await fetch(`/api/candidates/${c.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage }),
+      body: JSON.stringify({ stage, ...(stageNote ? { stageNote } : {}) }),
     });
     if (res.ok) {
       toast.success(`${c.name} dipindah ke "${stageLabel(stage)}".`);
@@ -102,7 +105,7 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
           )}
           {c.stage === "offer" && <OfferChecklistDialog candidate={c} onChanged={onChanged} />}
         </div>
-        <Select value={c.stage} onValueChange={(v) => v && handleStageChange(v)}>
+        <Select value={c.stage} onValueChange={(v) => (v === "rejected" ? setRejectOpen(true) : v && handleStageChange(v))}>
           <SelectTrigger className="h-7 min-w-0 w-full text-xs">
             <SelectValue className="truncate">{() => stageLabel(c.stage)}</SelectValue>
           </SelectTrigger>
@@ -113,6 +116,15 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
           </SelectContent>
         </Select>
       </CardContent>
+      <RejectionReasonDialog
+        candidateName={c.name}
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        onConfirm={async (reason) => {
+          await handleStageChange("rejected", reason || undefined);
+          setRejectOpen(false);
+        }}
+      />
     </Card>
   );
 }

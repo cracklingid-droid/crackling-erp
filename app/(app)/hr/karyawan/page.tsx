@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, ArrowLeft, MessageCircle, AlertTriangle } from "lucide-react";
+import { Plus, ArrowLeft, MessageCircle, AlertTriangle, Search, X } from "lucide-react";
 import { toWaNumber } from "@/lib/whatsapp";
 import { computeCompleteness } from "@/lib/employee-completeness";
 import { employeeCategory } from "@/lib/payroll-config";
@@ -71,6 +71,7 @@ export default function KaryawanPage() {
   // pertahanan tambahan + sembunyikan tombol tulis di tampilan.
   const readOnly = user?.role === "manager";
   const [tab, setTab] = useState<"outlet" | "kantor">("outlet");
+  const [search, setSearch] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -128,7 +129,16 @@ export default function KaryawanPage() {
   // lib/payroll-outlet-calc.ts). Permintaan Kevin 2026-09-13.
   const restoEmployees = employees.filter((e) => employeeCategory(e.outlet) === "outlet");
   const kantorEmployees = employees.filter((e) => employeeCategory(e.outlet) === "kantor");
-  const tabEmployees = tab === "outlet" ? restoEmployees : kantorEmployees;
+  const tabEmployeesAll = tab === "outlet" ? restoEmployees : kantorEmployees;
+  // Pencarian nama/jabatan/outlet/kode - tabel makin panjang seiring
+  // karyawan bertambah, tanpa filter jadi susah cari 1 orang. Permintaan
+  // Kevin 2026-09-17.
+  const q = search.trim().toLowerCase();
+  const tabEmployees = q
+    ? tabEmployeesAll.filter((e) =>
+        [e.name, e.position, e.outlet, e.employeeCode].some((v) => v?.toLowerCase().includes(q))
+      )
+    : tabEmployeesAll;
 
   return (
     <div className="max-w-5xl grid gap-6">
@@ -232,13 +242,38 @@ export default function KaryawanPage() {
         </Card>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "outlet" | "kantor")}>
-        <TabsList>
-          <TabsIndicator />
-          <TabsTab value="outlet">Resto ({restoEmployees.length})</TabsTab>
-          {!readOnly && <TabsTab value="kantor">Kantor ({kantorEmployees.length})</TabsTab>}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "outlet" | "kantor")}>
+          <TabsList>
+            <TabsIndicator />
+            <TabsTab value="outlet">Resto ({restoEmployees.length})</TabsTab>
+            {!readOnly && <TabsTab value="kantor">Kantor ({kantorEmployees.length})</TabsTab>}
+          </TabsList>
+        </Tabs>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama, jabatan, outlet, kode..."
+            className="pl-8 pr-8"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+      {q && (
+        <p className="text-xs text-muted-foreground -mt-3">
+          {tabEmployees.length} dari {tabEmployeesAll.length} karyawan cocok dengan &quot;{search}&quot;.
+        </p>
+      )}
 
       <Card>
         <div className="overflow-x-auto">
@@ -256,7 +291,11 @@ export default function KaryawanPage() {
             </TableHeader>
             <TableBody>
               {!loading && tabEmployees.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-muted-foreground">Belum ada karyawan {tab === "outlet" ? "resto" : "kantor"}.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={7} className="text-muted-foreground">
+                    {q ? `Tidak ada karyawan yang cocok dengan pencarian.` : `Belum ada karyawan ${tab === "outlet" ? "resto" : "kantor"}.`}
+                  </TableCell>
+                </TableRow>
               )}
               {tabEmployees.map((e) => {
                 const hasKtp = e.documents.some((d) => d.type === "ktp");

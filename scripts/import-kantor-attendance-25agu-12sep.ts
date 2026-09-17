@@ -19,11 +19,11 @@
 //    dipakai hitung lembur beneran - akan menghasilkan angka lembur sangat
 //    besar & salah kalau tidak dikoreksi.
 // 3) Jadwal kerja Calvin TERNYATA gantian 2 pola (08:00-20:00 & 10:00-22:00
-//    tergantung hari) - field Employee.workSchedule cuma menampung 1 pola
-//    tetap, jadi SENGAJA dikosongkan (bukan diisi asal salah satu) -
-//    deteksi "Terlambat" otomatis sistem tidak akan aktif utk Calvin
-//    sampai ini dibahas lebih lanjut. Candra & Sulthan pola tetap
-//    (09:00-18:00) - workSchedule mereka diisi.
+//    tergantung hari) - field Employee.scheduleStart/scheduleEnd cuma
+//    menampung 1 pola tetap, jadi SENGAJA dikosongkan (bukan diisi asal
+//    salah satu) - deteksi "Terlambat" otomatis sistem tidak akan aktif utk
+//    Calvin sampai ini dibahas lebih lanjut. Candra & Sulthan pola tetap
+//    (09:00-18:00) - jadwal mereka diisi.
 import { prisma } from "../lib/db";
 
 // jam lokal Jakarta disimpan di komponen UTC Date (konvensi yang sudah
@@ -124,9 +124,9 @@ async function main() {
   // (Payroll Kantor). Calvin SENGAJA tidak diisi (2 pola gantian, lihat
   // catatan atas).
   const candra = await prisma.employee.findFirstOrThrow({ where: { name: "Candra", outlet: "Kantor" } });
-  await prisma.employee.update({ where: { id: candra.id }, data: { workSchedule: "09:00-18:00" } });
+  await prisma.employee.update({ where: { id: candra.id }, data: { scheduleStart: "09:00", scheduleEnd: "18:00" } });
   const sulthan = await prisma.employee.findFirstOrThrow({ where: { name: "Sulthan", outlet: "Kantor" } });
-  await prisma.employee.update({ where: { id: sulthan.id }, data: { workSchedule: "09:00-18:00" } });
+  await prisma.employee.update({ where: { id: sulthan.id }, data: { scheduleStart: "09:00", scheduleEnd: "18:00" } });
   console.log("\nJadwal kerja Candra & Sulthan diisi 09:00-18:00.");
 }
 

@@ -42,6 +42,18 @@ const DOCUMENT_TYPES = [
   { value: "kontrak_kerja", label: "Kontrak Kerja" },
   { value: "lainnya", label: "Lainnya" },
 ];
+
+// Checklist Offboarding - muncul begitu status "Resign", mirror pola
+// Checklist Onboarding di atas. "Akun Portal" sebenarnya sudah otomatis
+// diblokir sistem begitu status resign (bukan menunggu checklist ini) -
+// item ini cuma jejak konfirmasi HR bahwa langkah manusianya beres.
+// Permintaan Kevin 2026-09-17.
+const OFFBOARDING_ITEMS: { key: "offboardingAssetReturned" | "offboardingPortalDisabled" | "offboardingExitInterviewDone" | "offboardingDocumentsComplete"; label: string }[] = [
+  { key: "offboardingAssetReturned", label: "Aset (seragam/alat/perangkat) sudah dikembalikan" },
+  { key: "offboardingPortalDisabled", label: "Akun Portal Karyawan tidak dipakai lagi (otomatis diblokir sistem)" },
+  { key: "offboardingExitInterviewDone", label: "Exit interview sudah dilakukan" },
+  { key: "offboardingDocumentsComplete", label: "Dokumen resign lengkap (surat resign/pengalaman kerja)" },
+];
 const documentTypeLabel = (v: string) => DOCUMENT_TYPES.find((d) => d.value === v)?.label ?? v;
 
 const HISTORY_FIELD_LABEL: Record<string, string> = {
@@ -90,7 +102,8 @@ type Employee = {
   position: string | null;
   outlet: string | null;
   employmentStatus: string | null;
-  workSchedule: string | null;
+  scheduleStart: string | null;
+  scheduleEnd: string | null;
   defaultOffDays: number[];
   joinDate: string | null;
   resignDate: string | null;
@@ -124,6 +137,11 @@ type Employee = {
   documents: Document[];
   candidate: { jobPosting: { title: string } } | null;
   historyEntries: HistoryEntry[];
+  offboardingAssetReturned: boolean;
+  offboardingPortalDisabled: boolean;
+  offboardingExitInterviewDone: boolean;
+  offboardingDocumentsComplete: boolean;
+  offboardingDepositSettled: boolean;
 };
 
 function toDateInput(iso: string | null) {
@@ -136,7 +154,7 @@ function todayInput() {
 
 const emptyForm = {
   name: "", email: "", phone: "", birthPlace: "", birthDate: "", gender: "", address: "",
-  employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", workSchedule: "", joinDate: "", resignDate: "",
+  employeeCode: "", ktpNumber: "", position: "", outlet: "", employmentStatus: "", scheduleStart: "", scheduleEnd: "", joinDate: "", resignDate: "",
   baseSalary: "", allowance: "", dailyTransportRate: "", dailyMealRate: "", standardWorkDays: "", dailyBaseRate: "",
   kantorOvertimeRate: "", kantorLateRate: "", kantorIncompleteClockRate: "", kantorFuelRatePerKm: "",
   kantorBpjsAllowance: "", kantorBpjsEmployerObligation: "", kantorBpjsRemittance: "",
@@ -177,7 +195,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           name: e.name ?? "", email: e.email ?? "", phone: e.phone ?? "",
           birthPlace: e.birthPlace ?? "", birthDate: toDateInput(e.birthDate), gender: e.gender ?? "", address: e.address ?? "",
           employeeCode: e.employeeCode ?? "", ktpNumber: e.ktpNumber ?? "", position: e.position ?? "", outlet: e.outlet ?? "",
-          employmentStatus: e.employmentStatus ?? "", workSchedule: e.workSchedule ?? "",
+          employmentStatus: e.employmentStatus ?? "", scheduleStart: e.scheduleStart ?? "", scheduleEnd: e.scheduleEnd ?? "",
           joinDate: toDateInput(e.joinDate), resignDate: toDateInput(e.resignDate),
           baseSalary: e.baseSalary != null ? String(e.baseSalary) : "", allowance: e.allowance != null ? String(e.allowance) : "",
           dailyTransportRate: e.dailyTransportRate != null ? String(e.dailyTransportRate) : "",
@@ -250,6 +268,19 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     } else {
       const err = await res.json();
       toast.error("Gagal: " + err.error);
+    }
+  }
+
+  async function handleOffboardingToggle(field: string, value: boolean) {
+    const res = await fetch(`/api/employees/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value }),
+    });
+    if (res.ok) {
+      load();
+    } else {
+      toast.error("Gagal menyimpan checklist offboarding");
     }
   }
 
@@ -502,6 +533,49 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         </Card>
       )}
 
+      {employee.status === "resigned" && (
+        <Card className="border-amber-500/40">
+          <CardHeader>
+            <CardTitle className="text-base">Checklist Offboarding</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-1.5">
+            {OFFBOARDING_ITEMS.map((it) => {
+              const done = employee[it.key];
+              const isAutoPortal = it.key === "offboardingPortalDisabled";
+              return (
+                <button
+                  key={it.key}
+                  type="button"
+                  onClick={() => handleOffboardingToggle(it.key, !done)}
+                  className="flex items-center gap-2 text-sm text-left w-fit hover:opacity-70 transition-opacity"
+                >
+                  {done ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+                  <span className={done ? "" : "text-muted-foreground"}>{it.label}</span>
+                  {isAutoPortal && <Badge variant="outline" className="font-normal text-[10px]">Otomatis</Badge>}
+                </button>
+              );
+            })}
+            {employee.employmentStatus === "kontrak" && (
+              <button
+                type="button"
+                onClick={() => handleOffboardingToggle("offboardingDepositSettled", !employee.offboardingDepositSettled)}
+                className="flex items-center gap-2 text-sm text-left w-fit hover:opacity-70 transition-opacity"
+              >
+                {employee.offboardingDepositSettled ? (
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                ) : (
+                  <Circle className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className={employee.offboardingDepositSettled ? "" : "text-muted-foreground"}>
+                  Settlement deposit kontrak lunas (saldo saat ini: Rp{employee.depositBalance.toLocaleString("id-ID")})
+                </span>
+              </button>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">Klik tiap item untuk menandai selesai/belum.</p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader><CardTitle className="text-base">Biodata</CardTitle></CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -602,9 +676,16 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <Label>Jadwal Kerja</Label>
-            <Input value={form.workSchedule} onChange={(e) => set("workSchedule", e.target.value)} placeholder="mis. 08:00-20:00" />
-            <p className="text-xs text-muted-foreground">Ditampilkan di halaman Rincian Perhitungan gaji sbg pembanding jam masuk/pulang aktual.</p>
+            <Label>Jadwal Kerja (Jam Masuk - Jam Pulang)</Label>
+            <div className="flex items-center gap-2">
+              <Input type="time" value={form.scheduleStart} onChange={(e) => set("scheduleStart", e.target.value)} className="w-auto" />
+              <span className="text-muted-foreground text-sm">-</span>
+              <Input type="time" value={form.scheduleEnd} onChange={(e) => set("scheduleEnd", e.target.value)} className="w-auto" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Jam Masuk dipakai deteksi otomatis "Terlambat"; keduanya ditampilkan di halaman Rincian Perhitungan gaji sbg
+              pembanding jam masuk/pulang aktual.
+            </p>
           </div>
           <div className="grid gap-1.5 sm:col-span-2">
             <Label>Hari Libur Rutin (Default)</Label>

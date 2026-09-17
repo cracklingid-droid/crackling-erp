@@ -58,7 +58,7 @@ export async function POST(req: Request) {
 
   const employees = await prisma.employee.findMany({ where: { status: "active" } });
   const inCategory = employees.filter((e) => employeeCategory(e.outlet) === category);
-  const schedules = new Map(inCategory.map((e) => [e.id, e.workSchedule]));
+  const schedules = new Map(inCategory.map((e) => [e.id, e.scheduleStart]));
   const summaries = await computeAttendanceSummaries(inCategory.map((e) => e.id), startDate, endDate, schedules);
 
   const period = await prisma.$transaction(async (tx) => {

@@ -11,13 +11,13 @@ export type AttendanceSummary = {
   incompleteClockOutCount: number;
 };
 
-// Jadwal kerja standar karyawan (field Employee.workSchedule, mis.
-// "08:00-20:00") - dipakai utk bandingkan jam masuk aktual vs jadwal, jadi
-// tahu berapa kali terlambat. Employee tanpa jadwal diisi = tidak dihitung
-// (bukan 0 kali, tapi memang tidak ada acuan).
-function parseScheduleStart(workSchedule: string | null | undefined): { h: number; m: number } | null {
-  if (!workSchedule) return null;
-  const m = workSchedule.match(/^\s*(\d{1,2}):(\d{2})/);
+// Jadwal kerja standar karyawan (field Employee.scheduleStart, format
+// terstruktur "HH:MM" dari <input type="time">) - dipakai utk bandingkan jam
+// masuk aktual vs jadwal, jadi tahu berapa kali terlambat. Employee tanpa
+// jadwal diisi = tidak dihitung (bukan 0 kali, tapi memang tidak ada acuan).
+function parseScheduleStart(scheduleStart: string | null | undefined): { h: number; m: number } | null {
+  if (!scheduleStart) return null;
+  const m = scheduleStart.match(/^\s*(\d{1,2}):(\d{2})/);
   if (!m) return null;
   return { h: Number(m[1]), m: Number(m[2]) };
 }
@@ -37,7 +37,7 @@ function parseScheduleStart(workSchedule: string | null | undefined): { h: numbe
 // nanti ada lembur beneran, dicatat manual oleh HR (mis. berdasar Pengajuan
 // Lembur SPV yang sudah disetujui), bukan diturunkan dari data absensi.
 // Parameter `schedules` opsional - kalau diisi,
-// lateCount dihitung dari jam masuk aktual vs jadwal (Employee.workSchedule)
+// lateCount dihitung dari jam masuk aktual vs jadwal (Employee.scheduleStart)
 // per karyawan; kalau tidak diisi (mis. dipanggil dari alur Payroll Outlet
 // yang sudah punya potongan telat manual sendiri), lateCount selalu 0.
 // Permintaan Kevin 2026-09-11.

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Plus, Copy, Lock, Unlock, FileText } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
 import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
+import { RejectionReasonDialog } from "@/app/components/RejectionReasonDialog";
 import { STAGES, stageLabel, allowedNextStages } from "@/lib/candidate-stages";
 
 type PsychTestSubmission = { percentage: number; passed: boolean } | null;
@@ -54,6 +55,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
   const [source, setSource] = useState("");
   const [saving, setSaving] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<Candidate | null>(null);
 
   function load() {
     setLoading(true);
@@ -96,11 +98,11 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
     }
   }
 
-  async function handleStageChange(candidateId: number, stage: string) {
+  async function handleStageChange(candidateId: number, stage: string, stageNote?: string) {
     const res = await fetch(`/api/candidates/${candidateId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage }),
+      body: JSON.stringify({ stage, ...(stageNote ? { stageNote } : {}) }),
     });
     if (res.ok) {
       toast.success(`Tahap diubah ke "${stageLabel(stage)}".`);
@@ -227,6 +229,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
               <TableRow>
                 <TableHead>Nama</TableHead>
                 <TableHead>Kontak</TableHead>
+                <TableHead>Sumber</TableHead>
                 <TableHead>Pengalaman</TableHead>
                 <TableHead>CV</TableHead>
                 <TableHead>Psikotest</TableHead>
@@ -236,7 +239,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
             </TableHeader>
             <TableBody>
               {posting.candidates.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
               )}
               {posting.candidates.map((c) => (
                 <TableRow key={c.id}>
@@ -246,6 +249,7 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
                   <TableCell className="text-sm text-muted-foreground">
                     {[c.email, c.phone].filter(Boolean).join(" · ") || "-"}
                   </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.source || "-"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{c.experience || "-"}</TableCell>
                   <TableCell className="text-sm">
                     {c.cvUrl ? (
@@ -280,7 +284,10 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
                     )}
                   </TableCell>
                   <TableCell>
-                    <Select value={c.stage} onValueChange={(v) => v && handleStageChange(c.id, v)}>
+                    <Select
+                      value={c.stage}
+                      onValueChange={(v) => (v === "rejected" ? setRejectTarget(c) : v && handleStageChange(c.id, v))}
+                    >
                       <SelectTrigger className="w-40">
                         <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
                       </SelectTrigger>
@@ -297,6 +304,17 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
           </Table>
         </div>
       </Card>
+      {rejectTarget && (
+        <RejectionReasonDialog
+          candidateName={rejectTarget.name}
+          open={!!rejectTarget}
+          onOpenChange={(v) => !v && setRejectTarget(null)}
+          onConfirm={async (reason) => {
+            await handleStageChange(rejectTarget.id, "rejected", reason || undefined);
+            setRejectTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }

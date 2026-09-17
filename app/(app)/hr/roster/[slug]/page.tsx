@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Copy, CopyPlus } from "lucide-react";
 import { slugToOutlet, addWeeks, dateKey, formatDayLabel } from "@/lib/roster";
 
 type RosterData = {
@@ -39,6 +39,7 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
   const [anchor, setAnchor] = useState(new Date());
   const [data, setData] = useState<RosterData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copyingLastWeek, setCopyingLastWeek] = useState(false);
 
   function load() {
     if (!outlet) return;
@@ -102,6 +103,41 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
     }
   }
 
+  // Salin Masuk/Libur dari minggu lalu ke cell yang MASIH KOSONG minggu ini
+  // saja - konsisten dgn auto-backfill pola libur di atas, tidak pernah
+  // menimpa yang sudah diisi HR secara eksplisit. Permintaan Kevin
+  // 2026-09-17.
+  async function copyFromLastWeek() {
+    if (!data || !outlet) return;
+    setCopyingLastWeek(true);
+    try {
+      const prevAnchor = addWeeks(anchor, -1);
+      const res = await fetch(`/api/roster?outlet=${encodeURIComponent(outlet)}&weekStart=${dateKey(prevAnchor)}`);
+      if (!res.ok) {
+        toast.error("Gagal memuat roster minggu lalu");
+        return;
+      }
+      const prevData: RosterData = await res.json();
+      let filled = 0;
+      for (const emp of data.employees) {
+        for (let i = 0; i < data.days.length; i++) {
+          const d = data.days[i];
+          const hasEntry = data.entries.some((e) => e.employeeId === emp.id && e.date === d);
+          if (hasEntry) continue;
+          const prevDay = prevData.days[i];
+          const prevEntry = prevData.entries.find((e) => e.employeeId === emp.id && e.date === prevDay);
+          if (prevEntry) {
+            await setCell(emp.id, d, prevEntry.isWorking);
+            filled++;
+          }
+        }
+      }
+      toast.success(filled > 0 ? `${filled} cell kosong diisi dari minggu lalu.` : "Tidak ada cell kosong yang bisa diisi dari minggu lalu.");
+    } finally {
+      setCopyingLastWeek(false);
+    }
+  }
+
   if (!outlet) return <p className="text-sm text-muted-foreground">Outlet tidak ditemukan.</p>;
 
   const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/roster/${slug}` : `/roster/${slug}`;
@@ -114,7 +150,8 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Roster - {outlet}</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Pilih status Masuk/Libur tiap karyawan lewat dropdown di bawah.
+          Pilih status Masuk/Libur tiap karyawan lewat dropdown di bawah, atau klik "Salin dari Minggu Lalu" untuk isi cell
+          kosong sesuai pola minggu sebelumnya (tidak menimpa yang sudah diisi).
           {outlet && WEEKEND_MASUK_OUTLETS.includes(outlet) && (
             <> Sabtu &amp; Minggu otomatis "Masuk" (resto ramai akhir pekan), kecuali karyawan itu punya pola libur pribadi di hari itu.</>
           )}
@@ -134,16 +171,21 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(publicUrl);
-              toast.success("Link roster disalin.");
-            }}
-            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-          >
-            <Copy className="h-3.5 w-3.5" /> Salin link untuk karyawan
-          </button>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Button variant="outline" size="sm" onClick={copyFromLastWeek} disabled={copyingLastWeek || loading || !data}>
+              <CopyPlus className="h-3.5 w-3.5" /> {copyingLastWeek ? "Menyalin..." : "Salin dari Minggu Lalu"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(publicUrl);
+                toast.success("Link roster disalin.");
+              }}
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
+              <Copy className="h-3.5 w-3.5" /> Salin link untuk karyawan
+            </button>
+          </div>
         </CardContent>
       </Card>
 

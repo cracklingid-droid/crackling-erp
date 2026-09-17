@@ -246,7 +246,12 @@ model Employee {
   depositInstallmentsPaid Int @default(0) // sudah dipotong berapa kali otomatis (maks 2)
   depositBalance          Int @default(0) // saldo deposit kontrak yang masih ditahan, dalam rupiah
 
-  workSchedule String? // jadwal jam kerja standar, mis. "08:00-20:00" - dipakai di Rincian Perhitungan
+  // Jadwal jam kerja standar - dulu 1 field teks bebas ("08:00-20:00"),
+  // dipecah jadi 2 field waktu terstruktur (format "HH:MM") supaya deteksi
+  // Terlambat (lib/attendance-summary.ts) tidak rawan salah parse & form
+  // isiannya pakai <input type="time"> asli. Permintaan Kevin 2026-09-17.
+  scheduleStart String? // jam masuk standar, mis. "08:00"
+  scheduleEnd   String? // jam pulang standar, mis. "20:00" - dipakai di Rincian Perhitungan
 
   // Hari libur rutin mingguan (0=Minggu..6=Sabtu, ikut JS Date.getDay()) -
   // dipakai Roster utk otomatis isi Masuk/Libur tiap buka minggu baru, biar
@@ -264,6 +269,19 @@ model Employee {
   // "Segera Jatuh Tempo" di Database Karyawan (H-30). Beda dari resignDate
   // (itu tanggal karyawan benar-benar keluar). Permintaan Kevin 2026-09-12.
   contractEndDate DateTime?
+
+  // Checklist Offboarding - muncul di halaman detail begitu status =
+  // "resigned", mirror Checklist Onboarding yang sudah ada (informasional,
+  // dicentang manual oleh HR, tidak menghalangi apa pun). Akun Portal
+  // sebenarnya SUDAH otomatis diblokir sistem begitu status "resigned"
+  // (lihat app/api/portal/login/route.ts) - field ini cuma jejak konfirmasi
+  // HR bahwa langkah manusianya (kembalikan akses fisik, dst) sudah beres.
+  // Permintaan Kevin 2026-09-17.
+  offboardingAssetReturned     Boolean @default(false) // aset (seragam/alat/perangkat) sudah dikembalikan
+  offboardingPortalDisabled    Boolean @default(false) // konfirmasi HR akun portal sudah tidak dipakai
+  offboardingExitInterviewDone Boolean @default(false) // exit interview sudah dilakukan
+  offboardingDocumentsComplete Boolean @default(false) // dokumen resign (surat resign/pengalaman kerja) lengkap
+  offboardingDepositSettled    Boolean @default(false) // settlement deposit kontrak sudah lunas (kalau kontrak)
 
   // Atasan langsung - dipakai utk lihat siapa lapor ke siapa per outlet.
   // Optional & self-relation, jadi kalau atasannya dihapus dari sistem

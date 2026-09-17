@@ -23,7 +23,7 @@ export async function recalcKantorPeriod(periodId: number): Promise<RecalcResult
   if (period.status !== "draft") return { error: "Periode sudah final - buka kembali dulu sebelum refresh" };
 
   const employeeIds = period.items.map((it) => it.employeeId);
-  const schedules = new Map(period.items.map((it) => [it.employeeId, it.employee.workSchedule]));
+  const schedules = new Map(period.items.map((it) => [it.employeeId, it.employee.scheduleStart]));
   const summaries = await computeAttendanceSummaries(employeeIds, period.startDate, period.endDate, schedules);
 
   let updated = 0;

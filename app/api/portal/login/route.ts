@@ -14,7 +14,10 @@ export async function POST(req: Request) {
   const employee = await prisma.employee.findFirst({
     where: { employeeCode: { equals: username, mode: "insensitive" } },
   });
-  if (!employee || !canUsePortal(employee)) {
+  // Karyawan resign otomatis kehilangan akses portal - tidak boleh
+  // bergantung pada HR mencentang checklist offboarding manual dulu.
+  // Permintaan Kevin 2026-09-17.
+  if (!employee || employee.status === "resigned" || !canUsePortal(employee)) {
     return NextResponse.json({ error: "ID atau password salah" }, { status: 401 });
   }
 

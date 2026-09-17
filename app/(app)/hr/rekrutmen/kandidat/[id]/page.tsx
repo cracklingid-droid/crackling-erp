@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, FileText, Mail, Phone, MapPin, GraduationCap, Briefcase as BriefcaseIcon, Wallet, CalendarClock, Download } from "lucide-react";
+import { ArrowLeft, FileText, Mail, Phone, MapPin, GraduationCap, Briefcase as BriefcaseIcon, Wallet, CalendarClock, Download, Share2 } from "lucide-react";
 import { formatSlotWIB } from "@/lib/interview-slots";
 import { PsychTestResultDialog } from "@/app/components/PsychTestResultDialog";
 import { OfferChecklistDialog } from "@/app/components/OfferChecklistDialog";
+import { RejectionReasonDialog } from "@/app/components/RejectionReasonDialog";
 import { STAGES, stageLabel, allowedNextStages } from "@/lib/candidate-stages";
 
 const GENDER_LABEL: Record<string, string> = { L: "Laki-laki", P: "Perempuan" };
@@ -23,6 +24,7 @@ type Candidate = {
   birthDate: string | null;
   gender: string | null;
   address: string | null;
+  source: string | null;
   preferredOutlet: string | null;
   lastEducation: string | null;
   institution: string | null;
@@ -61,6 +63,7 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
   const [c, setC] = useState<Candidate | null>(null);
   const [loading, setLoading] = useState(true);
   const [changingStage, setChangingStage] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   function load() {
     setLoading(true);
@@ -72,12 +75,12 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
 
   useEffect(load, [id]);
 
-  async function handleStageChange(stage: string) {
+  async function handleStageChange(stage: string, stageNote?: string) {
     setChangingStage(true);
     const res = await fetch(`/api/candidates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage }),
+      body: JSON.stringify({ stage, ...(stageNote ? { stageNote } : {}) }),
     });
     setChangingStage(false);
     if (res.ok) {
@@ -103,7 +106,7 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
             <h1 className="text-2xl font-heading font-semibold tracking-tight">{c.name}</h1>
             <p className="text-muted-foreground text-sm mt-0.5">{c.jobPosting.title} &middot; {c.jobPosting.position.name}</p>
           </div>
-          <Select value={c.stage} onValueChange={(v) => v && handleStageChange(v)}>
+          <Select value={c.stage} onValueChange={(v) => (v === "rejected" ? setRejectOpen(true) : v && handleStageChange(v))}>
             <SelectTrigger className="w-44" disabled={changingStage}>
               <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
             </SelectTrigger>
@@ -115,6 +118,16 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
           </Select>
         </div>
       </div>
+
+      <RejectionReasonDialog
+        candidateName={c.name}
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        onConfirm={async (reason) => {
+          await handleStageChange("rejected", reason || undefined);
+          setRejectOpen(false);
+        }}
+      />
 
       {c.stage === "offer" && (
         <Card className="border-primary/30">
@@ -145,6 +158,7 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
             />
           )}
           {c.address && <InfoRow icon={MapPin} label="Alamat" value={c.address} />}
+          {c.source && <InfoRow icon={Share2} label="Sumber Lamaran" value={c.source} />}
           {c.preferredOutlet && <InfoRow icon={MapPin} label="Lokasi/Cabang Diinginkan" value={c.preferredOutlet} />}
           {(c.lastEducation || c.institution) && (
             <InfoRow icon={GraduationCap} label="Pendidikan" value={`${c.lastEducation ?? "-"} - ${c.institution ?? "-"}`} />

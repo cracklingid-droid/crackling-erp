@@ -22,10 +22,10 @@ export async function GET(req: Request) {
 
   const employees = await prisma.employee.findMany({
     where: { status: "active" },
-    select: { id: true, name: true, position: true, outlet: true, workSchedule: true },
+    select: { id: true, name: true, position: true, outlet: true, scheduleStart: true },
     orderBy: { name: "asc" },
   });
-  const schedules = new Map(employees.map((e) => [e.id, e.workSchedule]));
+  const schedules = new Map(employees.map((e) => [e.id, e.scheduleStart]));
   const summaries = await computeAttendanceSummaries(employees.map((e) => e.id), start, end, schedules);
 
   const result = employees.map((e) => ({

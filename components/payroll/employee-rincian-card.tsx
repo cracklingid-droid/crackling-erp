@@ -22,7 +22,8 @@ export type RincianEmployee = {
   dailyTransportRate: number | null;
   dailyMealRate: number | null;
   dailyBaseRate: number | null;
-  workSchedule: string | null;
+  scheduleStart: string | null;
+  scheduleEnd: string | null;
 };
 export type RincianItem = {
   id: number;
@@ -153,7 +154,7 @@ export function EmployeeRincianCard({
         <CardTitle className="text-base">{item.employee.name}</CardTitle>
         <p className="text-xs text-muted-foreground">
           {[item.employee.position, item.employee.outlet].filter(Boolean).join(" · ") || "-"}
-          {item.employee.workSchedule ? ` · Jadwal ${item.employee.workSchedule}` : ""}
+          {item.employee.scheduleStart ? ` · Jadwal ${item.employee.scheduleStart}-${item.employee.scheduleEnd ?? "?"}` : ""}
         </p>
       </CardHeader>
       <CardContent className="grid gap-5">

@@ -21,7 +21,7 @@ type RecapRow = {
   overtimeMinutes: number;
   totalMinutes: number;
   lateCount: number;
-  workSchedule: string | null;
+  scheduleStart: string | null;
 };
 
 function formatHours(minutes: number): string {
@@ -121,7 +121,7 @@ export default function RekapAbsensiPage() {
                           {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
                         </TableCell>
                         <TableCell className={`tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                          {r.workSchedule ? `${r.lateCount} kali` : "-"}
+                          {r.scheduleStart ? `${r.lateCount} kali` : "-"}
                         </TableCell>
                         <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
                       </TableRow>
