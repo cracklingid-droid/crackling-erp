@@ -453,6 +453,21 @@ model AttendanceRecord {
   clockOut   DateTime?
   createdAt  DateTime  @default(now())
 
+  // Absen mandiri dari Portal Karyawan (selfie + lokasi GPS wajib, dicek vs
+  // titik lokasi outlet - lib/outlet-locations.ts) - berdampingan dgn impor
+  // absensi mesin fingerprint HR yang sudah ada (baris yang sama dipakai
+  // keduanya; import HR menimpa clockIn/clockOut TANPA menyentuh field di
+  // bawah, jadi field ini basi/stale kalau hari itu kemudian dikoreksi HR -
+  // itu wajar, cuma jejak bukti self check-in, bukan sumber kebenaran utama
+  // buat payroll). NULL = absen hari itu bukan dari self check-in (mis. dari
+  // mesin fingerprint). Permintaan Kevin 2026-09-17.
+  clockInSelfieUrl String?
+  clockInLat       Float?
+  clockInLng       Float?
+  clockOutSelfieUrl String?
+  clockOutLat       Float?
+  clockOutLng       Float?
+
   @@unique([employeeId, date])
 }
 

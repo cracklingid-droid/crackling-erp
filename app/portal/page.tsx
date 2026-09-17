@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePortalContext } from "./layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, CalendarDays, Receipt } from "lucide-react";
+import { User, CalendarDays, Receipt, Camera } from "lucide-react";
 
 const MENU = [
+  { href: "/portal/absensi", label: "Absensi", desc: "Absen masuk/pulang - selfie & lokasi GPS", icon: Camera },
   { href: "/portal/profil", label: "Profil Saya", desc: "Lihat biodata & data kepegawaian", icon: User },
   { href: "/portal/roster", label: "Roster Kerja", desc: "Jadwal masuk/libur mingguan", icon: CalendarDays },
   { href: "/portal/slip-gaji", label: "Slip Gaji", desc: "Riwayat & download slip gaji", icon: Receipt },
@@ -23,7 +24,7 @@ export default function PortalHomePage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {MENU.map((m) => (
           <Link key={m.href} href={m.href}>
             <Card className="h-full hover:border-primary/40 transition-colors">

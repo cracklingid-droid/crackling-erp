@@ -20,6 +20,7 @@ export function usePortalContext() {
 
 const BASE_NAV_ITEMS = [
   { href: "/portal", label: "Beranda" },
+  { href: "/portal/absensi", label: "Absensi" },
   { href: "/portal/profil", label: "Profil" },
   { href: "/portal/roster", label: "Roster" },
   { href: "/portal/slip-gaji", label: "Slip Gaji" },
