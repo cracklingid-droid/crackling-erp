@@ -1,33 +1,5 @@
-import Link from "next/link";
-import { Users, Warehouse, PiggyBank, ArrowRight, LucideIcon } from "lucide-react";
-
-const cardClass =
-  "group block h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5";
-
-function ModuleCard({
-  icon: Icon,
-  title,
-  desc,
-  tile,
-}: {
-  icon: LucideIcon;
-  title: string;
-  desc: string;
-  tile: string;
-}) {
-  return (
-    <>
-      <div className={`flex h-12 w-12 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3 ${tile}`}>
-        <Icon className="h-6 w-6" />
-      </div>
-      <h2 className="text-lg font-heading font-semibold mt-4">{title}</h2>
-      <p className="text-muted-foreground text-sm mt-1.5">{desc}</p>
-      <div className="flex items-center gap-1 text-sm font-medium text-primary mt-4">
-        Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-      </div>
-    </>
-  );
-}
+import { Users, Warehouse, PiggyBank } from "lucide-react";
+import { ModuleCard } from "./components/ModuleCard";
 
 export default function Home() {
   return (
@@ -40,35 +12,33 @@ export default function Home() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Link href="/hr" className={cardClass}>
-            <ModuleCard
-              icon={Users}
-              title="Human Resource"
-              desc="Rekrutmen, onboarding, data karyawan, dan proses HR lainnya."
-              tile="icon-tile-1"
-            />
-          </Link>
+          <ModuleCard
+            href="/hr"
+            icon={<Users className="h-5 w-5" />}
+            iconClass="icon-tile-1"
+            title="Human Resource"
+            description="Rekrutmen, onboarding, data karyawan, dan proses HR lainnya."
+          />
           {/* Bukan halaman internal - langsung redirect ke aplikasi Crackling
               Warehouse yang sudah berjalan terpisah (permintaan Kevin 2026-09-10). */}
-          <a href="https://crackling-warehouse.vercel.app/" className={cardClass}>
-            <ModuleCard
-              icon={Warehouse}
-              title="Crackling Warehouse"
-              desc="Inventory, belanja, surat jalan, dan laporan stok tiap outlet."
-              tile="icon-tile-2"
-            />
-          </a>
+          <ModuleCard
+            href="https://crackling-warehouse.vercel.app/"
+            external
+            icon={<Warehouse className="h-5 w-5" />}
+            iconClass="icon-tile-2"
+            title="Crackling Warehouse"
+            description="Inventory, belanja, surat jalan, dan laporan stok tiap outlet."
+          />
           {/* Akses: owner/developer/manager - halaman itu sendiri yang menolak
               role lain (403), kartu ini tetap tampil ke semua sesuai pola
               kartu lain di halaman ini. Permintaan Kevin 2026-09-12. */}
-          <Link href="/cost-center" className={cardClass}>
-            <ModuleCard
-              icon={PiggyBank}
-              title="Cost Center"
-              desc="Biaya gaji, pemakaian stok, dan Gross Profit per outlet."
-              tile="icon-tile-3"
-            />
-          </Link>
+          <ModuleCard
+            href="/cost-center"
+            icon={<PiggyBank className="h-5 w-5" />}
+            iconClass="icon-tile-3"
+            title="Cost Center"
+            description="Biaya gaji, pemakaian stok, dan Gross Profit per outlet."
+          />
         </div>
       </div>
     </div>

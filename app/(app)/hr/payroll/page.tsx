@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Upload, Store, Building2, ClipboardList } from "lucide-react";
+import { ArrowLeft, Upload, Store, Building2, ClipboardList } from "lucide-react";
 import { useAuthContext } from "../../../components/AuthContext";
+import { ModuleCard } from "../../../components/ModuleCard";
 
 export default function PayrollHomePage() {
   const { user } = useAuthContext();
@@ -22,60 +23,40 @@ export default function PayrollHomePage() {
           {readOnly ? "Lihat perhitungan & slip gaji outlet." : "Upload absensi, lalu hitung gaji outlet dan gaji kantor secara terpisah."}
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {!readOnly && (
-        <Link href="/hr/payroll/absensi" className="group">
-          <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-3 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
-              <Upload className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-heading font-semibold mt-2.5">Upload Data Absen</h2>
-            <p className="text-muted-foreground text-sm mt-1">Import rekap absensi dari mesin fingerprint untuk dasar hitung gaji.</p>
-            <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
-              Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-            </div>
-          </div>
-        </Link>
+          <ModuleCard
+            href="/hr/payroll/absensi"
+            icon={<Upload className="h-5 w-5" />}
+            iconClass="icon-tile-3"
+            title="Upload Data Absen"
+            description="Import rekap absensi dari mesin fingerprint untuk dasar hitung gaji."
+          />
         )}
         {!readOnly && (
-        <Link href="/hr/payroll/rekap-absensi" className="group">
-          <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-1 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
-              <ClipboardList className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-heading font-semibold mt-2.5">Rekap Absensi</h2>
-            <p className="text-muted-foreground text-sm mt-1">Lihat ringkasan hari hadir & jam kerja per karyawan per periode.</p>
-            <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
-              Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-            </div>
-          </div>
-        </Link>
+          <ModuleCard
+            href="/hr/payroll/rekap-absensi"
+            icon={<ClipboardList className="h-5 w-5" />}
+            iconClass="icon-tile-1"
+            title="Rekap Absensi"
+            description="Lihat ringkasan hari hadir & jam kerja per karyawan per periode."
+          />
         )}
-        <Link href="/hr/payroll/outlet" className="group">
-          <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-2 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
-              <Store className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-heading font-semibold mt-2.5">Perhitungan Gaji Outlet</h2>
-            <p className="text-muted-foreground text-sm mt-1">Gaji pokok + uang makan/lembur dari absensi untuk karyawan outlet.</p>
-            <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
-              Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-            </div>
-          </div>
-        </Link>
+        <ModuleCard
+          href="/hr/payroll/outlet"
+          icon={<Store className="h-5 w-5" />}
+          iconClass="icon-tile-2"
+          title="Perhitungan Gaji Outlet"
+          description="Gaji pokok + uang makan/lembur dari absensi untuk karyawan outlet."
+        />
         {!readOnly && (
-        <Link href="/hr/payroll/kantor" className="group">
-          <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-tile-4 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
-              <Building2 className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-heading font-semibold mt-2.5">Perhitungan Gaji Kantor</h2>
-            <p className="text-muted-foreground text-sm mt-1">Gaji tetap + uang makan, lembur, keterlambatan & BPJS kantor.</p>
-            <div className="flex items-center gap-1 text-sm font-medium text-primary mt-3">
-              Buka <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-            </div>
-          </div>
-        </Link>
+          <ModuleCard
+            href="/hr/payroll/kantor"
+            icon={<Building2 className="h-5 w-5" />}
+            iconClass="icon-tile-4"
+            title="Perhitungan Gaji Kantor"
+            description="Gaji tetap + uang makan, lembur, keterlambatan & BPJS kantor."
+          />
         )}
       </div>
     </div>
