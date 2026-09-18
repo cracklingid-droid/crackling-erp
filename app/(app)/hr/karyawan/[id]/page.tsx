@@ -443,7 +443,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <fieldset disabled={readOnly} className="contents">
-    <div className="max-w-3xl grid gap-6">
+    <div className="max-w-4xl grid gap-6">
       <div>
         <Link href="/hr/karyawan" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Database Karyawan
