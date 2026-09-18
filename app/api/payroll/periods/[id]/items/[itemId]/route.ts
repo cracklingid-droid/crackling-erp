@@ -47,6 +47,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; i
     return NextResponse.json({ error: "Periode ini sudah difinalisasi, tidak bisa diedit lagi" }, { status: 400 });
   }
 
+  const existing = await prisma.payrollItem.findUnique({
+    where: { id: Number(itemId) },
+    select: { periodId: true, employeeId: true, depositDeduction: true, depositRefund: true, employee: { select: { kantorFuelRatePerKm: true } } },
+  });
+  // Item HARUS benar-benar milik periode di URL - tanpa ini, itemId dari
+  // periode LAIN (termasuk yang sudah final) bisa dikirim lewat URL periode
+  // draft manapun, lolos cek status/lock di atas (yang ngecek periode di
+  // URL, bukan periode asli item-nya) & bypass field-locking. Ditemukan
+  // saat audit keamanan 2026-09-18 - semua route sepupu
+  // (notes/slip-pdf/dst) sudah benar melakukan ini, cuma route ini yang
+  // terlewat.
+  if (!existing || existing.periodId !== Number(id)) {
+    return NextResponse.json({ error: "Item gaji tidak ditemukan di periode ini" }, { status: 404 });
+  }
+
   const body = await req.json();
   const data: Record<string, unknown> = {};
   for (const f of NUMBER_FIELDS) {
@@ -58,11 +73,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; i
     if (f in body) data[f] = Number(body[f]) || 0;
   }
   if ("note" in body) data.note = body.note || null;
-
-  const existing = await prisma.payrollItem.findUnique({
-    where: { id: Number(itemId) },
-    select: { employeeId: true, depositDeduction: true, depositRefund: true, employee: { select: { kantorFuelRatePerKm: true } } },
-  });
 
   // Reimburse Bensin (Kantor): KM diinput manual, tapi nominalnya SELALU
   // diturunkan dari KM x rate karyawan - tidak pernah diketik langsung, biar

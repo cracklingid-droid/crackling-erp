@@ -420,7 +420,11 @@ model OvertimeRequest {
 
   createdAt DateTime @default(now())
 
-  @@index([employeeId, date])
+  // Unik per karyawan+tanggal (bukan cuma index) - cegah pengajuan dobel
+  // kalau tombol "Ajukan Lembur" ke-tap 2x (wajar terjadi, tombolnya nunggu
+  // upload foto dulu). Ditemukan saat audit 2026-09-18, pola sama dgn
+  // InterviewSlot/PayrollPeriod di app ini.
+  @@unique([employeeId, date])
   @@index([status])
 }
 

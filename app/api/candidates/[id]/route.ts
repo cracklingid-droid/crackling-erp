@@ -78,20 +78,36 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     stageChanged = true;
   }
 
-  const candidate = await prisma.$transaction(async (tx) => {
-    const updated = await tx.candidate.update({ where: { id: candidateId }, data });
-    if (stageChanged) {
-      await tx.candidateStageEvent.create({
-        data: {
-          candidateId,
-          stage: body.stage,
-          note: typeof body.stageNote === "string" ? body.stageNote : null,
-          createdById: user.id,
-        },
-      });
+  // Sentinel dilempar dalam transaksi kalau tahap sudah berubah duluan oleh
+  // request lain (double-klik/2 tab) - ditangkap di luar & jadi 409, bukan
+  // dobel-catat CandidateStageEvent + dobel-kirim email/side-effect lain di
+  // bawah. Pola sama dgn app/api/overtime-requests/[id]/decide/route.ts.
+  // Ditemukan saat audit keamanan 2026-09-18.
+  class StageRaceError extends Error {}
+  let candidate;
+  try {
+    candidate = await prisma.$transaction(async (tx) => {
+      if (stageChanged) {
+        const { count } = await tx.candidate.updateMany({ where: { id: candidateId, stage: previousStage as string }, data });
+        if (count === 0) throw new StageRaceError();
+        await tx.candidateStageEvent.create({
+          data: {
+            candidateId,
+            stage: body.stage,
+            note: typeof body.stageNote === "string" ? body.stageNote : null,
+            createdById: user.id,
+          },
+        });
+        return tx.candidate.findUniqueOrThrow({ where: { id: candidateId } });
+      }
+      return tx.candidate.update({ where: { id: candidateId }, data });
+    });
+  } catch (e) {
+    if (e instanceof StageRaceError) {
+      return NextResponse.json({ error: "Tahap kandidat sudah diubah pihak lain, muat ulang halaman" }, { status: 409 });
     }
-    return updated;
-  });
+    throw e;
+  }
 
   if (stageChanged && body.stage === "rejected") {
     await deleteCvForRejectedCandidate(candidateId);

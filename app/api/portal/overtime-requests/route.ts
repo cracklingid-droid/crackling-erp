@@ -35,13 +35,22 @@ export async function POST(req: Request) {
   // dilampirkan sifatnya wajib".
   if (!photoUrl) return NextResponse.json({ error: "Foto pekerjaan wajib dilampirkan" }, { status: 400 });
 
-  const created = await prisma.overtimeRequest.create({
-    data: {
-      employeeId: employee.id,
-      date: new Date(date),
-      reason: reason.trim(),
-      photoUrl,
-    },
-  });
-  return NextResponse.json(created, { status: 201 });
+  try {
+    const created = await prisma.overtimeRequest.create({
+      data: {
+        employeeId: employee.id,
+        date: new Date(date),
+        reason: reason.trim(),
+        photoUrl,
+      },
+    });
+    return NextResponse.json(created, { status: 201 });
+  } catch (e: unknown) {
+    // Cegah pengajuan dobel kalau tombol ke-tap 2x (unique constraint di
+    // schema.prisma) - ditemukan saat audit keamanan 2026-09-18.
+    if (typeof e === "object" && e !== null && "code" in e && e.code === "P2002") {
+      return NextResponse.json({ error: "Sudah ada pengajuan lembur utk tanggal ini." }, { status: 409 });
+    }
+    throw e;
+  }
 }
