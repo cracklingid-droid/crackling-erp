@@ -32,38 +32,51 @@ export async function createNextOutletPeriod(createdById: number | null): Promis
   const inCategory = employees.filter((e) => employeeCategory(e.outlet) === "outlet");
   const summaries = await computeAttendanceSummaries(inCategory.map((e) => e.id), range.start, range.end);
 
-  const period = await prisma.$transaction(async (tx) => {
-    const created = await tx.payrollPeriod.create({
-      data: { label, category: "outlet", startDate: range.start, endDate: range.end, createdById: createdById ?? undefined },
-    });
-
-    for (const emp of inCategory) {
-      const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0, incompleteClockInCount: 0, incompleteClockOutCount: 0 };
-
-      // Deposit wajib karyawan kontrak - Rp250rb otomatis di 2 periode
-      // pertama, berhenti sendiri setelahnya. Permintaan Kevin 2026-09-11.
-      const isContractDepositDue = emp.employmentStatus === "kontrak" && emp.depositInstallmentsPaid < CONTRACT_DEPOSIT_INSTALLMENT_COUNT;
-      const depositDeduction = isContractDepositDue ? CONTRACT_DEPOSIT_INSTALLMENT : 0;
-
-      await tx.payrollItem.create({
-        data: {
-          periodId: created.id,
-          employeeId: emp.id,
-          ...computeOutletPayrollFields(emp, daysPresent, overtimeMinutes),
-          depositDeduction,
-        },
+  // Cek `dup` di atas TIDAK cukup sendirian - race condition (cron & klik
+  // manual HR bisa lolos cek bersamaan). Constraint unik
+  // @@unique([category, startDate, endDate]) di schema.prisma yang jadi
+  // penjaga sebenarnya - P2002 di sini berarti request lain menang duluan.
+  // Ditemukan saat audit 2026-09-18.
+  let period;
+  try {
+    period = await prisma.$transaction(async (tx) => {
+      const created = await tx.payrollPeriod.create({
+        data: { label, category: "outlet", startDate: range.start, endDate: range.end, createdById: createdById ?? undefined },
       });
 
-      if (isContractDepositDue) {
-        await tx.employee.update({
-          where: { id: emp.id },
-          data: { depositInstallmentsPaid: { increment: 1 }, depositBalance: { increment: CONTRACT_DEPOSIT_INSTALLMENT } },
-        });
-      }
-    }
+      for (const emp of inCategory) {
+        const { daysPresent, overtimeMinutes } = summaries.get(emp.id) ?? { daysPresent: 0, overtimeMinutes: 0, totalMinutes: 0, lateCount: 0, incompleteClockInCount: 0, incompleteClockOutCount: 0 };
 
-    return created;
-  });
+        // Deposit wajib karyawan kontrak - Rp250rb otomatis di 2 periode
+        // pertama, berhenti sendiri setelahnya. Permintaan Kevin 2026-09-11.
+        const isContractDepositDue = emp.employmentStatus === "kontrak" && emp.depositInstallmentsPaid < CONTRACT_DEPOSIT_INSTALLMENT_COUNT;
+        const depositDeduction = isContractDepositDue ? CONTRACT_DEPOSIT_INSTALLMENT : 0;
+
+        await tx.payrollItem.create({
+          data: {
+            periodId: created.id,
+            employeeId: emp.id,
+            ...computeOutletPayrollFields(emp, daysPresent, overtimeMinutes),
+            depositDeduction,
+          },
+        });
+
+        if (isContractDepositDue) {
+          await tx.employee.update({
+            where: { id: emp.id },
+            data: { depositInstallmentsPaid: { increment: 1 }, depositBalance: { increment: CONTRACT_DEPOSIT_INSTALLMENT } },
+          });
+        }
+      }
+
+      return created;
+    });
+  } catch (e: unknown) {
+    if (typeof e === "object" && e !== null && "code" in e && e.code === "P2002") {
+      return { created: false, reason: `Periode utk rentang ini sudah dibuat request lain (race condition dicegah).` };
+    }
+    throw e;
+  }
 
   return { created: true, period: { id: period.id, label: period.label, startDate: period.startDate, endDate: period.endDate } };
 }

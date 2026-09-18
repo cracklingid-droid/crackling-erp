@@ -61,32 +61,42 @@ export async function POST(req: Request) {
   const schedules = new Map(inCategory.map((e) => [e.id, e.scheduleStart]));
   const summaries = await computeAttendanceSummaries(inCategory.map((e) => e.id), startDate, endDate, schedules);
 
-  const period = await prisma.$transaction(async (tx) => {
-    const created = await tx.payrollPeriod.create({
-      data: { label, category, startDate, endDate, createdById: user.id },
+  try {
+    const period = await prisma.$transaction(async (tx) => {
+      const created = await tx.payrollPeriod.create({
+        data: { label, category, startDate, endDate, createdById: user.id },
+      });
+
+      for (const emp of inCategory) {
+        const s = summaries.get(emp.id) ?? {
+          daysPresent: 0,
+          overtimeMinutes: 0,
+          totalMinutes: 0,
+          lateCount: 0,
+          incompleteClockInCount: 0,
+          incompleteClockOutCount: 0,
+        };
+
+        await tx.payrollItem.create({
+          data: {
+            periodId: created.id,
+            employeeId: emp.id,
+            ...computeKantorPayrollFields(emp, s),
+          },
+        });
+      }
+
+      return created;
     });
 
-    for (const emp of inCategory) {
-      const s = summaries.get(emp.id) ?? {
-        daysPresent: 0,
-        overtimeMinutes: 0,
-        totalMinutes: 0,
-        lateCount: 0,
-        incompleteClockInCount: 0,
-        incompleteClockOutCount: 0,
-      };
-
-      await tx.payrollItem.create({
-        data: {
-          periodId: created.id,
-          employeeId: emp.id,
-          ...computeKantorPayrollFields(emp, s),
-        },
-      });
+    return NextResponse.json(period, { status: 201 });
+  } catch (e: unknown) {
+    // Cegah double-klik "Buat Periode" bikin periode dobel utk rentang
+    // tanggal sama - ditangkap DB constraint unik, bukan cuma UI. Ditemukan
+    // saat audit 2026-09-18.
+    if (typeof e === "object" && e !== null && "code" in e && e.code === "P2002") {
+      return NextResponse.json({ error: "Periode utk rentang tanggal ini sudah ada." }, { status: 400 });
     }
-
-    return created;
-  });
-
-  return NextResponse.json(period, { status: 201 });
+    throw e;
+  }
 }

@@ -585,6 +585,12 @@ model PayrollPeriod {
   items      PayrollItem[]
   eventNotes PayrollEventNote[]
 
+  // Cegah 2 periode dgn rentang tanggal sama persis di kategori yang sama -
+  // sebelumnya cuma dicek via findFirst di lib/payroll-outlet-auto.ts
+  // (race condition TOCTOU: cron & klik manual HR bisa lolos cek
+  // bersamaan, bikin periode dobel + deposit kontrak terpotong 2x).
+  // Ditemukan saat audit keamanan/data-integrity 2026-09-18.
+  @@unique([category, startDate, endDate])
   @@index([category, startDate])
 }
 

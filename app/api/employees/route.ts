@@ -2,21 +2,51 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireHrReadUser, requireHrWriteUser } from "@/lib/hr-access";
 import { hasHrWriteAccess } from "@/lib/roles";
-import { employeeCategory } from "@/lib/payroll-config";
+import { OUTLET_NAMES } from "@/lib/payroll-config";
 
 export async function GET() {
   const { user, error } = await requireHrReadUser();
   if (error) return error;
 
+  // "manager" cuma boleh lihat Database Karyawan Resto (view-only,
+  // permintaan Kevin 2026-09-13) - disaring lewat WHERE di query, bukan
+  // fetch semua kolom+baris dulu baru filter di JS (pola rapuh: perubahan
+  // response di masa depan bisa lupa filter & bocorkan PII karyawan Kantor
+  // ke manager - ditemukan saat audit 2026-09-18, sama bentuknya dgn bug
+  // nyata yang pernah ada di Crackling Warehouse).
+  //
+  // select eksplisit jg sengaja dipersempit ke field yang benar2 dipakai
+  // halaman list (lihat type Employee di app/(app)/hr/karyawan/page.tsx) -
+  // field sensitif lain (gaji, deposit, rate payroll, portalPasswordEnc,
+  // dst) TIDAK ikut terkirim ke browser utk halaman ini.
   const employees = await prisma.employee.findMany({
-    include: { documents: { select: { type: true } } },
+    where: hasHrWriteAccess(user) ? undefined : { outlet: { in: OUTLET_NAMES } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      employeeCode: true,
+      position: true,
+      outlet: true,
+      employmentStatus: true,
+      status: true,
+      photoUrl: true,
+      ktpNumber: true,
+      address: true,
+      birthDate: true,
+      bankName: true,
+      bankAccountNumber: true,
+      bankAccountHolder: true,
+      npwp: true,
+      bpjsKesehatanNumber: true,
+      bpjsKetenagakerjaanNumber: true,
+      documents: { select: { type: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
-  // "manager" cuma boleh lihat Database Karyawan Resto (view-only,
-  // permintaan Kevin 2026-09-13) - Kantor disaring keluar sebelum dikirim.
-  const scoped = hasHrWriteAccess(user) ? employees : employees.filter((e) => employeeCategory(e.outlet) === "outlet");
-  return NextResponse.json(scoped);
+  return NextResponse.json(employees);
 }
 
 // Tambah karyawan manual - untuk karyawan lama yang tidak lewat pipeline

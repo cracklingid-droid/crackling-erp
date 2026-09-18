@@ -1,7 +1,6 @@
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import { Readable } from "stream";
-import { toLocalDateString } from "./date-utils";
 
 // Baca file absensi (xls/xlsx/csv) jadi array baris (tiap baris = array
 // string per kolom, sudah termasuk baris header). Dipakai baik utk preview
@@ -79,16 +78,42 @@ function cellToString(v: unknown): string {
 // best-effort. Baris yang gagal diparse dilewati & dihitung di ringkasan
 // import, bukan bikin gagal semua (permintaan implisit: jangan diam-diam
 // salah, tapi juga jangan berhenti total krn 1 baris rusak).
+//
+// KONTRAK PENTING: Date yang dikembalikan SELALU menyimpan jam-dinding yang
+// diparse di KOMPONEN UTC-nya (bukan instant UTC sungguhan) - sesuai
+// konvensi penyimpanan absensi di lib/wib-time.ts. Dibangun eksplisit lewat
+// Date.UTC(...), BUKAN `new Date(y, mo, d, h, mi, s)` (konstruktor lokal)
+// atau `new Date(raw)` mentah - keduanya di-parse mengikuti timezone
+// PROSES server (V8 membaca "YYYY-MM-DD HH:MM:SS" sbg waktu lokal, bukan
+// UTC). Kebetulan benar selama ini krn Vercel default TZ=UTC, tapi diam-diam
+// salah 7 jam kalau proses pernah jalan di TZ lain. Ditemukan & diperbaiki
+// 2026-09-18 (audit keamanan/data-integrity menyeluruh). Semua pemanggil
+// WAJIB baca hasilnya pakai getUTC*() juga, bukan getFullYear()/getHours()
+// dst - lihat buildAttendanceGroups di bawah.
 function parseDateTime(raw: string): Date | null {
   if (!raw) return null;
-  const direct = new Date(raw);
-  if (!isNaN(direct.getTime())) return direct;
-  const m = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  if (m) {
-    const [, d, mo, y, h = "0", mi = "0", s = "0"] = m;
-    const year = y.length === 2 ? 2000 + Number(y) : Number(y);
-    const dt = new Date(year, Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (iso) {
+    const [, y, mo, d, h = "0", mi = "0", s = "0"] = iso;
+    const dt = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s)));
     if (!isNaN(dt.getTime())) return dt;
+  }
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (dmy) {
+    const [, d, mo, y, h = "0", mi = "0", s = "0"] = dmy;
+    const year = y.length === 2 ? 2000 + Number(y) : Number(y);
+    const dt = new Date(Date.UTC(year, Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s)));
+    if (!isNaN(dt.getTime())) return dt;
+  }
+  // Fallback terakhir utk format eksotis yang tidak cocok pola di atas -
+  // native parse masih TZ-dependent utk kasus langka ini (tidak lebih
+  // buruk dari sebelumnya), tapi hasilnya dinormalisasi balik ke kontrak
+  // UTC-components di atas spy pemanggil tetap konsisten.
+  const direct = new Date(raw);
+  if (!isNaN(direct.getTime())) {
+    return new Date(
+      Date.UTC(direct.getFullYear(), direct.getMonth(), direct.getDate(), direct.getHours(), direct.getMinutes(), direct.getSeconds())
+    );
   }
   return null;
 }
@@ -139,10 +164,16 @@ export function buildAttendanceGroups(
           const raw = row[colIdx] ?? "";
           const t = parseTimeOfDay(raw) ?? (() => {
             const full = parseDateTime(raw);
-            return full ? { h: full.getHours(), m: full.getMinutes(), s: full.getSeconds() } : null;
+            // full ikut kontrak UTC-components parseDateTime - baca via
+            // getUTC*(), bukan getHours()/dst (TZ-dependent). Ditemukan &
+            // diperbaiki 2026-09-18.
+            return full ? { h: full.getUTCHours(), m: full.getUTCMinutes(), s: full.getUTCSeconds() } : null;
           })();
           if (t) {
-            found.push(new Date(dateBase.getFullYear(), dateBase.getMonth(), dateBase.getDate(), t.h, t.m, t.s));
+            // dateBase juga ikut kontrak UTC-components - Date.UTC di sini
+            // (bukan konstruktor lokal) spy jam absensi tidak bergantung
+            // timezone proses server. Ditemukan & diperbaiki 2026-09-18.
+            found.push(new Date(Date.UTC(dateBase.getUTCFullYear(), dateBase.getUTCMonth(), dateBase.getUTCDate(), t.h, t.m, t.s)));
           }
         }
       }
@@ -153,7 +184,12 @@ export function buildAttendanceGroups(
       continue;
     }
 
-    const dateKey = toLocalDateString(found[0]);
+    // toLocalDateString() baca komponen LOKAL (benar utk Date instant asli),
+    // tapi found[] di atas ikut kontrak UTC-components-nya parseDateTime -
+    // ambil tanggal dari situ langsung spy tidak bergantung timezone proses
+    // server. Ditemukan & diperbaiki 2026-09-18.
+    const d0 = found[0];
+    const dateKey = `${d0.getUTCFullYear()}-${String(d0.getUTCMonth() + 1).padStart(2, "0")}-${String(d0.getUTCDate()).padStart(2, "0")}`;
     const key = `${name}|${dateKey}`;
     const existing = perKey.get(key);
     if (existing) {
