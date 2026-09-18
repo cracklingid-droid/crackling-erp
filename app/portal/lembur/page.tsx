@@ -12,6 +12,7 @@ import { Clock3, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { usePortalContext } from "../layout";
 import { isSpvPosition } from "@/lib/roles";
+import { EmptyState } from "@/app/components/EmptyState";
 
 type OvertimeRequest = {
   id: number;
@@ -133,7 +134,7 @@ export default function PortalLemburPage() {
         {requests === null ? (
           <p className="text-sm text-muted-foreground">Memuat...</p>
         ) : requests.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Belum ada pengajuan lembur.</p>
+          <EmptyState icon={Clock3} title="Belum ada pengajuan lembur" />
         ) : (
           <div className="grid gap-2">
             {requests.map((r) => {

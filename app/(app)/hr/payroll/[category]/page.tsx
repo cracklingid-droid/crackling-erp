@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Plus, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Lock, Wallet } from "lucide-react";
+import { EmptyState } from "../../../../components/EmptyState";
 import { getDefaultPeriodRange, toDateInputValue } from "@/lib/payroll-period-cycle";
 import { nextOutletPeriodRange, outletPeriodLabel } from "@/lib/payroll-outlet-schedule";
 import { useAuthContext } from "../../../../components/AuthContext";
@@ -204,7 +205,7 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
 
       <div className="grid gap-2">
         {!loading && periods.length === 0 && (
-          <p className="text-sm text-muted-foreground">Belum ada periode gaji {categoryLabel.toLowerCase()}.</p>
+          <EmptyState icon={Wallet} title={`Belum ada periode gaji ${categoryLabel.toLowerCase()}`} />
         )}
         {periods.map((p) => (
           <Link

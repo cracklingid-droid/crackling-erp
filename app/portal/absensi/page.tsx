@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Camera, MapPin, CheckCircle2, LogIn, LogOut, Loader2, RefreshCw, ScanFace } from "lucide-react";
+import { Camera, MapPin, CheckCircle2, LogIn, LogOut, Loader2, RefreshCw, ScanFace, History } from "lucide-react";
+import { EmptyState } from "@/app/components/EmptyState";
 
 type AttendanceRecord = {
   id: number;
@@ -290,7 +291,7 @@ export default function PortalAbsensiPage() {
         {loading ? (
           <p className="text-sm text-muted-foreground">Memuat...</p>
         ) : !data || data.history.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Belum ada riwayat absensi.</p>
+          <EmptyState icon={History} title="Belum ada riwayat absensi" />
         ) : (
           <div className="grid gap-1.5">
             {data.history.map((h) => (

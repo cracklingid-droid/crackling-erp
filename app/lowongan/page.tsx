@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Briefcase } from "lucide-react";
+import { EmptyState } from "@/app/components/EmptyState";
 
 type Posting = {
   id: number;
@@ -40,7 +41,7 @@ export default function LowonganPage() {
         <div className="grid gap-3 mt-8">
           {loading && <p className="text-sm text-muted-foreground">Memuat...</p>}
           {!loading && postings.length === 0 && (
-            <p className="text-sm text-muted-foreground">Belum ada lowongan yang dibuka saat ini. Silakan cek kembali nanti.</p>
+            <EmptyState icon={Briefcase} title="Belum ada lowongan dibuka" description="Silakan cek kembali di lain waktu." />
           )}
           {postings.map((p) => (
             <Link key={p.id} href={`/lowongan/${p.id}`}>

@@ -10,6 +10,7 @@ import { Clock3, Check, X, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthContext } from "../../components/AuthContext";
 import { canDecideOvertimeStage } from "@/lib/roles";
+import { EmptyState } from "../../components/EmptyState";
 
 type OvertimeRequest = {
   id: number;
@@ -98,7 +99,11 @@ export default function LemburApprovalPage() {
           <div>
             <h2 className="text-sm font-medium text-muted-foreground mb-2">Menunggu Keputusan ({pending.length})</h2>
             {pending.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Tidak ada pengajuan menunggu.</p>
+              <EmptyState
+                icon={Clock3}
+                title="Tidak ada pengajuan menunggu"
+                description="Pengajuan lembur SPV yang baru akan muncul di sini untuk diputuskan."
+              />
             ) : (
               <div className="grid gap-2">
                 {pending.map((r) => {

@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, ArrowRight, FileQuestion } from "lucide-react";
+import { ArrowLeft, Plus, ArrowRight, FileQuestion, Briefcase } from "lucide-react";
+import { EmptyState } from "@/app/components/EmptyState";
 
 type Position = {
   id: number;
@@ -102,7 +103,7 @@ export default function PosisiPage() {
 
       {loading && <p className="text-sm text-muted-foreground">Memuat...</p>}
       {!loading && positions.length === 0 && (
-        <p className="text-sm text-muted-foreground">Belum ada posisi. Klik &quot;Posisi Baru&quot; untuk mulai.</p>
+        <EmptyState icon={Briefcase} title="Belum ada posisi" description={'Klik "Posisi Baru" di atas untuk mulai.'} />
       )}
 
       <div className="grid gap-3">
