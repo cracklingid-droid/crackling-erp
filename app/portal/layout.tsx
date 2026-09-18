@@ -35,9 +35,14 @@ function navItemsFor(employee: PortalEmployee | null) {
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/portal/login";
+  // Halaman wajib-ganti-password dirender polos (tanpa header/nav) sama
+  // spt login - karyawan tidak boleh "kabur" ke menu lain lewat nav sebelum
+  // selesai ganti password. usePortalAuth sendiri yang urus redirect balik
+  // kalau belum login sama sekali. Permintaan Kevin 2026-09-18.
+  const isResetPasswordPage = pathname === "/portal/reset-password";
   const { employee, loading, logout } = usePortalAuth(!isLoginPage);
 
-  if (isLoginPage) return children;
+  if (isLoginPage || isResetPasswordPage) return children;
 
   if (loading || !employee) {
     return <div className="flex items-center justify-center min-h-screen text-sm text-muted-foreground">Memuat...</div>;

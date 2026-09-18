@@ -176,6 +176,15 @@ model Employee {
   candidateId Int?       @unique
   candidate   Candidate? @relation(fields: [candidateId], references: [id])
 
+  // Password Portal Karyawan yang sudah diganti sendiri oleh karyawan
+  // (terenkripsi, bisa didekripsi - BUKAN hash satu arah), null selama
+  // karyawan belum pernah reset = masih pakai password default (kode+tahun
+  // lahir, lihat lib/employee-portal.ts). Karyawan WAJIB reset saat login
+  // pertama kali; HR bisa lihat password aktif ini di Database Karyawan utk
+  // bantu kalau lupa, atau klik "Reset ke Default" (set balik ke null) kalau
+  // perlu. Trade-off keamanan disadari & dikonfirmasi Kevin 2026-09-18.
+  portalPasswordEnc String?
+
   employeeCode String?   @unique // ID/kode karyawan internal (opsional), diisi HR
   ktpNumber    String? // No. KTP/NIK kependudukan (16 digit) - beda dari employeeCode
   name         String

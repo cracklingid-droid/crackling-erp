@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireHrReadUser, requireHrWriteUser, canViewCategory } from "@/lib/hr-access";
 import { employeeCategory } from "@/lib/payroll-config";
 import { getMissingOnboardingFields } from "@/lib/employee-onboarding";
+import { decryptPortalPassword } from "@/lib/portal-password-crypto";
 
 // Rate Payroll Kantor (permintaan Kevin 2026-09-13) - nullable, dikosongkan
 // kalau string kosong sama seperti field rate Outlet yang sudah ada.
@@ -68,7 +69,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!canViewCategory(user, employeeCategory(employee.outlet))) {
     return NextResponse.json({ error: "Tidak punya akses ke data karyawan ini" }, { status: 403 });
   }
-  return NextResponse.json(employee);
+  // portalPasswordEnc mentah TIDAK pernah dikirim ke client - didekripsi
+  // dulu di server jadi portalPasswordCurrent (null = karyawan belum pernah
+  // ganti password, masih pakai default). Permintaan Kevin 2026-09-18.
+  const { portalPasswordEnc, ...rest } = employee;
+  return NextResponse.json({
+    ...rest,
+    portalPasswordCurrent: portalPasswordEnc ? decryptPortalPassword(portalPasswordEnc) : null,
+  });
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -122,6 +130,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if ("faceReferenceUrl" in body && body.faceReferenceUrl === null) {
     data.faceReferenceUrl = null;
     data.faceReferenceUpdatedAt = null;
+  }
+  // HR cuma boleh RESET password portal ke default (null) lewat sini - tidak
+  // boleh diisi nilai baru (harus karyawan sendiri yang set lewat Portal),
+  // sama pola dgn faceReferenceUrl di atas. Permintaan Kevin 2026-09-18.
+  if ("portalPasswordEnc" in body && body.portalPasswordEnc === null) {
+    data.portalPasswordEnc = null;
   }
 
   const current = await prisma.employee.findUnique({
@@ -185,7 +199,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       }
       return updated;
     });
-    return NextResponse.json(employee);
+    const { portalPasswordEnc, ...rest } = employee;
+    return NextResponse.json({
+      ...rest,
+      portalPasswordCurrent: portalPasswordEnc ? decryptPortalPassword(portalPasswordEnc) : null,
+    });
   } catch (e: unknown) {
     if (typeof e === "object" && e !== null && "code" in e && e.code === "P2002") {
       return NextResponse.json({ error: "NIK/ID Karyawan sudah dipakai karyawan lain." }, { status: 400 });

@@ -145,6 +145,9 @@ type Employee = {
   offboardingDepositSettled: boolean;
   faceReferenceUrl: string | null;
   faceReferenceUpdatedAt: string | null;
+  // Password aktif portal karyawan, sudah didekripsi server - null berarti
+  // karyawan belum pernah ganti, masih pakai default (kode+tahun lahir).
+  portalPasswordCurrent: string | null;
 };
 
 function toDateInput(iso: string | null) {
@@ -184,6 +187,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [resettingFace, setResettingFace] = useState(false);
+  const [resettingPortalPassword, setResettingPortalPassword] = useState(false);
   const [otherEmployees, setOtherEmployees] = useState<EmployeeRef[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -272,6 +276,24 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     } else {
       const err = await res.json();
       toast.error("Gagal: " + err.error);
+    }
+  }
+
+  async function handleResetPortalPassword() {
+    if (!confirm("Reset password portal karyawan ini ke default (ID Karyawan + tahun lahir)? Karyawan akan diwajibkan ganti password lagi saat login berikutnya."))
+      return;
+    setResettingPortalPassword(true);
+    const res = await fetch(`/api/employees/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ portalPasswordEnc: null }),
+    });
+    setResettingPortalPassword(false);
+    if (res.ok) {
+      toast.success("Password portal direset ke default.");
+      load();
+    } else {
+      toast.error("Gagal reset password portal.");
     }
   }
 
@@ -503,17 +525,20 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                 <p className="text-sm font-mono font-medium">{employee.employeeCode}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Password</p>
-                <p className="text-sm font-mono font-medium">{derivePortalPassword(employee.employeeCode!, employee.birthDate!)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Password {employee.portalPasswordCurrent ? "Aktif (sudah diganti karyawan)" : "Default (belum diganti)"}
+                </p>
+                <p className="text-sm font-mono font-medium">
+                  {employee.portalPasswordCurrent ?? derivePortalPassword(employee.employeeCode!, employee.birthDate!)}
+                </p>
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  navigator.clipboard.writeText(
-                    `ID: ${employee.employeeCode}\nPassword: ${derivePortalPassword(employee.employeeCode!, employee.birthDate!)}\nLogin di: /portal/login`
-                  );
+                  const password = employee.portalPasswordCurrent ?? derivePortalPassword(employee.employeeCode!, employee.birthDate!);
+                  navigator.clipboard.writeText(`ID: ${employee.employeeCode}\nPassword: ${password}\nLogin di: /portal/login`);
                   toast.success("ID & password disalin.");
                 }}
               >
@@ -526,18 +551,24 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                 disabled={!employee.phone}
                 title={!employee.phone ? "Isi No. HP / WhatsApp karyawan dulu di atas" : undefined}
                 onClick={() => {
-                  const password = derivePortalPassword(employee.employeeCode!, employee.birthDate!);
+                  const password = employee.portalPasswordCurrent ?? derivePortalPassword(employee.employeeCode!, employee.birthDate!);
                   const message = `Halo ${employee.name}, berikut akun Portal Karyawan Crackling untuk melihat profil, jadwal kerja, dan slip gaji Anda:\n\nID Karyawan: ${employee.employeeCode}\nPassword: ${password}\n\nSilakan login di: https://crackling-erp.vercel.app/portal/login\n\nMohon simpan informasi ini baik-baik. Terima kasih.`;
                   window.open(buildWaLink(employee.phone!, message), "_blank");
                 }}
               >
                 <MessageCircle className="h-3.5 w-3.5" /> Kirim ke WA
               </Button>
+              {employee.portalPasswordCurrent && (
+                <Button type="button" variant="outline" size="sm" onClick={handleResetPortalPassword} disabled={resettingPortalPassword}>
+                  <RotateCcw className="h-3.5 w-3.5" /> {resettingPortalPassword ? "Mereset..." : "Reset ke Default"}
+                </Button>
+              )}
             </div>
           )}
           <p className="text-xs text-muted-foreground mt-2">
-            Password tetap = ID Karyawan + tahun lahir, tidak berubah kecuali ID Karyawan atau Tanggal Lahir diedit. Karyawan
-            login di halaman Portal Karyawan utk lihat profil, roster & riwayat slip gaji sendiri.
+            Password AWAL = ID Karyawan + tahun lahir. Karyawan wajib menggantinya sendiri saat login pertama kali di Portal
+            Karyawan - setelah itu password di atas adalah yang aktif dipakai (Anda tetap bisa lihat/salin/kirim di sini utk
+            bantu kalau lupa). Kalau perlu, klik &quot;Reset ke Default&quot; utk mengembalikan ke password awal.
           </p>
         </CardContent>
       </Card>

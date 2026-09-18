@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentEmployee } from "@/lib/current-employee";
+import { mustResetPortalPassword } from "@/lib/employee-portal";
 
 export async function GET() {
   const employee = await getCurrentEmployee();
@@ -12,6 +13,7 @@ export async function GET() {
       position: employee.position,
       outlet: employee.outlet,
       photoUrl: employee.photoUrl,
+      mustResetPassword: mustResetPortalPassword(employee),
     },
   });
 }

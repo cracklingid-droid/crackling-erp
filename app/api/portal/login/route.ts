@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createEmployeeSessionToken, COOKIE_NAME, MAX_AGE_SECONDS } from "@/lib/employee-session";
 import { derivePortalPassword, canUsePortal } from "@/lib/employee-portal";
+import { decryptPortalPassword } from "@/lib/portal-password-crypto";
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -21,13 +22,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ID atau password salah" }, { status: 401 });
   }
 
-  const expected = derivePortalPassword(employee.employeeCode!, employee.birthDate!);
-  if (password.toUpperCase() !== expected.toUpperCase()) {
+  // Kalau karyawan sudah pernah ganti password sendiri (portalPasswordEnc
+  // terisi), itu yang berlaku - password default (kode+tahun lahir) tidak
+  // bisa dipakai lagi login kecuali HR reset. Perbandingan password custom
+  // case-sensitive (beda dari default, yang sengaja case-insensitive spy
+  // gampang diketik). Permintaan Kevin 2026-09-18.
+  let ok: boolean;
+  if (employee.portalPasswordEnc) {
+    const current = decryptPortalPassword(employee.portalPasswordEnc);
+    ok = current !== null && password === current;
+  } else {
+    const expected = derivePortalPassword(employee.employeeCode!, employee.birthDate!);
+    ok = password.toUpperCase() === expected.toUpperCase();
+  }
+  if (!ok) {
     return NextResponse.json({ error: "ID atau password salah" }, { status: 401 });
   }
 
   const token = createEmployeeSessionToken({ employeeId: employee.id, employeeCode: employee.employeeCode!, name: employee.name });
-  const res = NextResponse.json({ id: employee.id, name: employee.name, employeeCode: employee.employeeCode });
+  const res = NextResponse.json({
+    id: employee.id,
+    name: employee.name,
+    employeeCode: employee.employeeCode,
+    mustResetPassword: !employee.portalPasswordEnc,
+  });
   res.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
