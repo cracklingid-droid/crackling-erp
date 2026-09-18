@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Crosshair, Loader2, CheckCircle2, Search } from "lucide-react";
+import { ArrowLeft, MapPin, Crosshair, Loader2, CheckCircle2, Search, ExternalLink } from "lucide-react";
 
 type OutletLocationRow = {
   outlet: string;
@@ -246,6 +246,20 @@ function OutletRow({
           <Label className="text-xs">Radius (m)</Label>
           <Input type="number" min={10} max={1000} value={radiusValue} onChange={(e) => onRadiusChange(e.target.value)} className="w-24" />
         </div>
+        {row.lat != null && (
+          // Tombol cek lokasi yang sudah dipin - buka titik persis di Google
+          // Maps supaya HR/staff bisa lihat visual, bukan cuma percaya angka
+          // koordinat mentah. Permintaan Kevin 2026-09-18.
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${row.lat},${row.lng}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Button type="button" variant="outline" size="sm">
+              <ExternalLink className="h-3.5 w-3.5" /> Cek di Peta
+            </Button>
+          </a>
+        )}
         <Button type="button" variant={row.lat != null ? "outline" : "default"} size="sm" disabled={busy} onClick={onUseCurrentLocation}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crosshair className="h-3.5 w-3.5" />}
           Gunakan Lokasi Saat Ini
