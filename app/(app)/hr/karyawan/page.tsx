@@ -71,6 +71,7 @@ export default function KaryawanPage() {
   // pertahanan tambahan + sembunyikan tombol tulis di tampilan.
   const readOnly = user?.role === "manager";
   const [tab, setTab] = useState<"outlet" | "kantor">("outlet");
+  const [statusFilter, setStatusFilter] = useState<"active" | "resigned" | "all">("active");
   const [search, setSearch] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,18 +131,29 @@ export default function KaryawanPage() {
   const restoEmployees = employees.filter((e) => employeeCategory(e.outlet) === "outlet");
   const kantorEmployees = employees.filter((e) => employeeCategory(e.outlet) === "kantor");
   const tabEmployeesAll = tab === "outlet" ? restoEmployees : kantorEmployees;
+  // Filter Aktif/Resign/Semua di dalam tab Resto/Kantor - defaultnya "Aktif"
+  // supaya karyawan yang sudah resign tidak ikut memenuhi halaman begitu
+  // jumlahnya banyak (mis. sinkron massal dari sheet HR). Permintaan Kevin
+  // 2026-09-18.
+  const statusCounts = {
+    active: tabEmployeesAll.filter((e) => e.status === "active" || e.status === "onboarding").length,
+    resigned: tabEmployeesAll.filter((e) => e.status === "resigned").length,
+    all: tabEmployeesAll.length,
+  };
+  const statusFilteredEmployees =
+    statusFilter === "all" ? tabEmployeesAll : tabEmployeesAll.filter((e) => (statusFilter === "active" ? e.status !== "resigned" : e.status === "resigned"));
   // Pencarian nama/jabatan/outlet/kode - tabel makin panjang seiring
   // karyawan bertambah, tanpa filter jadi susah cari 1 orang. Permintaan
   // Kevin 2026-09-17.
   const q = search.trim().toLowerCase();
   const tabEmployees = q
-    ? tabEmployeesAll.filter((e) =>
+    ? statusFilteredEmployees.filter((e) =>
         [e.name, e.position, e.outlet, e.employeeCode].some((v) => v?.toLowerCase().includes(q))
       )
-    : tabEmployeesAll;
+    : statusFilteredEmployees;
 
   return (
-    <div className="max-w-5xl grid gap-6">
+    <div className="max-w-5xl min-w-0 grid gap-6">
       <div>
         <Link href="/hr" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Human Resource
@@ -242,7 +254,7 @@ export default function KaryawanPage() {
         </Card>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3 min-w-0">
         <Tabs value={tab} onValueChange={(v) => setTab(v as "outlet" | "kantor")}>
           <TabsList>
             <TabsIndicator />
@@ -250,7 +262,7 @@ export default function KaryawanPage() {
             {!readOnly && <TabsTab value="kantor">Kantor ({kantorEmployees.length})</TabsTab>}
           </TabsList>
         </Tabs>
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full min-w-0 flex-1 sm:w-56 sm:flex-none">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             value={search}
@@ -269,13 +281,28 @@ export default function KaryawanPage() {
           )}
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(["active", "resigned", "all"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+            }`}
+          >
+            {s === "active" ? "Aktif" : s === "resigned" ? "Resign" : "Semua"} ({statusCounts[s]})
+          </button>
+        ))}
+      </div>
       {q && (
         <p className="text-xs text-muted-foreground -mt-3">
           {tabEmployees.length} dari {tabEmployeesAll.length} karyawan cocok dengan &quot;{search}&quot;.
         </p>
       )}
 
-      <Card>
+      <Card className="min-w-0">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -293,7 +320,11 @@ export default function KaryawanPage() {
               {!loading && tabEmployees.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-muted-foreground">
-                    {q ? `Tidak ada karyawan yang cocok dengan pencarian.` : `Belum ada karyawan ${tab === "outlet" ? "resto" : "kantor"}.`}
+                    {q
+                      ? `Tidak ada karyawan yang cocok dengan pencarian.`
+                      : statusFilter !== "all"
+                        ? `Tidak ada karyawan ${statusFilter === "active" ? "aktif" : "resign"} di ${tab === "outlet" ? "resto" : "kantor"}.`
+                        : `Belum ada karyawan ${tab === "outlet" ? "resto" : "kantor"}.`}
                   </TableCell>
                 </TableRow>
               )}

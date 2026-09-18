@@ -26,6 +26,7 @@ const EMPLOYMENT_STATUS_OPTIONS = [
   { value: "kontrak", label: "Kontrak" },
   { value: "pkwt", label: "PKWT" },
   { value: "magang", label: "Magang" },
+  { value: "probation", label: "Probation" },
 ];
 const WEEKDAY_OPTIONS = [
   { value: 1, label: "Sen" },

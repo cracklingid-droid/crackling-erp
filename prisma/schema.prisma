@@ -189,7 +189,13 @@ model Employee {
   birthPlace   String?
   birthDate    DateTime?
   gender       String? // L | P
-  address      String?
+  address      String? // alamat domisili/tempat tinggal saat ini
+  addressKtp   String? // alamat sesuai KTP - bisa beda dari `address` (domisili). Permintaan Kevin 2026-09-18 (sinkron dari sheet HR).
+  ktpPhotoUrl  String? // link foto/scan KTP (mis. Google Drive) - referensi saja, tidak di-upload ulang ke Blob kita
+
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String? // hubungan dgn karyawan, mis. "Ibu"/"Istri"/"Teman"
 
   position         String? // jabatan
   outlet           String? // lokasi/cabang kerja
