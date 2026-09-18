@@ -26,31 +26,21 @@ import {
   Clock3,
   PiggyBank,
   TrendingUp,
-  BookOpen,
-  Contact,
-  Package,
-  Landmark,
-  ShoppingCart,
-  Boxes,
-  Receipt,
-  Scale,
-  FileBarChart,
   Warehouse,
-  FileText,
   LogOut,
   ChevronsUpDown,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import { useAuthContext } from "./AuthContext";
-import { canAccessCostCenter, canAccessAccounting, canAccessInvoicing, canViewOvertimeRequests, hasFullAccess } from "@/lib/roles";
+import { canAccessCostCenter, canViewOvertimeRequests, hasFullAccess } from "@/lib/roles";
 
 // Sidebar kiri ERP - pola SAMA dgn Crackling Warehouse (Sidebar
 // collapsible="icon": bisa diciutkan jadi rail ikon spy ruang kerja lebih
 // lebar). Permintaan Kevin 2026-09-15 ("UI seperti di modul warehouse,
 // semua tampilan di sebelah kiri, bisa disempitkan"). Menu difilter per
 // role - ini cuma UX, proteksi sebenarnya tetap di tiap API route & layout
-// guard (hr/layout.tsx, accounting/layout.tsx).
+// guard (hr/layout.tsx).
 type NavItem = { href: string; label: string; icon: typeof Users; external?: boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
@@ -87,27 +77,6 @@ function buildGroups(role: string | undefined): NavGroup[] {
         { href: "/cost-center/business-dashboard", label: "Business Dashboard", icon: TrendingUp },
       ],
     });
-  }
-
-  if (canAccessAccounting(user)) {
-    groups.push({
-      label: "Accounting",
-      items: [
-        { href: "/accounting/sales", label: "Record Sales", icon: ShoppingCart },
-        { href: "/accounting/cogs", label: "COGS (HPP)", icon: Boxes },
-        { href: "/accounting/expenses", label: "Direct Expense", icon: Receipt },
-        { href: "/accounting/reconciliation", label: "Rekonsiliasi", icon: Scale },
-        { href: "/accounting/reports", label: "Laporan", icon: FileBarChart },
-        { href: "/accounting/coa", label: "Chart of Accounts", icon: BookOpen },
-        { href: "/accounting/contacts", label: "Contact", icon: Contact },
-        { href: "/accounting/products", label: "Product", icon: Package },
-        { href: "/accounting/fixed-assets", label: "Fixed Asset", icon: Landmark },
-      ],
-    });
-  }
-
-  if (canAccessInvoicing(user)) {
-    groups.push({ label: "Invoicing", items: [{ href: "/invoicing", label: "Invoice", icon: FileText }] });
   }
 
   if (full) {

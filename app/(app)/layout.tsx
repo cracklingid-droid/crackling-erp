@@ -10,7 +10,6 @@ import { Separator } from "@/components/ui/separator";
 // Crackling Warehouse) + header tipis berisi tombol ciut/buka & nama modul.
 // Permintaan Kevin 2026-09-15 - dulu navigasi ada di TopBar horizontal.
 function moduleTitle(pathname: string): string {
-  if (pathname.startsWith("/accounting")) return "Accounting";
   if (pathname.startsWith("/cost-center")) return "Cost Center";
   if (pathname.startsWith("/lembur")) return "Lembur";
   if (pathname.startsWith("/hr")) return "Human Resource";

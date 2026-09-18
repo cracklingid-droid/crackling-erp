@@ -9,4 +9,4 @@ export async function getCurrentUser() {
   return user;
 }
 
-export { hasFullAccess, canAccessCostCenter, canAccessAccounting, canAccessInvoicing } from "./roles";
+export { hasFullAccess, canAccessCostCenter } from "./roles";

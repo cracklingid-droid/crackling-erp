@@ -1,11 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-// Verifikasi wajah selfie absen (cegah titip absen) + deteksi masker - pola
-// pemanggilan Claude vision sama persis dgn app/api/accounting/expenses/
-// scan/route.ts (scan bon) yang sudah ada: tool_choice paksa 1 tool
-// terstruktur, model claude-sonnet-5. Permintaan Kevin 2026-09-17: "bisa
-// scan wajah agar tidak bisa titip absen" + "tidak memperbolehkan memakai
-// masker ketika absen, akan otomatis ditolak".
+// Verifikasi wajah selfie absen (cegah titip absen) + deteksi masker -
+// tool_choice paksa 1 tool terstruktur, model claude-sonnet-5. Permintaan
+// Kevin 2026-09-17: "bisa scan wajah agar tidak bisa titip absen" + "tidak
+// memperbolehkan memakai masker ketika absen, akan otomatis ditolak".
 const MASK_HINT = "kacamata dan hijab/kerudung yang TIDAK menutup hidung & mulut TIDAK dihitung sebagai masker";
 
 const ENROLL_TOOL = {

@@ -5,8 +5,6 @@
 // tidak ada auto-refresh terjadwal (keputusan Kevin 2026-09-12).
 // "Omzet" = kolom "Total" (Subtotal + Service Charge 5%) per keputusan
 // Kevin - BUKAN Nett Sales/Subtotal saja.
-// Di-export juga utk lib/sales-daily-sheet.ts (modul Record Sales Accounting
-// baca tab "Daily" dari file yang sama) - 1 daftar file, jangan diduplikat.
 export const SALES_SHEETS: { fileId: string; hrOutletName: string }[] = [
   { fileId: "1ixyKHwthFWyEX7uIsODR6-IGLv9claaunedRr-mhXRA", hrOutletName: "Gading Serpong" },
   { fileId: "1uDMslx7Y2T4xEb1mSaErclBFOrq6IU0GEKiLmgvyjOQ", hrOutletName: "Kelapa Gading" },
