@@ -351,6 +351,23 @@ model EmployeeHistoryEntry {
   @@index([employeeId, effectiveDate])
 }
 
+// Percobaan login Portal Karyawan yang GAGAL - dipakai rate limiting
+// (lib/portal-rate-limit.ts) supaya password lemah (kode+tahun lahir,
+// ~40-50 kemungkinan) tidak bisa di-brute-force karena ID Karyawan sendiri
+// sekuensial & gampang ditebak. Ditemukan sbg celah kritis saat audit
+// keamanan 2026-09-18 (portal login sebelumnya sama sekali tanpa
+// pembatasan percobaan), langsung diperbaiki. Baris lama otomatis
+// dibersihkan tiap ada percobaan gagal baru (lihat recordFailedPortalLogin).
+model PortalLoginAttempt {
+  id           Int      @id @default(autoincrement())
+  employeeCode String
+  ip           String
+  createdAt    DateTime @default(now())
+
+  @@index([employeeCode, createdAt])
+  @@index([ip, createdAt])
+}
+
 // Dokumen kepegawaian (KTP, ijazah, kontrak kerja, dst) - dipisah jadi tabel
 // sendiri (bukan 1 kolom per jenis dokumen) supaya jumlah & jenisnya bebas
 // menyesuaikan kebutuhan tiap karyawan, sama pola-nya dengan cvUrl di

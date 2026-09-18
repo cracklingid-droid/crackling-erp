@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { createEmployeeSessionToken, COOKIE_NAME, MAX_AGE_SECONDS } from "@/lib/employee-session";
 import { derivePortalPassword, canUsePortal } from "@/lib/employee-portal";
 import { decryptPortalPassword } from "@/lib/portal-password-crypto";
+import { checkPortalLoginRateLimit, recordFailedPortalLogin, clearPortalLoginAttempts, getClientIp } from "@/lib/portal-rate-limit";
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -12,6 +13,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ID dan password wajib diisi" }, { status: 400 });
   }
 
+  const ip = getClientIp(req);
+  const rateLimit = await checkPortalLoginRateLimit(username, ip);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: `Terlalu banyak percobaan login gagal. Coba lagi dalam ${rateLimit.retryAfterMinutes} menit, atau hubungi HR.` },
+      { status: 429 }
+    );
+  }
+
   const employee = await prisma.employee.findFirst({
     where: { employeeCode: { equals: username, mode: "insensitive" } },
   });
@@ -19,6 +29,7 @@ export async function POST(req: Request) {
   // bergantung pada HR mencentang checklist offboarding manual dulu.
   // Permintaan Kevin 2026-09-17.
   if (!employee || employee.status === "resigned" || !canUsePortal(employee)) {
+    await recordFailedPortalLogin(username, ip);
     return NextResponse.json({ error: "ID atau password salah" }, { status: 401 });
   }
 
@@ -36,8 +47,10 @@ export async function POST(req: Request) {
     ok = password.toUpperCase() === expected.toUpperCase();
   }
   if (!ok) {
+    await recordFailedPortalLogin(username, ip);
     return NextResponse.json({ error: "ID atau password salah" }, { status: 401 });
   }
+  await clearPortalLoginAttempts(username);
 
   const token = createEmployeeSessionToken({ employeeId: employee.id, employeeCode: employee.employeeCode!, name: employee.name });
   const res = NextResponse.json({
