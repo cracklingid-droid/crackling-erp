@@ -387,7 +387,7 @@ function JournalTab({ account, refreshKey }: { account: BankAccountSummary; refr
   return (
     <Card className="min-w-0">
       <CardContent className="pt-6 grid gap-4 min-w-0">
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-wrap gap-2">
           <Select value={status} onValueChange={(v) => { setStatus(v ?? "all"); setPage(1); }}>
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue>{() => ({ all: "Semua status", matched: "Reconciled", unmatched: "Belum recon" })[status]}</SelectValue>
@@ -485,7 +485,7 @@ function StatementTab({ account, refreshKey, onChanged }: { account: BankAccount
   return (
     <Card className="min-w-0">
       <CardContent className="pt-6 grid gap-4 min-w-0">
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-wrap gap-2">
           <Select value={status} onValueChange={(v) => { setStatus(v ?? "all"); setPage(1); }}>
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue>{() => ({ all: "Semua status", matched: "Reconciled", unmatched: "Belum recon" })[status]}</SelectValue>
@@ -754,7 +754,7 @@ function ReconTab({ account, refreshKey, onChanged }: { account: BankAccountSumm
           jurnal yang sudah ada (nominal harus sama), atau <span className="font-medium text-foreground">Catat</span> transaksi baru langsung dari mutasi ini (beban, penerimaan
           penjualan, atau jurnal umum/transfer).
         </p>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input className="pl-8" placeholder="Cari keterangan mutasi..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />

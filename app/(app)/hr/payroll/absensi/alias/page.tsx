@@ -90,7 +90,7 @@ export default function AttendanceAliasPage() {
   }
 
   return (
-    <div className="max-w-3xl grid gap-6">
+    <div className="max-w-3xl min-w-0 grid gap-6">
       <div>
         <Link href="/hr/payroll/absensi" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Upload Absensi
@@ -130,11 +130,11 @@ export default function AttendanceAliasPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="text-base">Alias Tersimpan ({aliases.length})</CardTitle>
         </CardHeader>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

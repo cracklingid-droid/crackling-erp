@@ -321,8 +321,8 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Gaji {categoryLabel}
         </Link>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <div className="flex flex-wrap gap-3 items-start justify-between">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-heading font-semibold tracking-tight">{period.label}</h1>
               <Badge variant={isFinal ? "default" : "outline"}>{isFinal ? "Final" : "Draft"}</Badge>

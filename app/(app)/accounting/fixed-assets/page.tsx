@@ -375,7 +375,7 @@ export default function FixedAssetsPage() {
             Posting jurnal penyusutan (Dr Beban Penyusutan / Cr Akumulasi Penyusutan) utk semua aset aktif di bulan yang
             dipilih. Aman diklik ulang utk bulan yang sama - jurnal lama diganti, tidak dobel.
           </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-wrap gap-2 items-end">
             <div className="grid gap-1.5">
               <Label>Bulan</Label>
               <Input type="month" value={depMonth} onChange={(e) => setDepMonth(e.target.value)} className="h-10 w-full sm:w-44" />

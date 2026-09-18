@@ -187,7 +187,7 @@ export default function ContactsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 min-w-0">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input

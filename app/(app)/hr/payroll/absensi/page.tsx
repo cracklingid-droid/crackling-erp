@@ -247,7 +247,7 @@ export default function UploadAbsensiPage() {
   }
 
   return (
-    <div className="max-w-4xl grid gap-6">
+    <div className="w-full min-w-0 grid gap-6">
       <div>
         <Link href="/hr/payroll" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Payroll
@@ -397,12 +397,12 @@ export default function UploadAbsensiPage() {
 
       {rows && (
         <>
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle className="text-base">2. Pratinjau Data</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
+            <CardContent className="min-w-0">
+              <div className="min-w-0 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

@@ -149,16 +149,16 @@ export default function ChartOfAccountsPage() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <BookOpen className="h-4 w-4" /> Daftar Akun ({accounts.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="min-w-0">
           {loading && <p className="text-sm text-muted-foreground">Memuat...</p>}
           {!loading && (
-            <div className="overflow-x-auto -mx-6 px-6">
+            <div className="min-w-0 overflow-x-auto -mx-6 px-6">
               <Table>
                 <TableHeader>
                   <TableRow>

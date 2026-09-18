@@ -246,7 +246,7 @@ export default function CostCenterPage() {
   }
 
   return (
-    <div className="max-w-5xl grid gap-6">
+    <div className="w-full min-w-0 grid gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -275,7 +275,7 @@ export default function CostCenterPage() {
         </div>
       </div>
 
-      <Card className="transition-shadow hover:shadow-sm">
+      <Card className="min-w-0 transition-shadow hover:shadow-sm">
         <CardHeader>
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-primary" />
@@ -285,7 +285,7 @@ export default function CostCenterPage() {
             {fmtDate(dailyStart)} &ndash; {fmtDate(dailyEnd)} &middot; {dailyOutlet}
           </p>
         </CardHeader>
-        <CardContent className="pt-0 grid gap-4">
+        <CardContent className="min-w-0 pt-0 grid gap-4">
           <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
             <div className="grid gap-1.5">
               <span className="text-xs text-muted-foreground">Dari</span>
@@ -365,7 +365,7 @@ export default function CostCenterPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto -mx-6 px-6 max-h-[26rem] overflow-y-auto rounded-lg">
+          <div className="min-w-0 overflow-x-auto -mx-6 px-6 max-h-[26rem] overflow-y-auto rounded-lg">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
