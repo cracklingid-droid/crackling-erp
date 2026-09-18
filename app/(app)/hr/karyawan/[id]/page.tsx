@@ -15,7 +15,7 @@ import { REQUIRED_ONBOARDING_FIELDS, getMissingOnboardingFields } from "@/lib/em
 import { computeCompleteness } from "@/lib/employee-completeness";
 import { derivePortalPassword, canUsePortal } from "@/lib/employee-portal";
 import { prefixForOutlet } from "@/lib/employee-code";
-import { toWaNumber } from "@/lib/whatsapp";
+import { toWaNumber, buildWaLink } from "@/lib/whatsapp";
 import { employeeCategory } from "@/lib/payroll-config";
 import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
 import { useAuthContext } from "../../../../components/AuthContext";
@@ -517,6 +517,20 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                 }}
               >
                 <Copy className="h-3.5 w-3.5" /> Salin
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!employee.phone}
+                title={!employee.phone ? "Isi No. HP / WhatsApp karyawan dulu di atas" : undefined}
+                onClick={() => {
+                  const password = derivePortalPassword(employee.employeeCode!, employee.birthDate!);
+                  const message = `Halo ${employee.name}, berikut akun Portal Karyawan Crackling untuk melihat profil, jadwal kerja, dan slip gaji Anda:\n\nID Karyawan: ${employee.employeeCode}\nPassword: ${password}\n\nSilakan login di: https://crackling-erp.vercel.app/portal/login\n\nMohon simpan informasi ini baik-baik. Terima kasih.`;
+                  window.open(buildWaLink(employee.phone!, message), "_blank");
+                }}
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> Kirim ke WA
               </Button>
             </div>
           )}
