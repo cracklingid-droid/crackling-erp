@@ -5,6 +5,7 @@ import { formatRupiah as fmtRupiah } from "@/lib/format";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeft,
@@ -304,22 +305,24 @@ export default function BusinessDashboardPage() {
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
         <div className="grid gap-1.5">
           <span className="text-xs text-muted-foreground">Dari</span>
-          <input
+          <Input
             type="date"
+            aria-label="Dari tanggal"
             value={start}
             max={end}
             onChange={(e) => e.target.value && setStart(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="w-auto"
           />
         </div>
         <div className="grid gap-1.5">
           <span className="text-xs text-muted-foreground">Sampai</span>
-          <input
+          <Input
             type="date"
+            aria-label="Sampai tanggal"
             value={end}
             min={start}
             onChange={(e) => e.target.value && setEnd(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="w-auto"
           />
         </div>
         <div className="flex gap-1.5">

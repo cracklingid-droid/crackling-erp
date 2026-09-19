@@ -77,7 +77,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <div className="ml-auto flex items-center gap-2">
             <EmployeeAvatar photoUrl={employee.photoUrl} name={employee.name} size={28} />
             <span className="text-sm hidden sm:inline">{employee.name}</span>
-            <Button variant="ghost" size="sm" onClick={logout} aria-label="Keluar" title="Keluar">
+            <Button variant="ghost" size="sm" className="h-10 min-w-10" onClick={logout} aria-label="Keluar" title="Keluar">
               <LogOut className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Keluar</span>
             </Button>
           </div>

@@ -233,7 +233,7 @@ export default function RekrutmenPage() {
             </Button>
           </Link>
           <Button variant={showForm ? "outline" : "default"} onClick={() => setShowForm((v) => !v)} className="flex-1 sm:flex-none whitespace-nowrap">
-            <Plus className="h-4 w-4" /> Lowongan Baru
+            <Plus className="h-4 w-4" /> Tambah Lowongan
           </Button>
         </div>
       </div>

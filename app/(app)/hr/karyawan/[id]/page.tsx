@@ -355,7 +355,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
       } else {
         toast.error("Gagal simpan dokumen: " + (await readErrorMessage(res)));
       }
-    } catch (err) {
+    } catch {
       toast.error("Gagal upload dokumen. Periksa koneksi lalu coba lagi.");
     } finally {
       setUploadingDoc(false);
@@ -383,7 +383,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
       } else {
         toast.error("Gagal simpan foto: " + (await readErrorMessage(res)));
       }
-    } catch (err) {
+    } catch {
       toast.error("Gagal upload foto. Periksa koneksi lalu coba lagi.");
     } finally {
       setUploadingPhoto(false);

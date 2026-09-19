@@ -205,7 +205,7 @@ export default function PortalAbsensiPage() {
       } else {
         toast.error(json.error || "Gagal absen");
       }
-    } catch (err) {
+    } catch {
       toast.error("Gagal upload foto. Periksa koneksi lalu coba lagi.");
     } finally {
       setSubmitting(false);

@@ -114,7 +114,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
           }
         })
         .catch(() => {});
-    } catch (err) {
+    } catch {
       toast.error("Gagal upload CV. Periksa koneksi lalu coba lagi.");
     }
     setUploadingCv(false);

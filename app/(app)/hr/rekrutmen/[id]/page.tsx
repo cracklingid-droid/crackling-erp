@@ -248,86 +248,84 @@ export default function RekrutmenDetailPage({ params }: { params: Promise<{ id: 
       )}
 
       <Card className="min-w-0">
-        <div className="min-w-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead>Kontak</TableHead>
-                <TableHead>Sumber</TableHead>
-                <TableHead>Pengalaman</TableHead>
-                <TableHead>CV</TableHead>
-                <TableHead>Psikotest</TableHead>
-                <TableHead>Jadwal Interview</TableHead>
-                <TableHead>Tahap</TableHead>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nama</TableHead>
+              <TableHead>Kontak</TableHead>
+              <TableHead>Sumber</TableHead>
+              <TableHead>Pengalaman</TableHead>
+              <TableHead>CV</TableHead>
+              <TableHead>Psikotest</TableHead>
+              <TableHead>Jadwal Interview</TableHead>
+              <TableHead>Tahap</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {posting.candidates.length === 0 && (
+              <TableRow><TableCell colSpan={8} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
+            )}
+            {posting.candidates.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="font-medium">
+                  <Link href={`/hr/rekrutmen/kandidat/${c.id}`} className="hover:underline">{c.name}</Link>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {[c.email, c.phone].filter(Boolean).join(" · ") || "-"}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{c.source || "-"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{c.experience || "-"}</TableCell>
+                <TableCell className="text-sm">
+                  {c.cvUrl ? (
+                    <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                      <FileText className="h-3.5 w-3.5" /> Lihat
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm">
+                  {c.psychTestSubmission ? (
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal">
+                        {c.psychTestSubmission.percentage}% · {c.psychTestSubmission.passed ? "Lulus" : "Tidak lulus"}
+                      </Badge>
+                      <PsychTestResultDialog candidateId={c.id} />
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Belum test</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {c.interviewSlot ? (
+                    <>
+                      {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).tanggal}
+                      <br />
+                      {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).jam}
+                    </>
+                  ) : (
+                    "-"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Select
+                    value={c.stage}
+                    onValueChange={(v) => (v === "rejected" ? setRejectTarget(c) : v && handleStageChange(c.id, v))}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STAGES.filter((s) => allowedNextStages(c.stage).includes(s.value)).map((s) => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {posting.candidates.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-muted-foreground">Belum ada kandidat.</TableCell></TableRow>
-              )}
-              {posting.candidates.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/hr/rekrutmen/kandidat/${c.id}`} className="hover:underline">{c.name}</Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {[c.email, c.phone].filter(Boolean).join(" · ") || "-"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.source || "-"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.experience || "-"}</TableCell>
-                  <TableCell className="text-sm">
-                    {c.cvUrl ? (
-                      <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                        <FileText className="h-3.5 w-3.5" /> Lihat
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {c.psychTestSubmission ? (
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal">
-                          {c.psychTestSubmission.percentage}% · {c.psychTestSubmission.passed ? "Lulus" : "Tidak lulus"}
-                        </Badge>
-                        <PsychTestResultDialog candidateId={c.id} />
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Belum test</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {c.interviewSlot ? (
-                      <>
-                        {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).tanggal}
-                        <br />
-                        {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).jam}
-                      </>
-                    ) : (
-                      "-"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={c.stage}
-                      onValueChange={(v) => (v === "rejected" ? setRejectTarget(c) : v && handleStageChange(c.id, v))}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue>{() => stageLabel(c.stage)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STAGES.filter((s) => allowedNextStages(c.stage).includes(s.value)).map((s) => (
-                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            ))}
+          </TableBody>
+        </Table>
       </Card>
       {rejectTarget && (
         <RejectionReasonDialog

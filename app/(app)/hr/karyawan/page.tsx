@@ -308,76 +308,74 @@ export default function KaryawanPage() {
       )}
 
       <Card className="min-w-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nama</TableHead>
+              <TableHead>Jabatan</TableHead>
+              <TableHead>Outlet</TableHead>
+              <TableHead>Status Kepegawaian</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Kelengkapan</TableHead>
+              <TableHead>WA</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {!loading && tabEmployees.length === 0 && (
               <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead>Jabatan</TableHead>
-                <TableHead>Outlet</TableHead>
-                <TableHead>Status Kepegawaian</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Kelengkapan</TableHead>
-                <TableHead>WA</TableHead>
+                <TableCell colSpan={7} className="text-muted-foreground">
+                  {q
+                    ? `Tidak ada karyawan yang cocok dengan pencarian.`
+                    : statusFilter !== "all"
+                      ? `Tidak ada karyawan ${statusFilter === "active" ? "aktif" : "resign"} di ${tab === "outlet" ? "resto" : "kantor"}.`
+                      : `Belum ada karyawan ${tab === "outlet" ? "resto" : "kantor"}.`}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!loading && tabEmployees.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
-                    {q
-                      ? `Tidak ada karyawan yang cocok dengan pencarian.`
-                      : statusFilter !== "all"
-                        ? `Tidak ada karyawan ${statusFilter === "active" ? "aktif" : "resign"} di ${tab === "outlet" ? "resto" : "kantor"}.`
-                        : `Belum ada karyawan ${tab === "outlet" ? "resto" : "kantor"}.`}
-                  </TableCell>
-                </TableRow>
-              )}
-              {tabEmployees.map((e) => {
-                const hasKtp = e.documents.some((d) => d.type === "ktp");
-                const completeness = computeCompleteness(e, hasKtp);
-                return (
-                <TableRow key={e.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/hr/karyawan/${e.id}`} className="flex items-center gap-2 hover:underline">
-                      <EmployeeAvatar photoUrl={e.photoUrl} name={e.name} size={24} />
-                      {e.name}
-                    </Link>
-                    {e.employeeCode && <span className="text-xs text-muted-foreground ml-1.5">({e.employeeCode})</span>}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{e.position || "-"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{e.outlet || "-"}</TableCell>
-                  <TableCell className="text-muted-foreground">{employmentStatusLabel(e.employmentStatus)}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[e.status] ?? "outline"} className="font-normal">
-                      {STATUS_LABEL[e.status] ?? e.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-sm tabular-nums font-medium ${completenessColor(completeness.percent)}`} title={completeness.missing.join(", ")}>
-                      {completeness.percent}%
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {e.phone ? (
-                      <button
-                        type="button"
-                        title="Chat WhatsApp"
-                        onClick={() => window.open(`https://wa.me/${toWaNumber(e.phone!)}`, "_blank")}
-                        className="inline-flex items-center justify-center text-primary hover:text-primary/70 transition-colors"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </button>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+            )}
+            {tabEmployees.map((e) => {
+              const hasKtp = e.documents.some((d) => d.type === "ktp");
+              const completeness = computeCompleteness(e, hasKtp);
+              return (
+              <TableRow key={e.id}>
+                <TableCell className="font-medium">
+                  <Link href={`/hr/karyawan/${e.id}`} className="flex items-center gap-2 hover:underline">
+                    <EmployeeAvatar photoUrl={e.photoUrl} name={e.name} size={24} />
+                    {e.name}
+                  </Link>
+                  {e.employeeCode && <span className="text-xs text-muted-foreground ml-1.5">({e.employeeCode})</span>}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{e.position || "-"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{e.outlet || "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{employmentStatusLabel(e.employmentStatus)}</TableCell>
+                <TableCell>
+                  <Badge variant={STATUS_VARIANT[e.status] ?? "outline"} className="font-normal">
+                    {STATUS_LABEL[e.status] ?? e.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <span className={`text-sm tabular-nums font-medium ${completenessColor(completeness.percent)}`} title={completeness.missing.join(", ")}>
+                    {completeness.percent}%
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {e.phone ? (
+                    <button
+                      type="button"
+                      title="Chat WhatsApp"
+                      onClick={() => window.open(`https://wa.me/${toWaNumber(e.phone!)}`, "_blank")}
+                      className="inline-flex items-center justify-center text-primary hover:text-primary/70 transition-colors"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+              </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </Card>
     </div>
   );

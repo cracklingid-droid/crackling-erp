@@ -80,7 +80,7 @@ export default function PosisiPage() {
             </p>
           </div>
           <Button variant={showForm ? "outline" : "default"} onClick={() => setShowForm((v) => !v)}>
-            <Plus className="h-4 w-4" /> Posisi Baru
+            <Plus className="h-4 w-4" /> Tambah Posisi
           </Button>
         </div>
       </div>
@@ -108,7 +108,7 @@ export default function PosisiPage() {
 
       {loading && <LoadingState variant="section" />}
       {!loading && positions.length === 0 && (
-        <EmptyState icon={Briefcase} title="Belum ada posisi" description={'Klik "Posisi Baru" di atas untuk mulai.'} />
+        <EmptyState icon={Briefcase} title="Belum ada posisi" description={'Klik "Tambah Posisi" di atas untuk mulai.'} />
       )}
 
       <div className="grid gap-3">

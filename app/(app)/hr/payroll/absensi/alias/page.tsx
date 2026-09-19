@@ -141,56 +141,54 @@ export default function AttendanceAliasPage() {
         <CardHeader>
           <CardTitle className="text-base">Alias Tersimpan ({aliases.length})</CardTitle>
         </CardHeader>
-        <div className="min-w-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nama di Mesin Absen</TableHead>
+              <TableHead>Karyawan</TableHead>
+              <TableHead>Dibuat Oleh</TableHead>
+              <TableHead>Tanggal</TableHead>
+              <TableHead className="w-10"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {!loading && aliases.length === 0 && (
               <TableRow>
-                <TableHead>Nama di Mesin Absen</TableHead>
-                <TableHead>Karyawan</TableHead>
-                <TableHead>Dibuat Oleh</TableHead>
-                <TableHead>Tanggal</TableHead>
-                <TableHead className="w-10"></TableHead>
+                <TableCell colSpan={5} className="text-muted-foreground">Belum ada alias tersimpan.</TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!loading && aliases.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">Belum ada alias tersimpan.</TableCell>
-                </TableRow>
-              )}
-              {aliases.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.machineName}</TableCell>
-                  <TableCell>
-                    {a.employee.name}
-                    {a.employee.outlet && <span className="text-muted-foreground"> · {a.employee.outlet}</span>}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{a.createdBy?.name ?? "-"}</TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateID(a.createdAt)}</TableCell>
-                  <TableCell>
-                    <button
-                      type="button"
-                      aria-label="Hapus alias"
-                      title="Hapus alias"
-                      onClick={() =>
-                        confirmDlg.ask({
-                          title: "Hapus alias ini?",
-                          description: `"${a.machineName}" tidak lagi otomatis dicocokkan ke ${a.employee.name} saat upload absensi berikutnya.`,
-                          confirmLabel: "Hapus",
-                          destructive: true,
-                          onConfirm: () => deleteAlias(a.id),
-                        })
-                      }
-                      className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            )}
+            {aliases.map((a) => (
+              <TableRow key={a.id}>
+                <TableCell className="font-medium">{a.machineName}</TableCell>
+                <TableCell>
+                  {a.employee.name}
+                  {a.employee.outlet && <span className="text-muted-foreground"> · {a.employee.outlet}</span>}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{a.createdBy?.name ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateID(a.createdAt)}</TableCell>
+                <TableCell>
+                  <button
+                    type="button"
+                    aria-label="Hapus alias"
+                    title="Hapus alias"
+                    onClick={() =>
+                      confirmDlg.ask({
+                        title: "Hapus alias ini?",
+                        description: `"${a.machineName}" tidak lagi otomatis dicocokkan ke ${a.employee.name} saat upload absensi berikutnya.`,
+                        confirmLabel: "Hapus",
+                        destructive: true,
+                        onConfirm: () => deleteAlias(a.id),
+                      })
+                    }
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </Card>
     </div>
   );

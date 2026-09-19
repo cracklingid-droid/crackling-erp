@@ -92,7 +92,7 @@ export default function PortalLemburPage() {
       } else {
         toast.error("Gagal: " + (await readErrorMessage(res)));
       }
-    } catch (err) {
+    } catch {
       toast.error("Gagal upload foto. Periksa koneksi lalu coba lagi.");
     } finally {
       setSubmitting(false);

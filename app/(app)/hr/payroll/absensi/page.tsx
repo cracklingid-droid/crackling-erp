@@ -170,7 +170,7 @@ export default function UploadAbsensiPage() {
       setDatetimeCol("");
       setDetectNote(null);
       detectMapping(data.rows);
-    } catch (err) {
+    } catch {
       toast.error("Gagal baca file. Periksa koneksi lalu coba lagi.");
     } finally {
       setParsing(false);
@@ -402,26 +402,24 @@ export default function UploadAbsensiPage() {
               <CardTitle className="text-base">2. Pratinjau Data</CardTitle>
             </CardHeader>
             <CardContent className="min-w-0">
-              <div className="min-w-0 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {headers.map((h, i) => (
-                        <TableHead key={i} className="whitespace-nowrap">{h || `Kolom ${i + 1}`}</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {headers.map((h, i) => (
+                      <TableHead key={i} className="whitespace-nowrap">{h || `Kolom ${i + 1}`}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.map((r, i) => (
+                    <TableRow key={i}>
+                      {headers.map((_, ci) => (
+                        <TableCell key={ci} className="whitespace-nowrap text-sm text-muted-foreground">{r[ci] ?? ""}</TableCell>
                       ))}
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {preview.map((r, i) => (
-                      <TableRow key={i}>
-                        {headers.map((_, ci) => (
-                          <TableCell key={ci} className="whitespace-nowrap text-sm text-muted-foreground">{r[ci] ?? ""}</TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 

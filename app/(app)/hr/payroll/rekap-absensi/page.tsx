@@ -97,41 +97,39 @@ export default function RekapAbsensiPage() {
               </TabsList>
             </Tabs>
             <Card className="min-w-0">
-              <div className="min-w-0 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nama</TableHead>
-                      <TableHead>Jabatan / Outlet</TableHead>
-                      <TableHead className="text-right">Hari Hadir</TableHead>
-                      <TableHead className="text-right">Terlambat</TableHead>
-                      <TableHead className="text-right">Total Jam Kerja</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama</TableHead>
+                    <TableHead>Jabatan / Outlet</TableHead>
+                    <TableHead className="text-right">Hari Hadir</TableHead>
+                    <TableHead className="text-right">Terlambat</TableHead>
+                    <TableHead className="text-right">Total Jam Kerja</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tabRows?.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-muted-foreground">Tidak ada karyawan aktif di kategori ini.</TableCell></TableRow>
+                  )}
+                  {tabRows?.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/hr/karyawan/${r.id}`} className="hover:underline">{r.name}</Link>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {[r.position, r.outlet].filter(Boolean).join(" · ") || "-"}
+                      </TableCell>
+                      <TableCell className={`text-right tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
+                        {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
+                      </TableCell>
+                      <TableCell className={`text-right tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                        {r.scheduleStart ? `${r.lateCount} kali` : "-"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tabRows?.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-muted-foreground">Tidak ada karyawan aktif di kategori ini.</TableCell></TableRow>
-                    )}
-                    {tabRows?.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-medium">
-                          <Link href={`/hr/karyawan/${r.id}`} className="hover:underline">{r.name}</Link>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {[r.position, r.outlet].filter(Boolean).join(" · ") || "-"}
-                        </TableCell>
-                        <TableCell className={`text-right tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
-                          {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
-                        </TableCell>
-                        <TableCell className={`text-right tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                          {r.scheduleStart ? `${r.lateCount} kali` : "-"}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
           </>
         );

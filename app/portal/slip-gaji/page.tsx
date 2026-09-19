@@ -84,7 +84,7 @@ export default function PortalSlipGajiPage() {
                   </p>
                   <p className="text-sm font-medium tabular-nums">{fmtRupiah(s.netPay)}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => downloadSlip(s.itemId)}>
+                <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => downloadSlip(s.itemId)}>
                   <Download className="h-3.5 w-3.5" /> PDF
                 </Button>
               </CardContent>

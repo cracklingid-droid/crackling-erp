@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   PiggyBank,
@@ -292,22 +293,24 @@ export default function CostCenterPage() {
           <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
             <div className="grid gap-1.5">
               <span className="text-xs text-muted-foreground">Dari</span>
-              <input
+              <Input
                 type="date"
+                aria-label="Dari tanggal"
                 value={dailyStart}
                 max={dailyEnd}
                 onChange={(e) => e.target.value && setDailyStart(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="w-auto"
               />
             </div>
             <div className="grid gap-1.5">
               <span className="text-xs text-muted-foreground">Sampai</span>
-              <input
+              <Input
                 type="date"
+                aria-label="Sampai tanggal"
                 value={dailyEnd}
                 min={dailyStart}
                 onChange={(e) => e.target.value && setDailyEnd(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="w-auto"
               />
             </div>
             <div className="grid gap-1.5">

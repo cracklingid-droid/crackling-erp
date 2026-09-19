@@ -128,7 +128,7 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
           </div>
           {!readOnly && (
             <Button variant={showForm ? "outline" : "default"} onClick={openForm} className="shrink-0">
-              <Plus className="h-4 w-4" /> Periode Baru
+              <Plus className="h-4 w-4" /> Tambah Periode
             </Button>
           )}
         </div>
