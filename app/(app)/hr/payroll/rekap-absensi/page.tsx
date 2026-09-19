@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTab, TabsIndicator } from "@/components/ui/tabs";
 import { ArrowLeft } from "lucide-react";
-import { getDefaultPeriodRange, toDateInputValue } from "@/lib/payroll-period-cycle";
 import { employeeCategory } from "@/lib/payroll-config";
 
 type RecapRow = {
@@ -35,11 +34,17 @@ function formatHours(minutes: number): string {
   return `${h}j ${m}m`;
 }
 
-const { start: defaultStart, end: defaultEnd } = getDefaultPeriodRange();
+// Tanggal hari ini menurut WIB (bukan zona browser/server) - default tampilan
+// harian, permintaan Kevin 2026-09-19 (default sebulan ke belakang tidak
+// berguna utk pengecekan sehari-hari). Dihitung saat komponen dibuat, bukan
+// di level modul, supaya tidak basi kalau tab dibiarkan terbuka lewat tengah malam.
+function todayWib(): string {
+  return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 export default function RekapAbsensiPage() {
-  const [startDate, setStartDate] = useState(toDateInputValue(defaultStart));
-  const [endDate, setEndDate] = useState(toDateInputValue(defaultEnd));
+  const [startDate, setStartDate] = useState(todayWib);
+  const [endDate, setEndDate] = useState(todayWib);
   const [rows, setRows] = useState<RecapRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   // Resto & Kantor dipisah - cara hitung absensi/gaji beda total di antara
@@ -66,9 +71,10 @@ export default function RekapAbsensiPage() {
         </Link>
         <h1 className="text-2xl font-heading font-semibold tracking-tight">Rekap Absensi</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Ringkasan hari hadir, keterlambatan & jam kerja per karyawan dalam satu rentang tanggal. Default siklus 21 s.d.
-          20 bulan berikutnya (gajian tanggal 25) - rentang tetap bisa diubah bebas kalau perlu penyesuaian sementara.
-          Kolom Terlambat cuma terisi utk karyawan yang sudah diisi "Jadwal Kerja" di Database Karyawan.
+          Default menampilkan hari ini: jam datang & jam pulang tiap karyawan. Ubah Dari/Sampai untuk melihat rentang
+          lain - kalau lebih dari 1 hari, yang tampil ringkasan hari hadir, keterlambatan & total jam kerja (siklus gaji:
+          21 s.d. 20 bulan berikutnya). Kolom Terlambat cuma terisi utk karyawan yang sudah diisi "Jadwal Kerja" di
+          Database Karyawan.
         </p>
       </div>
 
