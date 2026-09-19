@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Plus, ArrowLeft, MessageCircle, AlertTriangle, Search, X } from "lucide
 import { toWaNumber } from "@/lib/whatsapp";
 import { computeCompleteness } from "@/lib/employee-completeness";
 import { employeeCategory } from "@/lib/payroll-config";
+import { EMPLOYEE_STATUS_LABEL, EMPLOYEE_STATUS_VARIANT, employmentStatusLabel } from "@/lib/employee-status";
 import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
 import { useAuthContext } from "../../../components/AuthContext";
 
@@ -57,12 +59,8 @@ function completenessColor(percent: number) {
   return "text-destructive";
 }
 
-const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  onboarding: "outline",
-  active: "default",
-  resigned: "secondary",
-};
+const STATUS_LABEL = EMPLOYEE_STATUS_LABEL;
+const STATUS_VARIANT = EMPLOYEE_STATUS_VARIANT;
 
 export default function KaryawanPage() {
   const { user } = useAuthContext();
@@ -85,16 +83,18 @@ export default function KaryawanPage() {
   function load() {
     setLoading(true);
     fetch("/api/employees")
-      .then((r) => r.json())
+      .then(readJson)
       .then(setEmployees)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
   useEffect(() => {
     fetch("/api/employees/reminders")
-      .then((r) => r.json())
-      .then(setReminders);
+      .then(readJson)
+      .then(setReminders)
+      .catch(() => {}); // widget pengingat - kalau gagal cukup tidak tampil
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -104,22 +104,24 @@ export default function KaryawanPage() {
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, phone }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      toast.success("Karyawan ditambahkan. Lengkapi datanya di halaman detail.");
-      setName("");
-      setEmail("");
-      setPhone("");
-      setShowForm(false);
-      load();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, phone }),
+      });
+      if (res.ok) {
+        toast.success("Karyawan ditambahkan. Lengkapi datanya di halaman detail.");
+        setName("");
+        setEmail("");
+        setPhone("");
+        setShowForm(false);
+        load();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -175,7 +177,7 @@ export default function KaryawanPage() {
               Portal Karyawan &rarr;
             </a>
             {!readOnly && (
-              <Button onClick={() => setShowForm((v) => !v)} className="whitespace-nowrap">
+              <Button variant={showForm ? "outline" : "default"} onClick={() => setShowForm((v) => !v)} className="whitespace-nowrap">
                 <Plus className="h-4 w-4" /> Tambah Karyawan
               </Button>
             )}
@@ -267,12 +269,15 @@ export default function KaryawanPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Cari karyawan"
             placeholder="Cari nama, jabatan, outlet, kode..."
             className="pl-8 pr-8"
           />
           {search && (
             <button
               type="button"
+              aria-label="Hapus pencarian"
+              title="Hapus pencarian"
               onClick={() => setSearch("")}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
@@ -289,7 +294,7 @@ export default function KaryawanPage() {
             type="button"
             onClick={() => setStatusFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+              statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/80 hover:bg-muted/70"
             }`}
           >
             {s === "active" ? "Aktif" : s === "resigned" ? "Resign" : "Semua"} ({statusCounts[s]})
@@ -342,7 +347,7 @@ export default function KaryawanPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{e.position || "-"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{e.outlet || "-"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground capitalize">{e.employmentStatus || "-"}</TableCell>
+                  <TableCell className="text-muted-foreground">{employmentStatusLabel(e.employmentStatus)}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[e.status] ?? "outline"} className="font-normal">
                       {STATUS_LABEL[e.status] ?? e.status}

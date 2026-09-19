@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatRupiah } from "@/lib/format";
 import { DEDUCTION_FIELD_KEYS, fieldsForCategory, computeNetPay, type FieldDef } from "./payroll-fields";
 
 type Item = {
@@ -7,10 +8,6 @@ type Item = {
   [key: string]: unknown;
 };
 type Period = { label: string; startDate: Date; endDate: Date; category: string };
-
-function formatRupiah(n: number): string {
-  return `Rp${Math.round(n).toLocaleString("id-ID")}`;
-}
 
 function formatDate(d: Date) {
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });

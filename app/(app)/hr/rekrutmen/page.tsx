@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,8 +77,7 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
       toast.success(`${c.name} dipindah ke "${stageLabel(stage)}".`);
       onChanged();
     } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+      toast.error("Gagal: " + (await readErrorMessage(res)));
     }
   }
 
@@ -92,14 +93,14 @@ function CandidateCard({ c, onChanged }: { c: Candidate; onChanged: () => void }
         <div className="flex flex-wrap items-center gap-1">
           {c.psychTestSubmission && (
             <>
-              <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal text-[10px]">
+              <Badge variant={c.psychTestSubmission.passed ? "default" : "destructive"} className="font-normal">
                 Test {c.psychTestSubmission.percentage}%
               </Badge>
               <PsychTestResultDialog candidateId={c.id} size="h-3.5 w-3.5" />
             </>
           )}
           {c.interviewSlot && (
-            <Badge variant="outline" className="font-normal text-[10px]">
+            <Badge variant="outline" className="font-normal">
               {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).tanggal.split(",")[0]}, {formatSlotWIB(new Date(c.interviewSlot.scheduledAt)).jam}
             </Badge>
           )}
@@ -146,21 +147,23 @@ export default function RekrutmenPage() {
   function load() {
     setLoading(true);
     Promise.all([
-      fetch("/api/job-postings").then((r) => r.json()),
-      fetch("/api/candidates").then((r) => r.json()),
+      fetch("/api/job-postings").then(readJson),
+      fetch("/api/candidates").then(readJson),
     ])
       .then(([p, c]) => {
         setPostings(p);
         setCandidates(c);
       })
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
   useEffect(() => {
     fetch("/api/positions")
-      .then((r) => r.json())
-      .then(setPositions);
+      .then(readJson)
+      .then(setPositions)
+      .catch(() => {}); // cuma utk pilihan posisi di form lowongan
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -174,25 +177,27 @@ export default function RekrutmenPage() {
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/job-postings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, positionId: Number(positionId), department, location, employmentType, description }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      toast.success("Lowongan dibuat.");
-      setTitle("");
-      setPositionId("");
-      setDepartment("");
-      setLocation("");
-      setEmploymentType("");
-      setDescription("");
-      setShowForm(false);
-      load();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch("/api/job-postings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, positionId: Number(positionId), department, location, employmentType, description }),
+      });
+      if (res.ok) {
+        toast.success("Lowongan dibuat.");
+        setTitle("");
+        setPositionId("");
+        setDepartment("");
+        setLocation("");
+        setEmploymentType("");
+        setDescription("");
+        setShowForm(false);
+        load();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -215,7 +220,7 @@ export default function RekrutmenPage() {
   const columns = STAGES.map((s) => ({ ...s, items: candidates.filter((c) => c.stage === s.value) }));
 
   return (
-    <div className="max-w-7xl grid gap-6 overflow-x-hidden">
+    <div className="max-w-7xl min-w-0 grid gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
         <div className="min-w-0">
           <h1 className="text-2xl font-heading font-semibold tracking-tight">Rekrutmen</h1>
@@ -227,18 +232,79 @@ export default function RekrutmenPage() {
               <ListChecks className="h-4 w-4" /> Posisi &amp; Soal
             </Button>
           </Link>
-          <Button onClick={() => setShowForm((v) => !v)} className="flex-1 sm:flex-none whitespace-nowrap">
+          <Button variant={showForm ? "outline" : "default"} onClick={() => setShowForm((v) => !v)} className="flex-1 sm:flex-none whitespace-nowrap">
             <Plus className="h-4 w-4" /> Lowongan Baru
           </Button>
         </div>
       </div>
 
+      {showForm && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Buat Lowongan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="grid gap-4 max-w-xl">
+              <div className="grid gap-1.5">
+                <Label>Judul Lowongan</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="mis. Kitchen Staff - Joglo" autoFocus />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Posisi (menentukan bank soal psikotest)</Label>
+                {positions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Belum ada posisi.{" "}
+                    <Link href="/hr/rekrutmen/posisi" className="text-primary underline">
+                      Buat posisi dulu di sini
+                    </Link>
+                    .
+                  </p>
+                ) : (
+                  <Select value={positionId} onValueChange={(v) => v && setPositionId(v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih posisi..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {positions.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label>Departemen / Outlet</Label>
+                  <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="mis. Kitchen - Joglo" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Lokasi</Label>
+                  <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="mis. Gading Serpong" />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Tipe Kerja</Label>
+                <Input value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} placeholder="mis. Full-time" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Deskripsi (opsional)</Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</Button>
+                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Batal</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       {loading ? (
-        <p className="text-sm text-muted-foreground">Memuat...</p>
+        <LoadingState variant="section" rows={4} />
       ) : (
         <>
           {/* Stat cards */}
-          <div className="min-w-0 grid gap-4 grid-cols-2 md:grid-cols-4">
+          <div className="min-w-0 grid gap-4 grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardContent className="flex items-center gap-3 py-1">
                 <div className="icon-tile-4 flex h-10 w-10 items-center justify-center rounded-lg shrink-0"><Briefcase className="h-5 w-5" /></div>
@@ -383,66 +449,6 @@ export default function RekrutmenPage() {
         </>
       )}
 
-      {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Buat Lowongan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="grid gap-4 max-w-xl">
-              <div className="grid gap-1.5">
-                <Label>Judul Lowongan</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="mis. Kitchen Staff - Joglo" autoFocus />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Posisi (menentukan bank soal psikotest)</Label>
-                {positions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Belum ada posisi.{" "}
-                    <Link href="/hr/rekrutmen/posisi" className="text-primary underline">
-                      Buat posisi dulu di sini
-                    </Link>
-                    .
-                  </p>
-                ) : (
-                  <Select value={positionId} onValueChange={(v) => v && setPositionId(v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih posisi..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {positions.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label>Departemen / Outlet</Label>
-                  <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="mis. Kitchen - Joglo" />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Lokasi</Label>
-                  <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="mis. Gading Serpong" />
-                </div>
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Tipe Kerja</Label>
-                <Input value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} placeholder="mis. Full-time" />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Deskripsi (opsional)</Label>
-                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</Button>
-                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Batal</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

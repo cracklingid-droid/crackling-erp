@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Briefcase } from "lucide-react";
@@ -21,8 +24,9 @@ export default function LowonganPage() {
 
   useEffect(() => {
     fetch("/api/public/job-postings")
-      .then((r) => r.json())
+      .then(readJson)
       .then(setPostings)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,7 +43,7 @@ export default function LowonganPage() {
         <p className="text-muted-foreground mt-1">Bergabung bersama tim Crackling. Pilih posisi yang sesuai untuk melamar.</p>
 
         <div className="grid gap-3 mt-8">
-          {loading && <p className="text-sm text-muted-foreground">Memuat...</p>}
+          {loading && <LoadingState variant="section" />}
           {!loading && postings.length === 0 && (
             <EmptyState icon={Briefcase} title="Belum ada lowongan dibuka" description="Silakan cek kembali di lain waktu." />
           )}

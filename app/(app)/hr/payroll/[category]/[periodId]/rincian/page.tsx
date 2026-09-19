@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { toast } from "sonner";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,8 +38,9 @@ export default function RincianPerhitunganPage({ params }: { params: Promise<{ c
   function load() {
     setLoading(true);
     fetch(`/api/payroll/periods/${periodId}/rincian`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setPeriod)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -45,7 +49,7 @@ export default function RincianPerhitunganPage({ params }: { params: Promise<{ c
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
   const filteredItems = period?.items.filter((it) => it.employee.name.toLowerCase().includes(search.toLowerCase())) ?? [];
 
-  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (loading) return <LoadingState />;
   if (!period) return <p className="text-sm text-muted-foreground">Periode tidak ditemukan.</p>;
 
   return (

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
@@ -20,8 +23,9 @@ export default function PortalRosterPage() {
   useEffect(() => {
     setLoading(true);
     fetch(`/api/portal/roster?weekStart=${dateKey(anchor)}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setData)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }, [anchor.getTime()]);
 
@@ -36,20 +40,20 @@ export default function PortalRosterPage() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, -1))}>
+        <Button variant="outline" size="icon" aria-label="Minggu sebelumnya" title="Minggu sebelumnya" onClick={() => setAnchor((a) => addWeeks(a, -1))}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <span className="text-sm font-medium">
           {data ? `${formatDayLabel(new Date(data.days[0]))} - ${formatDayLabel(new Date(data.days[6]))}` : "..."}
         </span>
-        <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, 1))}>
+        <Button variant="outline" size="icon" aria-label="Minggu berikutnya" title="Minggu berikutnya" onClick={() => setAnchor((a) => addWeeks(a, 1))}>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
 
       <Card>
         {loading || !data ? (
-          <p className="text-sm text-muted-foreground p-4">Memuat...</p>
+          <LoadingState variant="section" className="p-4" />
         ) : (
           <div className="grid divide-y">
             {data.days.map((d) => {
@@ -59,11 +63,11 @@ export default function PortalRosterPage() {
                 <div key={d} className="flex items-center justify-between px-4 py-3">
                   <span className="text-sm">{formatDayLabel(new Date(d))}</span>
                   <span
-                    className={`inline-block w-20 text-center rounded-md px-2 py-1 text-xs ${
+                    className={`inline-block w-20 text-center rounded-md px-2 py-1 text-sm ${
                       val === true
                         ? "bg-primary/10 text-primary"
                         : val === false
-                          ? "bg-muted text-muted-foreground"
+                          ? "bg-muted text-foreground/70"
                           : "text-muted-foreground/40"
                     }`}
                   >

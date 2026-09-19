@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { formatRupiah } from "@/lib/format";
+import { readErrorMessage } from "@/lib/fetch-json";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ConfirmDialog, useConfirm } from "@/app/components/ConfirmDialog";
 import { Trash2, Plus } from "lucide-react";
 import { calcOutletLateRate } from "@/lib/payroll-config";
 import { EVENT_NOTE_CATEGORIES } from "@/lib/payroll-event-notes";
@@ -40,9 +43,6 @@ export type RincianPeriod = {
   status: string;
 };
 
-function formatRupiah(n: number): string {
-  return `Rp${Math.round(n).toLocaleString("id-ID")}`;
-}
 function formatDateShort(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }
@@ -70,6 +70,7 @@ export function EmployeeRincianCard({
   const [noteAmount, setNoteAmount] = useState("");
   const [noteText, setNoteText] = useState("");
   const [saving, setSaving] = useState(false);
+  const confirmDlg = useConfirm();
 
   const dailyMealRate = item.employee.dailyMealRate ?? 0;
   const lateRate = calcOutletLateRate(dailyMealRate);
@@ -120,21 +121,23 @@ export function EmployeeRincianCard({
       return;
     }
     setSaving(true);
-    const res = await fetch(`/api/payroll/periods/${period.id}/items/${item.id}/notes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: noteDate, category: noteCategory, amount, note: noteText }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const err = await res.json();
-      toast.error("Gagal simpan catatan: " + err.error);
-      return;
+    try {
+      const res = await fetch(`/api/payroll/periods/${period.id}/items/${item.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: noteDate, category: noteCategory, amount, note: noteText }),
+      });
+      if (!res.ok) {
+        toast.error("Gagal simpan catatan: " + (await readErrorMessage(res)));
+        return;
+      }
+      setNoteAmount("");
+      setNoteText("");
+      toast.success("Catatan disimpan.");
+      onNoteAdded();
+    } finally {
+      setSaving(false);
     }
-    setNoteAmount("");
-    setNoteText("");
-    toast.success("Catatan disimpan.");
-    onNoteAdded();
   }
 
   async function deleteNote(noteId: number) {
@@ -150,6 +153,7 @@ export function EmployeeRincianCard({
 
   return (
     <Card className="print:break-inside-avoid print:border-0 print:shadow-none">
+      <ConfirmDialog {...confirmDlg.props} />
       <CardHeader>
         <CardTitle className="text-base">{item.employee.name}</CardTitle>
         <p className="text-xs text-muted-foreground">
@@ -226,7 +230,21 @@ export function EmployeeRincianCard({
                             {EVENT_NOTE_CATEGORIES.find((c) => c.key === n.category)?.label ?? n.category}
                             {n.note ? ` - ${n.note}` : ""}
                             {!isFinal && (
-                              <button type="button" onClick={() => deleteNote(n.id)} className="text-muted-foreground hover:text-destructive">
+                              <button
+                                type="button"
+                                aria-label="Hapus catatan"
+                                title="Hapus catatan"
+                                onClick={() =>
+                                  confirmDlg.ask({
+                                    title: "Hapus catatan ini?",
+                                    description: "Potongan yang berasal dari catatan ini ikut dikurangi dari gaji karyawan.",
+                                    confirmLabel: "Hapus",
+                                    destructive: true,
+                                    onConfirm: () => deleteNote(n.id),
+                                  })
+                                }
+                                className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
                                 <Trash2 className="h-3 w-3" />
                               </button>
                             )}
@@ -286,7 +304,7 @@ export function EmployeeRincianCard({
               <Input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="mis. Hekeng Rusak" />
             </div>
             <Button size="sm" onClick={addNote} disabled={saving}>
-              <Plus className="h-3.5 w-3.5" /> Catat
+              <Plus className="h-3.5 w-3.5" /> {saving ? "Menyimpan..." : "Tambah Catatan"}
             </Button>
           </div>
         )}

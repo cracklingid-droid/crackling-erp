@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -68,8 +70,9 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
   function load() {
     setLoading(true);
     fetch(`/api/candidates/${id}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setC)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -87,12 +90,11 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
       toast.success(`Tahap diubah ke "${stageLabel(stage)}".`);
       load();
     } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+      toast.error("Gagal: " + (await readErrorMessage(res)));
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (loading) return <LoadingState />;
   if (!c) return <p className="text-sm text-muted-foreground">Kandidat tidak ditemukan.</p>;
 
   return (
@@ -165,7 +167,7 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
           )}
           {c.experience && <InfoRow icon={BriefcaseIcon} label="Pengalaman Kerja" value={c.experience} />}
           {c.expectedSalary != null && (
-            <InfoRow icon={Wallet} label="Ekspektasi Gaji" value={`Rp ${c.expectedSalary.toLocaleString("id-ID")}`} />
+            <InfoRow icon={Wallet} label="Ekspektasi Gaji" value={`Rp${c.expectedSalary.toLocaleString("id-ID")}`} />
           )}
         </CardContent>
       </Card>
@@ -237,6 +239,7 @@ export default function KandidatDetailPage({ params }: { params: Promise<{ id: s
           <CardTitle className="text-base">Riwayat Tahap</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2">
+          {c.stageEvents.length === 0 && <p className="text-sm text-muted-foreground">Belum ada riwayat perubahan tahap.</p>}
           {c.stageEvents.map((ev) => (
             <div key={ev.id} className="flex items-start gap-2.5 text-sm">
               <FileText className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />

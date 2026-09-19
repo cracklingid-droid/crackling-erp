@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePortalAuth, type PortalEmployee } from "../components/usePortalAuth";
@@ -45,7 +46,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   if (isLoginPage || isResetPasswordPage) return children;
 
   if (loading || !employee) {
-    return <div className="flex items-center justify-center min-h-screen text-sm text-muted-foreground">Memuat...</div>;
+    return <LoadingState variant="screen" />;
   }
 
   const navItems = navItemsFor(employee);
@@ -76,17 +77,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <div className="ml-auto flex items-center gap-2">
             <EmployeeAvatar photoUrl={employee.photoUrl} name={employee.name} size={28} />
             <span className="text-sm hidden sm:inline">{employee.name}</span>
-            <Button variant="ghost" size="sm" onClick={logout}>
+            <Button variant="ghost" size="sm" onClick={logout} aria-label="Keluar" title="Keluar">
               <LogOut className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Keluar</span>
             </Button>
           </div>
         </header>
-        <nav className="flex sm:hidden items-center gap-1 border-b px-2 py-1.5 overflow-x-auto">
+        <nav aria-label="Menu portal" className="flex flex-wrap sm:hidden items-center gap-1 border-b px-2 py-1.5">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors ${
+              aria-current={pathname === item.href ? "page" : undefined}
+              className={`shrink-0 rounded-md px-3 py-2 text-sm transition-colors ${
                 pathname === item.href ? "bg-muted font-medium" : "text-muted-foreground"
               }`}
             >

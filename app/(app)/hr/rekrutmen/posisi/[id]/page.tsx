@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { ConfirmDialog, useConfirm } from "@/app/components/ConfirmDialog";
+import { EmptyState } from "@/app/components/EmptyState";
 import { ArrowLeft, Plus, Trash2, Pencil, X, Check } from "lucide-react";
 
 type Option = { id?: number; label: string; score: number };
@@ -77,27 +81,29 @@ function NewQuestionForm({ positionId, onSaved }: { positionId: number; onSaved:
     if (!text.trim()) return toast.error("Pertanyaan wajib diisi");
     if (options.some((o) => !o.label.trim())) return toast.error("Semua opsi wajib diisi");
     setSaving(true);
-    const res = await fetch(`/api/positions/${positionId}/questions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, options }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      toast.success("Soal ditambahkan.");
-      setText("");
-      setOptions([{ label: "", score: 0 }, { label: "", score: 0 }]);
-      onSaved();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch(`/api/positions/${positionId}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, options }),
+      });
+      if (res.ok) {
+        toast.success("Soal ditambahkan.");
+        setText("");
+        setOptions([{ label: "", score: 0 }, { label: "", score: 0 }]);
+        onSaved();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Tambah Soal</CardTitle>
+        <CardTitle id="tambah-soal" className="text-base scroll-mt-20">Tambah Soal</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
@@ -118,6 +124,7 @@ function NewQuestionForm({ positionId, onSaved }: { positionId: number; onSaved:
 
 function QuestionRow({ q, onChanged }: { q: Question; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
+  const confirmDlg = useConfirm();
   const [text, setText] = useState(q.text);
   const [options, setOptions] = useState<Option[]>(q.options);
   const [saving, setSaving] = useState(false);
@@ -126,24 +133,25 @@ function QuestionRow({ q, onChanged }: { q: Question; onChanged: () => void }) {
     if (!text.trim()) return toast.error("Pertanyaan wajib diisi");
     if (options.some((o) => !o.label.trim())) return toast.error("Semua opsi wajib diisi");
     setSaving(true);
-    const res = await fetch(`/api/questions/${q.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, options }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      toast.success("Soal diperbarui.");
-      setEditing(false);
-      onChanged();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch(`/api/questions/${q.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, options }),
+      });
+      if (res.ok) {
+        toast.success("Soal diperbarui.");
+        setEditing(false);
+        onChanged();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!confirm("Hapus soal ini?")) return;
     const res = await fetch(`/api/questions/${q.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Soal dihapus.");
@@ -181,8 +189,28 @@ function QuestionRow({ q, onChanged }: { q: Question; onChanged: () => void }) {
         <div className="flex items-start justify-between gap-4">
           <p className="font-medium">{q.text}</p>
           <div className="flex gap-1 shrink-0">
-            <Button size="icon" variant="ghost" onClick={() => setEditing(true)}><Pencil className="h-3.5 w-3.5" /></Button>
-            <Button size="icon" variant="ghost" onClick={handleDelete}><Trash2 className="h-3.5 w-3.5" /></Button>
+            <Button size="icon" variant="ghost" aria-label="Edit soal" title="Edit soal" onClick={() => setEditing(true)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Hapus soal"
+              title="Hapus soal"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() =>
+                confirmDlg.ask({
+                  title: "Hapus soal ini?",
+                  description: q.text,
+                  confirmLabel: "Hapus",
+                  destructive: true,
+                  onConfirm: handleDelete,
+                })
+              }
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+            <ConfirmDialog {...confirmDlg.props} />
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
@@ -209,11 +237,12 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
   function load() {
     setLoading(true);
     fetch(`/api/positions/${id}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then((p) => {
         setPosition(p);
         setPassingScore(String(p.passingScore));
       })
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -267,7 +296,7 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (loading) return <LoadingState />;
   if (!position) return <p className="text-sm text-muted-foreground">Posisi tidak ditemukan.</p>;
 
   const maxScore = position.questions.reduce(
@@ -281,7 +310,19 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
         <Link href="/hr/rekrutmen/posisi" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Posisi
         </Link>
-        <h1 className="text-2xl font-heading font-semibold tracking-tight">{position.name}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-heading font-semibold tracking-tight">{position.name}</h1>
+          {/* Daftar soal bisa 25+ item - form tambah ada di paling bawah,
+              tombol ini lompat ke sana tanpa scroll manual. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => document.getElementById("tambah-soal")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          >
+            <Plus className="h-3.5 w-3.5" /> Tambah Soal
+          </Button>
+        </div>
         <p className="text-muted-foreground text-sm">
           {position.questions.length} soal · skor maksimum {maxScore}
         </p>
@@ -338,6 +379,9 @@ export default function PosisiDetailPage({ params }: { params: Promise<{ id: str
       </Card>
 
       <div className="grid gap-3">
+        {position.questions.length === 0 && (
+          <EmptyState title="Belum ada soal" description="Tambahkan soal psikotest lewat form di bawah." />
+        )}
         {position.questions.map((q) => (
           <QuestionRow key={q.id} q={q} onChanged={load} />
         ))}

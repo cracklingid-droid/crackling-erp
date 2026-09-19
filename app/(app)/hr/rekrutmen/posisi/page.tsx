@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,8 +31,9 @@ export default function PosisiPage() {
   function load() {
     setLoading(true);
     fetch("/api/positions")
-      .then((r) => r.json())
+      .then(readJson)
       .then(setPositions)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -43,21 +46,23 @@ export default function PosisiPage() {
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/positions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, passingScore: Number(passingScore) }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      toast.success("Posisi dibuat.");
-      setName("");
-      setPassingScore("70");
-      setShowForm(false);
-      load();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch("/api/positions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, passingScore: Number(passingScore) }),
+      });
+      if (res.ok) {
+        toast.success("Posisi dibuat.");
+        setName("");
+        setPassingScore("70");
+        setShowForm(false);
+        load();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -67,14 +72,14 @@ export default function PosisiPage() {
         <Link href="/hr/rekrutmen" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Rekrutmen
         </Link>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-2xl font-heading font-semibold tracking-tight">Posisi & Bank Soal Psikotest</h1>
             <p className="text-muted-foreground text-sm">
               Tiap posisi punya soal & ambang nilai lulus sendiri. Dipakai ulang tiap kali lowongan posisi ini dibuka lagi.
             </p>
           </div>
-          <Button onClick={() => setShowForm((v) => !v)}>
+          <Button variant={showForm ? "outline" : "default"} onClick={() => setShowForm((v) => !v)}>
             <Plus className="h-4 w-4" /> Posisi Baru
           </Button>
         </div>
@@ -101,7 +106,7 @@ export default function PosisiPage() {
         </Card>
       )}
 
-      {loading && <p className="text-sm text-muted-foreground">Memuat...</p>}
+      {loading && <LoadingState variant="section" />}
       {!loading && positions.length === 0 && (
         <EmptyState icon={Briefcase} title="Belum ada posisi" description={'Klik "Posisi Baru" di atas untuk mulai.'} />
       )}

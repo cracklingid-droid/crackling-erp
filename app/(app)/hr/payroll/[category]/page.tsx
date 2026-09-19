@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -55,8 +56,9 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
     if (!valid) return;
     setLoading(true);
     fetch(`/api/payroll/periods?category=${category}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setPeriods)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -88,22 +90,24 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
       return;
     }
     setSaving(true);
-    const body = category === "outlet" ? { category } : { label, category, startDate, endDate };
-    const res = await fetch("/api/payroll/periods", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setSaving(false);
-    if (res.ok) {
-      const created = await res.json();
-      toast.success("Periode gaji dibuat.");
-      setShowForm(false);
-      load();
-      window.location.href = `/hr/payroll/${category}/${created.id}`;
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const body = category === "outlet" ? { category } : { label, category, startDate, endDate };
+      const res = await fetch("/api/payroll/periods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        toast.success("Periode gaji dibuat.");
+        setShowForm(false);
+        load();
+        window.location.href = `/hr/payroll/${category}/${created.id}`;
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -123,7 +127,7 @@ export default function PayrollCategoryPage({ params }: { params: Promise<{ cate
             <p className="text-muted-foreground text-sm mt-0.5">Daftar periode gaji yang sudah dibuat untuk kategori {categoryLabel.toLowerCase()}.</p>
           </div>
           {!readOnly && (
-            <Button onClick={openForm} className="shrink-0">
+            <Button variant={showForm ? "outline" : "default"} onClick={openForm} className="shrink-0">
               <Plus className="h-4 w-4" /> Periode Baru
             </Button>
           )}

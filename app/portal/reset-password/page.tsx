@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LoadingState } from "@/app/components/LoadingState";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -51,22 +52,25 @@ export default function PortalResetPasswordPage() {
       return;
     }
     setLoading(true);
-    const res = await fetch("/api/portal/set-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newPassword }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      router.push("/portal");
-    } else {
-      const data = await res.json();
-      setError(data.error ?? "Gagal menyimpan password baru");
+    try {
+      const res = await fetch("/api/portal/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (res.ok) {
+        router.push("/portal");
+      } else {
+        const data = await res.json();
+        setError(data.error ?? "Gagal menyimpan password baru");
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
   if (checking) {
-    return <div className="flex items-center justify-center min-h-screen text-sm text-muted-foreground">Memuat...</div>;
+    return <LoadingState variant="screen" />;
   }
 
   return (
@@ -104,12 +108,12 @@ export default function PortalResetPasswordPage() {
                 minLength={6}
               />
               <p className="text-xs text-muted-foreground">Minimal 6 karakter. Simpan baik-baik - kalau lupa, minta bantuan HR.</p>
+              {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
             </div>
             <Button type="submit" disabled={loading} className="w-full">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               Simpan &amp; Lanjutkan
             </Button>
-            {error && <p className="text-sm text-destructive">{error}</p>}
           </form>
         </CardContent>
       </Card>

@@ -1,10 +1,27 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { AuthProvider } from "../components/AuthContext";
 import { AppSidebar } from "../components/AppSidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+
+// Di tablet (768-1023px) sidebar penuh (256px) memakan sepertiga layar -
+// tabel Payroll/Database Karyawan cuma sisa 2-3 kolom. Ciutkan ke rail ikon
+// otomatis SEKALI saat pertama buka, kecuali user sudah pernah memilih
+// sendiri (cookie sidebar_state ada). Tetap bisa dibuka lewat tombol.
+// Perbaikan UI menyeluruh 2026-09-19.
+function AutoCollapseOnTablet() {
+  const { setOpen, isMobile } = useSidebar();
+  useEffect(() => {
+    if (isMobile) return;
+    const hasPreference = document.cookie.split("; ").some((c) => c.startsWith("sidebar_state="));
+    if (!hasPreference && window.innerWidth < 1024) setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
 
 // Layout ERP: sidebar kiri yang bisa diciutkan (pola sama persis dgn
 // Crackling Warehouse) + header tipis berisi tombol ciut/buka & nama modul.
@@ -31,6 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <SidebarProvider>
+        <AutoCollapseOnTablet />
         <AppSidebar />
         <SidebarInset>
           <Header />

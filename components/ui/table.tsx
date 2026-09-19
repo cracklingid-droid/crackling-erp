@@ -3,7 +3,11 @@
 import * as React from "react"
 import { cn } from "cn"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  containerClassName,
+  ...props
+}: React.ComponentProps<"table"> & { containerClassName?: string }) {
   return (
     // min-w-0 wajib - kalau Table ini dipakai langsung di dalam wrapper
     // "flex" (mis. Card, components/ui/card.tsx pakai flex flex-col), div
@@ -11,9 +15,13 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     // menyusut mengikuti overflow-x-auto, malah ikut melebar mengikuti
     // tabel lalu kepotong diam-diam tanpa scrollbar sama sekali. Perbaikan
     // 2026-09-13 (ditemukan di tabel Payroll yg sangat lebar).
+    // containerClassName: utk tabel dgn tinggi terbatas + header sticky -
+    // scroll vertikal HARUS di container yang sama dgn scroll horizontal
+    // ini (bukan div pembungkus di luar), kalau tidak `sticky top-0` di
+    // TableHeader tidak pernah menempel. Perbaikan 2026-09-19.
     <div
       data-slot="table-container"
-      className="relative w-full min-w-0 overflow-x-auto"
+      className={cn("scroll-x-hint thin-scrollbar relative w-full min-w-0 overflow-x-auto", containerClassName)}
     >
       <table
         data-slot="table"

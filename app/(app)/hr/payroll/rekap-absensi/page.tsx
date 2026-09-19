@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { readJson, errorMessage } from "@/lib/fetch-json";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,8 +47,9 @@ export default function RekapAbsensiPage() {
   function load() {
     setLoading(true);
     fetch(`/api/payroll/attendance/recap?start=${startDate}&end=${endDate}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setRows)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -100,9 +103,9 @@ export default function RekapAbsensiPage() {
                     <TableRow>
                       <TableHead>Nama</TableHead>
                       <TableHead>Jabatan / Outlet</TableHead>
-                      <TableHead>Hari Hadir</TableHead>
-                      <TableHead>Terlambat</TableHead>
-                      <TableHead>Total Jam Kerja</TableHead>
+                      <TableHead className="text-right">Hari Hadir</TableHead>
+                      <TableHead className="text-right">Terlambat</TableHead>
+                      <TableHead className="text-right">Total Jam Kerja</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -117,13 +120,13 @@ export default function RekapAbsensiPage() {
                         <TableCell className="text-sm text-muted-foreground">
                           {[r.position, r.outlet].filter(Boolean).join(" · ") || "-"}
                         </TableCell>
-                        <TableCell className={`tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
+                        <TableCell className={`text-right tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
                           {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
                         </TableCell>
-                        <TableCell className={`tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                        <TableCell className={`text-right tabular-nums text-sm ${r.lateCount > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
                           {r.scheduleStart ? `${r.lateCount} kali` : "-"}
                         </TableCell>
-                        <TableCell className="tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{formatHours(r.totalMinutes)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

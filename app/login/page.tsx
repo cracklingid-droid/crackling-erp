@@ -19,17 +19,20 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: username.trim(), password }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      router.push("/hr");
-    } else {
-      const data = await res.json();
-      setError(data.error ?? "Login gagal");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      if (res.ok) {
+        router.push("/hr");
+      } else {
+        const data = await res.json();
+        setError(data.error ?? "Login gagal");
+      }
+    } finally {
+      setLoading(false);
     }
   }
 

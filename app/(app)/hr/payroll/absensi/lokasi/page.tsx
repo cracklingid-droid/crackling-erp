@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,11 +69,12 @@ export default function OutletLocationPage() {
   function load() {
     setLoading(true);
     fetch("/api/outlet-locations")
-      .then((r) => r.json())
+      .then(readJson)
       .then((data: OutletLocationRow[]) => {
         setRows(data);
         setRadiusDraft(Object.fromEntries(data.map((r) => [r.outlet, String(r.radiusMeters)])));
       })
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -146,7 +149,7 @@ export default function OutletLocationPage() {
         </CardHeader>
         <CardContent className="grid gap-4">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Memuat...</p>
+            <LoadingState variant="section" />
           ) : (
             rows.map((r) => (
               <OutletRow

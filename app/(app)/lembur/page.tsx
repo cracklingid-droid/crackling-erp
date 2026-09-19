@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Clock3, Check, X, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthContext } from "../../components/AuthContext";
@@ -68,8 +70,7 @@ export default function LemburApprovalPage() {
         setNote("");
         load();
       } else {
-        const err = await res.json();
-        toast.error("Gagal: " + err.error);
+        toast.error("Gagal: " + (await readErrorMessage(res)));
       }
     } finally {
       setSubmitting(false);
@@ -93,7 +94,7 @@ export default function LemburApprovalPage() {
       </div>
 
       {requests === null ? (
-        <p className="text-sm text-muted-foreground">Memuat...</p>
+        <LoadingState variant="section" />
       ) : (
         <>
           <div>
@@ -184,12 +185,12 @@ export default function LemburApprovalPage() {
           <div className="grid gap-1.5">
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Catatan (opsional)" />
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDecideTarget(null)} disabled={submitting}>Batal</Button>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDecideTarget(null)} disabled={submitting}>Batal</Button>
             <Button onClick={submitDecision} disabled={submitting} variant={decideTarget?.decision === "rejected" ? "destructive" : "default"}>
-              {submitting ? "Menyimpan..." : "Konfirmasi"}
+              {submitting ? "Menyimpan..." : decideTarget?.decision === "rejected" ? "Tolak Pengajuan" : "Setujui Pengajuan"}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -198,7 +199,7 @@ export default function LemburApprovalPage() {
           <DialogHeader>
             <DialogTitle>Foto Lampiran</DialogTitle>
           </DialogHeader>
-          {previewUrl && <img src={previewUrl} alt="Foto lampiran lembur" className="w-full rounded-md" />}
+          {previewUrl && <img src={previewUrl} alt="Foto lampiran lembur" className="w-full max-h-[70vh] rounded-md object-contain" />}
         </DialogContent>
       </Dialog>
     </div>

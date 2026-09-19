@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { formatRupiah } from "@/lib/format";
+import { toast } from "sonner";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer, Download } from "lucide-react";
@@ -26,10 +30,6 @@ type Period = {
   items: Item[];
 };
 
-function formatRupiah(n: number): string {
-  return `Rp${Math.round(n).toLocaleString("id-ID")}`;
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -42,12 +42,13 @@ export default function PayrollSlipPage({ params }: { params: Promise<{ category
   useEffect(() => {
     setLoading(true);
     fetch(`/api/payroll/periods/${periodId}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setPeriod)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }, [periodId]);
 
-  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (loading) return <LoadingState />;
   const item = period?.items.find((it) => it.id === Number(itemId));
   if (!period || !item) return <p className="text-sm text-muted-foreground">Data slip gaji tidak ditemukan.</p>;
 

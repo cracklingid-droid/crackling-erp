@@ -107,8 +107,11 @@ function findBestActiveHref(pathname: string, allHrefs: string[]): string | null
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuthContext();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
+  // Di HP sidebar tampil sbg sheet - tutup otomatis begitu menu diklik,
+  // sebelumnya sheet tetap terbuka menutupi halaman tujuan.
+  const closeMobile = () => isMobile && setOpenMobile(false);
   const groups = buildGroups(user?.role);
   const allHrefs = groups.flatMap((g) => g.items.filter((i) => !i.external).map((i) => i.href));
   const activeHref = findBestActiveHref(pathname, allHrefs);
@@ -132,7 +135,7 @@ export function AppSidebar() {
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      render={item.external ? <a href={item.href} /> : <Link href={item.href} />}
+                      render={item.external ? <a href={item.href} /> : <Link href={item.href} onClick={closeMobile} />}
                       isActive={!item.external && item.href === activeHref}
                       tooltip={item.label}
                       className="relative transition-all duration-200 ease-out hover:translate-x-0.5 data-[active]:font-medium data-[active]:before:absolute data-[active]:before:-left-2 data-[active]:before:top-1/2 data-[active]:before:h-4 data-[active]:before:-translate-y-1/2 data-[active]:before:rounded-full data-[active]:before:bg-sidebar-primary data-[active]:before:w-1"

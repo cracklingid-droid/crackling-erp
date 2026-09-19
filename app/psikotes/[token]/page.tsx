@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef, use as usePromise } from "react";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Clock } from "lucide-react";
+import { CheckCircle2, Clock } from "lucide-react";
 
 type Question = { id: number; text: string; options: { id: number; label: string }[] };
 type TestState =
@@ -95,7 +96,7 @@ export default function PsikotesPage({ params }: { params: Promise<{ token: stri
   }, [state.status === "pending" ? state.deadline : null]);
 
   if (state.status === "loading") {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Memuat...</div>;
+    return <LoadingState variant="screen" />;
   }
 
   if (state.status === "not-found") {
@@ -115,7 +116,7 @@ export default function PsikotesPage({ params }: { params: Promise<{ token: stri
             {state.passed ? (
               <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
             ) : (
-              <XCircle className="h-10 w-10 text-muted-foreground mx-auto" />
+              <CheckCircle2 className="h-10 w-10 text-muted-foreground mx-auto" />
             )}
             <h1 className="font-heading font-semibold text-xl">
               {state.passed ? "Selamat, Anda lolos psikotest!" : "Terima kasih telah mengikuti psikotest"}

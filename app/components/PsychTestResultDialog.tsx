@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { FileText } from "lucide-react";
@@ -32,8 +35,9 @@ export function PsychTestResultDialog({ candidateId, size = "h-4 w-4" }: { candi
     if (open && !data && !loading) {
       setLoading(true);
       fetch(`/api/candidates/${candidateId}/psychtest`)
-        .then((r) => r.json())
+        .then(readJson)
         .then(setData)
+        .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
         .finally(() => setLoading(false));
     }
   }
@@ -52,7 +56,7 @@ export function PsychTestResultDialog({ candidateId, size = "h-4 w-4" }: { candi
           <DialogTitle>Hasil Psikotest</DialogTitle>
         </DialogHeader>
 
-        {loading && <p className="text-sm text-muted-foreground">Memuat...</p>}
+        {loading && <LoadingState variant="section" rows={2} />}
 
         {data && (
           <div className="grid gap-4">

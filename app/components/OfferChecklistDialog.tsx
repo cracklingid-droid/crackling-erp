@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { readErrorMessage } from "@/lib/fetch-json";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,17 +56,19 @@ export function OfferChecklistDialog({ candidate, onChanged }: { candidate: Offe
 
   async function setFlag(field: "offerDocumentReady" | "offerWhatsappSent", value: boolean) {
     setSaving(true);
-    const res = await fetch(`/api/candidates/${candidate.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: value }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      onChanged();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch(`/api/candidates/${candidate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (res.ok) {
+        onChanged();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -119,8 +122,14 @@ export function OfferChecklistDialog({ candidate, onChanged }: { candidate: Offe
               <Button type="button" variant="outline" size="sm" onClick={copyLetter}>
                 <Copy className="h-3.5 w-3.5" /> Salin Teks
               </Button>
-              <Button type="button" size="sm" disabled={saving} onClick={() => setFlag("offerDocumentReady", !candidate.offerDocumentReady)}>
-                {candidate.offerDocumentReady ? "Batalkan Tanda Selesai" : "Tandai Dokumen Sudah Dibuat"}
+              <Button
+                type="button"
+                size="sm"
+                variant={candidate.offerDocumentReady ? "outline" : "default"}
+                disabled={saving}
+                onClick={() => setFlag("offerDocumentReady", !candidate.offerDocumentReady)}
+              >
+                {saving ? "Menyimpan..." : candidate.offerDocumentReady ? "Batalkan Tanda Selesai" : "Tandai Dokumen Sudah Dibuat"}
               </Button>
             </div>
           </div>
@@ -141,8 +150,14 @@ export function OfferChecklistDialog({ candidate, onChanged }: { candidate: Offe
               <Button type="button" variant="outline" size="sm" onClick={openWhatsapp}>
                 <MessageCircle className="h-3.5 w-3.5" /> Buka WhatsApp
               </Button>
-              <Button type="button" size="sm" disabled={saving} onClick={() => setFlag("offerWhatsappSent", !candidate.offerWhatsappSent)}>
-                {candidate.offerWhatsappSent ? "Batalkan Tanda Terkirim" : "Tandai Sudah Dikirim"}
+              <Button
+                type="button"
+                size="sm"
+                variant={candidate.offerWhatsappSent ? "outline" : "default"}
+                disabled={saving}
+                onClick={() => setFlag("offerWhatsappSent", !candidate.offerWhatsappSent)}
+              >
+                {saving ? "Menyimpan..." : candidate.offerWhatsappSent ? "Batalkan Tanda Terkirim" : "Tandai Sudah Dikirim"}
               </Button>
             </div>
           </div>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { LoadingState } from "@/app/components/LoadingState";
+import { EmptyState } from "@/app/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { addWeeks, dateKey, formatDayLabel } from "@/lib/roster";
@@ -46,22 +48,52 @@ export default function PublicRosterPage({ params }: { params: Promise<{ slug: s
         <p className="text-muted-foreground text-sm mb-6">Jadwal masuk/libur mingguan.</p>
 
         <div className="flex items-center gap-2 mb-4">
-          <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, -1))}>
+          <Button variant="outline" size="icon" aria-label="Minggu sebelumnya" title="Minggu sebelumnya" onClick={() => setAnchor((a) => addWeeks(a, -1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium">
             {data ? `${formatDayLabel(new Date(data.days[0]))} - ${formatDayLabel(new Date(data.days[6]))}` : "..."}
           </span>
-          <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, 1))}>
+          <Button variant="outline" size="icon" aria-label="Minggu berikutnya" title="Minggu berikutnya" onClick={() => setAnchor((a) => addWeeks(a, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border">
+        {/* Tampilan HP: 1 kartu per karyawan dgn 7 chip hari - tabel 8 kolom
+            di bawah cuma muat 1 hari di layar 390px (harus geser tanpa
+            petunjuk). Perbaikan UI menyeluruh 2026-09-19. */}
+        {!loading && data && data.employees.length > 0 && (
+          <div className="grid gap-2 md:hidden">
+            {data.employees.map((emp) => (
+              <div key={emp.id} className="rounded-lg border bg-card px-3 py-2.5">
+                <p className="text-sm font-medium">{emp.name}</p>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {data.days.map((d) => {
+                    const entry = data.entries.find((e) => e.employeeId === emp.id && e.date === d);
+                    const val = entry?.isWorking;
+                    const day = new Date(d).toLocaleDateString("id-ID", { weekday: "short" });
+                    return (
+                      <span
+                        key={d}
+                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs ${
+                          val === true ? "bg-primary/10 text-primary" : val === false ? "bg-muted text-foreground/70" : "text-muted-foreground/50"
+                        }`}
+                      >
+                        <span className="font-medium">{day}</span>
+                        {val === true ? "Masuk" : val === false ? "Libur" : "-"}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={`overflow-x-auto rounded-lg border ${!loading && data && data.employees.length > 0 ? "hidden md:block" : ""}`}>
           {loading || !data ? (
-            <p className="text-sm text-muted-foreground p-4">Memuat...</p>
+            <LoadingState variant="section" className="p-4" />
           ) : data.employees.length === 0 ? (
-            <p className="text-sm text-muted-foreground p-4">Belum ada data karyawan untuk outlet ini.</p>
+            <EmptyState icon={CalendarDays} title="Belum ada jadwal untuk outlet ini" className="m-4" />
           ) : (
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -88,7 +120,7 @@ export default function PublicRosterPage({ params }: { params: Promise<{ slug: s
                               val === true
                                 ? "bg-primary/10 text-primary"
                                 : val === false
-                                  ? "bg-muted text-muted-foreground"
+                                  ? "bg-muted text-foreground/70"
                                   : "text-muted-foreground/40"
                             }`}
                           >

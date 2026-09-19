@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatRupiah as fmtRupiah } from "@/lib/format";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { EmptyState } from "@/app/components/EmptyState";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Receipt } from "lucide-react";
@@ -18,10 +23,6 @@ type Slip = {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function fmtRupiah(n: number) {
-  return `Rp${n.toLocaleString("id-ID")}`;
 }
 
 async function downloadSlip(itemId: number) {
@@ -44,12 +45,16 @@ async function downloadSlip(itemId: number) {
 
 export default function PortalSlipGajiPage() {
   const [slips, setSlips] = useState<Slip[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
+    setLoadError(null);
     fetch("/api/portal/slips")
-      .then((r) => r.json())
-      .then(setSlips);
-  }, []);
+      .then(readJson)
+      .then(setSlips)
+      .catch((e) => setLoadError(errorMessage(e, "Gagal memuat slip gaji.")));
+  }
+  useEffect(load, []);
 
   return (
     <div className="max-w-2xl grid gap-6">
@@ -61,20 +66,23 @@ export default function PortalSlipGajiPage() {
         <p className="text-muted-foreground text-sm mt-0.5">Riwayat slip gaji Anda selama pernah bekerja di Crackling F&amp;B.</p>
       </div>
 
-      {slips === null ? (
-        <p className="text-sm text-muted-foreground">Memuat...</p>
+      {loadError ? (
+        <ErrorState message={loadError} onRetry={load} />
+      ) : slips === null ? (
+        <LoadingState variant="section" />
       ) : slips.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Belum ada slip gaji yang diterbitkan.</p>
+        <EmptyState icon={Receipt} title="Belum ada slip gaji" description="Slip gaji akan muncul di sini setelah periode gaji difinalisasi HR." />
       ) : (
         <div className="grid gap-2">
           {slips.map((s) => (
             <Card key={s.itemId}>
               <CardContent className="flex items-center justify-between gap-3 py-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{s.label}</p>
                   <p className="text-xs text-muted-foreground">
-                    {fmtDate(s.startDate)} - {fmtDate(s.endDate)} · {fmtRupiah(s.netPay)}
+                    {fmtDate(s.startDate)} - {fmtDate(s.endDate)}
                   </p>
+                  <p className="text-sm font-medium tabular-nums">{fmtRupiah(s.netPay)}</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => downloadSlip(s.itemId)}>
                   <Download className="h-3.5 w-3.5" /> PDF

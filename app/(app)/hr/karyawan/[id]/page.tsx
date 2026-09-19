@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, use as usePromise } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ConfirmDialog, useConfirm } from "@/app/components/ConfirmDialog";
 import { ArrowLeft, Upload, FileText, Trash2, CheckCircle2, Circle, MessageCircle, Wand2, Copy, KeyRound, ScanFace, RotateCcw } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { REQUIRED_ONBOARDING_FIELDS, getMissingOnboardingFields } from "@/lib/employee-onboarding";
@@ -17,17 +20,11 @@ import { derivePortalPassword, canUsePortal } from "@/lib/employee-portal";
 import { prefixForOutlet } from "@/lib/employee-code";
 import { toWaNumber, buildWaLink } from "@/lib/whatsapp";
 import { employeeCategory } from "@/lib/payroll-config";
+import { EMPLOYEE_STATUS_LABEL, EMPLOYMENT_STATUS_OPTIONS } from "@/lib/employee-status";
 import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
 import { useAuthContext } from "../../../../components/AuthContext";
 
-const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
-const EMPLOYMENT_STATUS_OPTIONS = [
-  { value: "tetap", label: "Karyawan Tetap" },
-  { value: "kontrak", label: "Kontrak" },
-  { value: "pkwt", label: "PKWT" },
-  { value: "magang", label: "Magang" },
-  { value: "probation", label: "Probation" },
-];
+const STATUS_LABEL = EMPLOYEE_STATUS_LABEL;
 const WEEKDAY_OPTIONS = [
   { value: 1, label: "Sen" },
   { value: 2, label: "Sel" },
@@ -188,6 +185,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   const [generatingCode, setGeneratingCode] = useState(false);
   const [resettingFace, setResettingFace] = useState(false);
   const [resettingPortalPassword, setResettingPortalPassword] = useState(false);
+  const confirmDlg = useConfirm();
   const [otherEmployees, setOtherEmployees] = useState<EmployeeRef[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -195,7 +193,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   function load() {
     setLoading(true);
     fetch(`/api/employees/${id}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then((e: Employee) => {
         setEmployee(e);
         setOffDays(e.defaultOffDays ?? []);
@@ -223,16 +221,18 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           contractEndDate: toDateInput(e.contractEndDate), reportsToId: e.reportsToId != null ? String(e.reportsToId) : "",
         });
       })
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
   useEffect(load, [id]);
   useEffect(() => {
     fetch("/api/employees")
-      .then((r) => r.json())
+      .then(readJson)
       .then((list: (EmployeeRef & { id: number; status: string })[]) =>
         setOtherEmployees(list.filter((e) => e.id !== Number(id) && e.status !== "resigned"))
-      );
+      )
+      .catch(() => {}); // cuma utk pilihan "Atasan Langsung" - kalau gagal, dropdown tetap kosong
   }, [id]);
 
   function set<K extends keyof typeof emptyForm>(key: K, value: string) {
@@ -245,72 +245,79 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
     setSaving(true);
-    const res = await fetch(`/api/employees/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, defaultOffDays: offDays, historyEffectiveDate, historyNote }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      toast.success("Data karyawan disimpan.");
-      setHistoryNote("");
-      setHistoryEffectiveDate(todayInput());
-      load();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, defaultOffDays: offDays, historyEffectiveDate, historyNote }),
+      });
+      if (res.ok) {
+        toast.success("Data karyawan disimpan.");
+        setHistoryNote("");
+        setHistoryEffectiveDate(todayInput());
+        load();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
   async function handleStatusChange(status: string) {
     setChangingStatus(true);
-    const res = await fetch(`/api/employees/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    setChangingStatus(false);
-    if (res.ok) {
-      toast.success(`Status diubah ke "${STATUS_LABEL[status]}".`);
-      load();
-    } else {
-      const err = await res.json();
-      toast.error("Gagal: " + err.error);
+    try {
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        toast.success(`Status diubah ke "${STATUS_LABEL[status]}".`);
+        load();
+      } else {
+        toast.error("Gagal: " + (await readErrorMessage(res)));
+      }
+    } finally {
+      setChangingStatus(false);
     }
   }
 
   async function handleResetPortalPassword() {
-    if (!confirm("Reset password portal karyawan ini ke default (ID Karyawan + tahun lahir)? Karyawan akan diwajibkan ganti password lagi saat login berikutnya."))
-      return;
     setResettingPortalPassword(true);
-    const res = await fetch(`/api/employees/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ portalPasswordEnc: null }),
-    });
-    setResettingPortalPassword(false);
-    if (res.ok) {
-      toast.success("Password portal direset ke default.");
-      load();
-    } else {
-      toast.error("Gagal reset password portal.");
+    try {
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ portalPasswordEnc: null }),
+      });
+      if (res.ok) {
+        toast.success("Password portal direset ke default.");
+        load();
+      } else {
+        toast.error("Gagal reset password portal.");
+      }
+    } finally {
+      setResettingPortalPassword(false);
     }
   }
 
   async function handleResetFaceReference() {
-    if (!confirm("Reset foto acuan wajah karyawan ini? Karyawan perlu daftar ulang wajah lewat Portal sebelum bisa absen mandiri lagi.")) return;
     setResettingFace(true);
-    const res = await fetch(`/api/employees/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ faceReferenceUrl: null }),
-    });
-    setResettingFace(false);
-    if (res.ok) {
-      toast.success("Foto acuan wajah direset - karyawan bisa daftar ulang lewat Portal.");
-      load();
-    } else {
-      toast.error("Gagal reset foto acuan wajah.");
+    try {
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ faceReferenceUrl: null }),
+      });
+      if (res.ok) {
+        toast.success("Foto acuan wajah direset - karyawan bisa daftar ulang lewat Portal.");
+        load();
+      } else {
+        toast.error("Gagal reset foto acuan wajah.");
+      }
+    } finally {
+      setResettingFace(false);
     }
   }
 
@@ -346,11 +353,10 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         setDocExpiryDate("");
         load();
       } else {
-        const err = await res.json();
-        toast.error("Gagal simpan dokumen: " + err.error);
+        toast.error("Gagal simpan dokumen: " + (await readErrorMessage(res)));
       }
     } catch (err) {
-      toast.error("Gagal upload dokumen: " + (err instanceof Error ? err.message : "unknown"));
+      toast.error("Gagal upload dokumen. Periksa koneksi lalu coba lagi.");
     } finally {
       setUploadingDoc(false);
       e.target.value = "";
@@ -375,11 +381,10 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         toast.success("Foto profil diperbarui.");
         load();
       } else {
-        const err = await res.json();
-        toast.error("Gagal simpan foto: " + err.error);
+        toast.error("Gagal simpan foto: " + (await readErrorMessage(res)));
       }
     } catch (err) {
-      toast.error("Gagal upload foto: " + (err instanceof Error ? err.message : "unknown"));
+      toast.error("Gagal upload foto. Periksa koneksi lalu coba lagi.");
     } finally {
       setUploadingPhoto(false);
       e.target.value = "";
@@ -392,14 +397,17 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
     setGeneratingCode(true);
-    const res = await fetch(`/api/employees/next-code?outlet=${encodeURIComponent(form.outlet)}`);
-    const data = await res.json();
-    setGeneratingCode(false);
-    if (res.ok) {
-      set("employeeCode", data.code);
-      toast.success(`Kode diisi: ${data.code} (belum tersimpan, klik "Simpan Perubahan")`);
-    } else {
-      toast.error(data.error);
+    try {
+      const res = await fetch(`/api/employees/next-code?outlet=${encodeURIComponent(form.outlet)}`);
+      const data = await res.json();
+      if (res.ok) {
+        set("employeeCode", data.code);
+        toast.success(`Kode diisi: ${data.code} (belum tersimpan, klik "Simpan Perubahan")`);
+      } else {
+        toast.error(data.error);
+      }
+    } finally {
+      setGeneratingCode(false);
     }
   }
 
@@ -417,7 +425,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (loading) return <LoadingState />;
   if (!employee) return <p className="text-sm text-muted-foreground">Karyawan tidak ditemukan.</p>;
 
   const hasKtp = employee.documents.some((d) => d.type === "ktp");
@@ -444,6 +452,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
   return (
     <fieldset disabled={readOnly} className="contents">
     <div className="max-w-4xl grid gap-6">
+      <ConfirmDialog {...confirmDlg.props} />
       <div>
         <Link href="/hr/karyawan" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Database Karyawan
@@ -559,7 +568,21 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                 <MessageCircle className="h-3.5 w-3.5" /> Kirim ke WA
               </Button>
               {employee.portalPasswordCurrent && (
-                <Button type="button" variant="outline" size="sm" onClick={handleResetPortalPassword} disabled={resettingPortalPassword}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={resettingPortalPassword}
+                  onClick={() =>
+                    confirmDlg.ask({
+                      title: "Reset password portal ke default?",
+                      description: "Password kembali ke ID Karyawan + tahun lahir. Karyawan akan diwajibkan membuat password baru saat login berikutnya.",
+                      confirmLabel: "Reset Password",
+                      destructive: true,
+                      onConfirm: handleResetPortalPassword,
+                    })
+                  }
+                >
                   <RotateCcw className="h-3.5 w-3.5" /> {resettingPortalPassword ? "Mereset..." : "Reset ke Default"}
                 </Button>
               )}
@@ -591,7 +614,21 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                   </span>
                 )}
               </p>
-              <Button type="button" variant="outline" size="sm" onClick={handleResetFaceReference} disabled={resettingFace}>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={resettingFace}
+                onClick={() =>
+                  confirmDlg.ask({
+                    title: "Reset foto acuan wajah?",
+                    description: "Karyawan perlu daftar ulang wajah lewat Portal sebelum bisa absen mandiri lagi.",
+                    confirmLabel: "Reset Wajah",
+                    destructive: true,
+                    onConfirm: handleResetFaceReference,
+                  })
+                }
+              >
                 <RotateCcw className="h-3.5 w-3.5" /> {resettingFace ? "Mereset..." : "Reset (utk daftar ulang)"}
               </Button>
             </div>
@@ -778,10 +815,10 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           </div>
           <div className="grid gap-1.5">
             <Label>Jadwal Kerja (Jam Masuk - Jam Pulang)</Label>
-            <div className="flex items-center gap-2">
-              <Input type="time" value={form.scheduleStart} onChange={(e) => set("scheduleStart", e.target.value)} className="w-auto" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Input type="time" aria-label="Jam masuk" value={form.scheduleStart} onChange={(e) => set("scheduleStart", e.target.value)} className="w-auto min-w-0" />
               <span className="text-muted-foreground text-sm">-</span>
-              <Input type="time" value={form.scheduleEnd} onChange={(e) => set("scheduleEnd", e.target.value)} className="w-auto" />
+              <Input type="time" aria-label="Jam pulang" value={form.scheduleEnd} onChange={(e) => set("scheduleEnd", e.target.value)} className="w-auto min-w-0" />
             </div>
             <p className="text-xs text-muted-foreground">
               Jam Masuk dipakai deteksi otomatis "Terlambat"; keduanya ditampilkan di halaman Rincian Perhitungan gaji sbg
@@ -867,30 +904,30 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-1.5">
             <Label>Gaji Pokok (Rp/bulan)</Label>
-            <Input type="number" value={form.baseSalary} onChange={(e) => set("baseSalary", e.target.value)} />
+            <Input type="number" min={0} value={form.baseSalary} onChange={(e) => set("baseSalary", e.target.value)} />
             <p className="text-xs text-muted-foreground">Untuk karyawan tetap/bulanan. Kosongkan kalau karyawan part time.</p>
           </div>
           <div className="grid gap-1.5">
             <Label>Gaji Harian - Part Time (Rp/hari)</Label>
-            <Input type="number" value={form.dailyBaseRate} onChange={(e) => set("dailyBaseRate", e.target.value)} />
+            <Input type="number" min={0} value={form.dailyBaseRate} onChange={(e) => set("dailyBaseRate", e.target.value)} />
             <p className="text-xs text-muted-foreground">Untuk karyawan part time (mis. Rp150.000/hari). Kosongkan kalau bulanan.</p>
           </div>
           <div className="grid gap-1.5">
             <Label>Tunjangan Tetap (Rp/bulan)</Label>
-            <Input type="number" value={form.allowance} onChange={(e) => set("allowance", e.target.value)} />
+            <Input type="number" min={0} value={form.allowance} onChange={(e) => set("allowance", e.target.value)} />
           </div>
           <div className="grid gap-1.5">
             <Label>Uang Transport (Rp/hari hadir)</Label>
-            <Input type="number" value={form.dailyTransportRate} onChange={(e) => set("dailyTransportRate", e.target.value)} />
+            <Input type="number" min={0} value={form.dailyTransportRate} onChange={(e) => set("dailyTransportRate", e.target.value)} />
           </div>
           <div className="grid gap-1.5">
             <Label>Uang Makan (Rp/hari hadir)</Label>
-            <Input type="number" value={form.dailyMealRate} onChange={(e) => set("dailyMealRate", e.target.value)} />
+            <Input type="number" min={0} value={form.dailyMealRate} onChange={(e) => set("dailyMealRate", e.target.value)} />
           </div>
           <div className="grid gap-1.5">
             <Label>Hari Kerja Standar/Bulan</Label>
             <Input
-              type="number"
+              type="number" min={0}
               value={form.standardWorkDays}
               onChange={(e) => set("standardWorkDays", e.target.value)}
               placeholder="mis. 25 atau 27"
@@ -916,7 +953,7 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <div className="grid gap-1.5">
                 <Label>Saldo Deposit Ditahan (Rp)</Label>
-                <Input type="number" value={form.depositBalance} onChange={(e) => set("depositBalance", e.target.value)} />
+                <Input type="number" min={0} value={form.depositBalance} onChange={(e) => set("depositBalance", e.target.value)} />
                 <p className="text-xs text-muted-foreground">
                   Otomatis mengikuti "Bayar Deposit"/"Kembali Deposit" di Payroll Outlet. Jadi acuan HR saat karyawan resign.
                 </p>
@@ -946,35 +983,35 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label>Lembur (Rp/jam)</Label>
-              <Input type="number" value={form.kantorOvertimeRate} onChange={(e) => set("kantorOvertimeRate", e.target.value)} />
+              <Input type="number" min={0} value={form.kantorOvertimeRate} onChange={(e) => set("kantorOvertimeRate", e.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label>Potongan Keterlambatan (Rp/kejadian)</Label>
-              <Input type="number" value={form.kantorLateRate} onChange={(e) => set("kantorLateRate", e.target.value)} />
+              <Input type="number" min={0} value={form.kantorLateRate} onChange={(e) => set("kantorLateRate", e.target.value)} />
               <p className="text-xs text-muted-foreground">Dihitung otomatis dari absensi vs Jadwal Kerja x rate ini.</p>
             </div>
             <div className="grid gap-1.5">
               <Label>Potongan Absen Tdk Lengkap (Rp/kejadian)</Label>
-              <Input type="number" value={form.kantorIncompleteClockRate} onChange={(e) => set("kantorIncompleteClockRate", e.target.value)} />
+              <Input type="number" min={0} value={form.kantorIncompleteClockRate} onChange={(e) => set("kantorIncompleteClockRate", e.target.value)} />
               <p className="text-xs text-muted-foreground">Berlaku sama untuk lupa Clock In maupun Clock Out.</p>
             </div>
             <div className="grid gap-1.5">
               <Label>Reimburse Bensin (Rp/KM)</Label>
-              <Input type="number" value={form.kantorFuelRatePerKm} onChange={(e) => set("kantorFuelRatePerKm", e.target.value)} />
+              <Input type="number" min={0} value={form.kantorFuelRatePerKm} onChange={(e) => set("kantorFuelRatePerKm", e.target.value)} />
               <p className="text-xs text-muted-foreground">KM diinput manual tiap periode gaji - di luar Take Home Pay.</p>
             </div>
             <div className="grid gap-1.5">
               <Label>Tunjangan BPJS Kar (Rp/bulan)</Label>
-              <Input type="number" value={form.kantorBpjsAllowance} onChange={(e) => set("kantorBpjsAllowance", e.target.value)} />
+              <Input type="number" min={0} value={form.kantorBpjsAllowance} onChange={(e) => set("kantorBpjsAllowance", e.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label>Kewajiban BPJS Ktr (Rp/bulan)</Label>
-              <Input type="number" value={form.kantorBpjsEmployerObligation} onChange={(e) => set("kantorBpjsEmployerObligation", e.target.value)} />
+              <Input type="number" min={0} value={form.kantorBpjsEmployerObligation} onChange={(e) => set("kantorBpjsEmployerObligation", e.target.value)} />
               <p className="text-xs text-muted-foreground">Ikut menambah Total Penghasilan (sesuai kebijakan, bukan salah ketik).</p>
             </div>
             <div className="grid gap-1.5">
               <Label>Setoran ke BPJS (Rp/bulan)</Label>
-              <Input type="number" value={form.kantorBpjsRemittance} onChange={(e) => set("kantorBpjsRemittance", e.target.value)} />
+              <Input type="number" min={0} value={form.kantorBpjsRemittance} onChange={(e) => set("kantorBpjsRemittance", e.target.value)} />
             </div>
           </CardContent>
         </Card>
@@ -1049,9 +1086,15 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</Button>
-      </div>
+      {/* Bar simpan menempel di bawah layar - form ini ±6 section panjang,
+          sebelumnya tombol Simpan cuma ada di tengah halaman (di antara
+          Riwayat & Dokumen) sehingga sering tidak kelihatan. */}
+      {!readOnly && (
+        <div className="sticky bottom-0 z-20 -mx-4 flex items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+          <span className="text-xs text-muted-foreground hidden sm:inline">Perubahan belum tersimpan sampai Anda klik Simpan.</span>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Dokumen Kepegawaian</CardTitle></CardHeader>
@@ -1108,7 +1151,21 @@ export default function KaryawanDetailPage({ params }: { params: Promise<{ id: s
                         Kedaluwarsa {new Date(d.expiryDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     )}
-                    <button type="button" onClick={() => handleDeleteDoc(d.id)} className="text-muted-foreground hover:text-destructive">
+                    <button
+                      type="button"
+                      aria-label="Hapus dokumen"
+                      title="Hapus dokumen"
+                      onClick={() =>
+                        confirmDlg.ask({
+                          title: "Hapus dokumen ini?",
+                          description: `${documentTypeLabel(d.type)} - ${d.fileName ?? "file"} akan dihapus permanen.`,
+                          confirmLabel: "Hapus",
+                          destructive: true,
+                          onConfirm: () => handleDeleteDoc(d.id),
+                        })
+                      }
+                      className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>

@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
+import { ErrorState } from "@/app/components/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmployeeAvatar } from "@/app/components/EmployeeAvatar";
+import { EMPLOYEE_STATUS_LABEL, employmentStatusLabel } from "@/lib/employee-status";
 
 type Profile = {
   name: string;
@@ -21,8 +25,7 @@ type Profile = {
   status: string;
 };
 
-const EMPLOYMENT_STATUS_LABEL: Record<string, string> = { tetap: "Karyawan Tetap", kontrak: "Kontrak", pkwt: "PKWT", magang: "Magang" };
-const STATUS_LABEL: Record<string, string> = { onboarding: "Onboarding", active: "Aktif", resigned: "Resign" };
+const STATUS_LABEL = EMPLOYEE_STATUS_LABEL;
 
 function fmtDate(iso: string | null) {
   if (!iso) return "-";
@@ -40,14 +43,19 @@ function Field({ label, value }: { label: string; value: string }) {
 
 export default function PortalProfilPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
+    setLoadError(null);
     fetch("/api/portal/profile")
-      .then((r) => r.json())
-      .then(setProfile);
-  }, []);
+      .then(readJson)
+      .then(setProfile)
+      .catch((e) => setLoadError(errorMessage(e, "Gagal memuat profil.")));
+  }
+  useEffect(load, []);
 
-  if (!profile) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
+  if (!profile) return <LoadingState />;
 
   return (
     <div className="max-w-2xl grid gap-6">
@@ -66,7 +74,7 @@ export default function PortalProfilPage() {
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="Email" value={profile.email ?? ""} />
           <Field label="No. HP" value={profile.phone ?? ""} />
-          <Field label="Tempat, Tanggal Lahir" value={`${profile.birthPlace ?? "-"}, ${fmtDate(profile.birthDate)}`} />
+          <Field label="Tempat, Tanggal Lahir" value={[profile.birthPlace, fmtDate(profile.birthDate)].filter(Boolean).join(", ")} />
           <Field label="Jenis Kelamin" value={profile.gender === "L" ? "Laki-laki" : profile.gender === "P" ? "Perempuan" : ""} />
           <Field label="Alamat" value={profile.address ?? ""} />
         </CardContent>
@@ -77,7 +85,7 @@ export default function PortalProfilPage() {
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="Jabatan" value={profile.position ?? ""} />
           <Field label="Outlet / Cabang" value={profile.outlet ?? ""} />
-          <Field label="Status Kepegawaian" value={profile.employmentStatus ? EMPLOYMENT_STATUS_LABEL[profile.employmentStatus] ?? profile.employmentStatus : ""} />
+          <Field label="Status Kepegawaian" value={profile.employmentStatus ? employmentStatusLabel(profile.employmentStatus) : ""} />
           <Field label="Tanggal Mulai Kerja" value={fmtDate(profile.joinDate)} />
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatRupiah as fmtRupiah } from "@/lib/format";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,10 +50,6 @@ type DashboardData = {
   warehouseError: string | null;
 };
 
-function fmtRupiah(n: number) {
-  const sign = n < 0 ? "-" : "";
-  return `${sign}Rp${Math.round(Math.abs(n)).toLocaleString("id-ID")}`;
-}
 function fmtRupiahCompact(n: number) {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";

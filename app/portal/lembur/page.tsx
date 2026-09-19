@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RequiredMark } from "@/app/components/RequiredMark";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import { upload } from "@vercel/blob/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +16,7 @@ import { toast } from "sonner";
 import { usePortalContext } from "../layout";
 import { isSpvPosition } from "@/lib/roles";
 import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
 
 type OvertimeRequest = {
   id: number;
@@ -43,10 +47,13 @@ export default function PortalLemburPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
   function load() {
+    setLoadError(null);
     fetch("/api/portal/overtime-requests")
-      .then((r) => r.json())
-      .then(setRequests);
+      .then(readJson)
+      .then(setRequests)
+      .catch((e) => setLoadError(errorMessage(e, "Gagal memuat riwayat pengajuan.")));
   }
 
   useEffect(load, []);
@@ -83,11 +90,10 @@ export default function PortalLemburPage() {
         setPhotoFile(null);
         load();
       } else {
-        const err = await res.json();
-        toast.error("Gagal: " + err.error);
+        toast.error("Gagal: " + (await readErrorMessage(res)));
       }
     } catch (err) {
-      toast.error("Gagal upload foto: " + (err instanceof Error ? err.message : "unknown"));
+      toast.error("Gagal upload foto. Periksa koneksi lalu coba lagi.");
     } finally {
       setSubmitting(false);
     }
@@ -110,15 +116,15 @@ export default function PortalLemburPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div className="grid gap-1.5">
-              <Label>Tanggal Rencana Lembur</Label>
+              <Label>Tanggal Rencana Lembur<RequiredMark /></Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
             <div className="grid gap-1.5">
-              <Label>Alasan Perlu Lembur</Label>
+              <Label>Alasan Perlu Lembur<RequiredMark /></Label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Jelaskan pekerjaan yang perlu diselesaikan lembur..." required />
             </div>
             <div className="grid gap-1.5">
-              <Label>Foto Pekerjaan (wajib)</Label>
+              <Label>Foto Pekerjaan<RequiredMark /></Label>
               <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)} required />
               {photoFile && <p className="text-xs text-muted-foreground">{photoFile.name}</p>}
             </div>
@@ -131,8 +137,10 @@ export default function PortalLemburPage() {
 
       <div>
         <h2 className="text-sm font-medium text-muted-foreground mb-2">Riwayat Pengajuan</h2>
-        {requests === null ? (
-          <p className="text-sm text-muted-foreground">Memuat...</p>
+        {loadError ? (
+          <ErrorState message={loadError} onRetry={load} />
+        ) : requests === null ? (
+          <LoadingState variant="section" />
         ) : requests.length === 0 ? (
           <EmptyState icon={Clock3} title="Belum ada pengajuan lembur" />
         ) : (

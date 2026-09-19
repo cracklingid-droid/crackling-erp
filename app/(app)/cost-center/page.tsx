@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatRupiah as fmtRupiah } from "@/lib/format";
+import { readJson, errorMessage } from "@/lib/fetch-json";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -63,10 +65,6 @@ type DailyDetail = {
   warehouseError: string | null;
 };
 
-function fmtRupiah(n: number) {
-  const sign = n < 0 ? "-" : "";
-  return `${sign}Rp${Math.round(Math.abs(n)).toLocaleString("id-ID")}`;
-}
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -181,6 +179,7 @@ export default function CostCenterPage() {
         }
         setDailyReport(data);
       })
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setDailyLoading(false));
   }
 
@@ -202,8 +201,9 @@ export default function CostCenterPage() {
     const params = new URLSearchParams({ date: detailDate });
     if (dailyOutlet !== DAILY_OUTLET_ALL) params.set("outlet", dailyOutlet);
     fetch(`/api/cost-center/daily/detail?${params}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setDetailData)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setDetailLoading(false));
   }
 
@@ -231,18 +231,21 @@ export default function CostCenterPage() {
 
   async function handleSync() {
     setSyncing(true);
-    const res = await fetch("/api/cost-center/sync-sales", { method: "POST" });
-    const data = await res.json();
-    setSyncing(false);
-    if (!res.ok) {
-      toast.error("Gagal sync: " + data.error);
-      return;
+    try {
+      const res = await fetch("/api/cost-center/sync-sales", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error("Gagal sync: " + data.error);
+        return;
+      }
+      toast.success(
+        `Omzet disinkron: ${data.totalRows} hari (${data.byOutlet.map((o: { outletName: string; days: number }) => `${o.outletName} ${o.days} hari`).join(", ")}). Biaya Gaji & Biaya Pemakaian ikut ter-refresh (selalu real-time).`
+      );
+      loadDaily();
+      loadDetail();
+    } finally {
+      setSyncing(false);
     }
-    toast.success(
-      `Omzet disinkron: ${data.totalRows} hari (${data.byOutlet.map((o: { outletName: string; days: number }) => `${o.outletName} ${o.days} hari`).join(", ")}). Biaya Gaji & Biaya Pemakaian ikut ter-refresh (selalu real-time).`
-    );
-    loadDaily();
-    loadDetail();
   }
 
   return (
@@ -269,7 +272,7 @@ export default function CostCenterPage() {
           {canSync && (
             <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
               <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Sinkron..." : "Sync & Refresh Semua"}
+              {syncing ? "Menyinkronkan..." : "Sync & Refresh Semua"}
             </Button>
           )}
         </div>
@@ -365,8 +368,7 @@ export default function CostCenterPage() {
             </div>
           )}
 
-          <div className="min-w-0 overflow-x-auto -mx-6 px-6 max-h-[26rem] overflow-y-auto rounded-lg">
-            <Table>
+          <Table containerClassName="max-h-[26rem] overflow-y-auto rounded-lg border">
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead>Tanggal</TableHead>
@@ -432,7 +434,6 @@ export default function CostCenterPage() {
                 </TableBody>
               )}
             </Table>
-          </div>
 
           {dailyReport && (
             <p className="text-xs text-muted-foreground text-right">

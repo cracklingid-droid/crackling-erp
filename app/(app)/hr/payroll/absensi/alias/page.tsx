@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
+import { ConfirmDialog, useConfirm } from "@/app/components/ConfirmDialog";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
 type Alias = {
@@ -35,12 +37,13 @@ export default function AttendanceAliasPage() {
   const [machineName, setMachineName] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [saving, setSaving] = useState(false);
+  const confirmDlg = useConfirm();
 
   function load() {
     setLoading(true);
     Promise.all([
-      fetch("/api/payroll/attendance/name-aliases").then((r) => r.json()),
-      fetch("/api/employees").then((r) => r.json()),
+      fetch("/api/payroll/attendance/name-aliases").then(readJson),
+      fetch("/api/employees").then(readJson),
     ])
       .then(([aliasData, employeeData]) => {
         setAliases(aliasData);
@@ -51,6 +54,7 @@ export default function AttendanceAliasPage() {
             .sort((a: EmployeeOption, b: EmployeeOption) => a.name.localeCompare(b.name))
         );
       })
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -62,21 +66,23 @@ export default function AttendanceAliasPage() {
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/payroll/attendance/name-aliases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ machineName, employeeId: Number(employeeId) }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const err = await res.json();
-      toast.error("Gagal simpan: " + err.error);
-      return;
+    try {
+      const res = await fetch("/api/payroll/attendance/name-aliases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ machineName, employeeId: Number(employeeId) }),
+      });
+      if (!res.ok) {
+        toast.error("Gagal simpan: " + (await readErrorMessage(res)));
+        return;
+      }
+      setMachineName("");
+      setEmployeeId("");
+      toast.success("Alias disimpan.");
+      load();
+    } finally {
+      setSaving(false);
     }
-    setMachineName("");
-    setEmployeeId("");
-    toast.success("Alias disimpan.");
-    load();
   }
 
   async function deleteAlias(id: number) {
@@ -91,6 +97,7 @@ export default function AttendanceAliasPage() {
 
   return (
     <div className="max-w-3xl min-w-0 grid gap-6">
+      <ConfirmDialog {...confirmDlg.props} />
       <div>
         <Link href="/hr/payroll/absensi" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Upload Absensi
@@ -125,7 +132,7 @@ export default function AttendanceAliasPage() {
             </Select>
           </div>
           <Button onClick={addAlias} disabled={saving}>
-            <Plus className="h-3.5 w-3.5" /> Simpan
+            <Plus className="h-3.5 w-3.5" /> {saving ? "Menambahkan..." : "Tambah Alias"}
           </Button>
         </CardContent>
       </Card>
@@ -161,7 +168,21 @@ export default function AttendanceAliasPage() {
                   <TableCell className="text-muted-foreground">{a.createdBy?.name ?? "-"}</TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateID(a.createdAt)}</TableCell>
                   <TableCell>
-                    <button type="button" onClick={() => deleteAlias(a.id)} className="text-muted-foreground hover:text-destructive">
+                    <button
+                      type="button"
+                      aria-label="Hapus alias"
+                      title="Hapus alias"
+                      onClick={() =>
+                        confirmDlg.ask({
+                          title: "Hapus alias ini?",
+                          description: `"${a.machineName}" tidak lagi otomatis dicocokkan ke ${a.employee.name} saat upload absensi berikutnya.`,
+                          confirmLabel: "Hapus",
+                          destructive: true,
+                          onConfirm: () => deleteAlias(a.id),
+                        })
+                      }
+                      className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </TableCell>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { readJson, errorMessage, readErrorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTab, TabsIndicator, TabsPanel } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { ConfirmDialog, useConfirm } from "@/app/components/ConfirmDialog";
 import { ArrowLeft, Lock, Unlock, FileText, RefreshCw, FileSpreadsheet, Printer, Pencil } from "lucide-react";
 import { OUTLET_LOCKED_FIELD_KEYS } from "@/lib/payroll-outlet-calc";
 import { KANTOR_LOCKED_FIELD_KEYS } from "@/lib/payroll-kantor-calc";
@@ -138,7 +141,7 @@ function FieldRow({
         )
       ) : (
         <span className={`flex-1 text-right text-sm tabular-nums ${colorClass ?? "text-muted-foreground"}`} title={hint}>
-          {isMoney ? `Rp ${formatRupiah(value)}` : value}
+          {isMoney ? `Rp${formatRupiah(value)}` : value}
         </span>
       )}
     </div>
@@ -151,6 +154,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const confirmDlg = useConfirm();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
@@ -164,11 +168,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
   function load() {
     setLoading(true);
     fetch(`/api/payroll/periods/${periodId}/rincian`)
-      .then((r) => r.json())
+      .then(readJson)
       .then((p: Period) => {
         setPeriod(p);
         setItems(p.items);
       })
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -199,8 +204,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const err = await res.json();
-      toast.error("Gagal simpan: " + err.error);
+      toast.error("Gagal simpan: " + (await readErrorMessage(res)));
     }
   }
 
@@ -208,31 +212,37 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
     if (!period) return;
     const nextStatus = period.status === "final" ? "draft" : "final";
     setTogglingStatus(true);
-    const res = await fetch(`/api/payroll/periods/${periodId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: nextStatus }),
-    });
-    setTogglingStatus(false);
-    if (res.ok) {
-      toast.success(nextStatus === "final" ? "Periode difinalisasi." : "Periode dibuka kembali untuk diedit.");
-      load();
-    } else {
-      toast.error("Gagal mengubah status.");
+    try {
+      const res = await fetch(`/api/payroll/periods/${periodId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (res.ok) {
+        toast.success(nextStatus === "final" ? "Periode difinalisasi." : "Periode dibuka kembali untuk diedit.");
+        load();
+      } else {
+        toast.error("Gagal mengubah status.");
+      }
+    } finally {
+      setTogglingStatus(false);
     }
   }
 
   async function recalculate() {
     setRecalculating(true);
-    const res = await fetch(`/api/payroll/periods/${periodId}/recalculate`, { method: "POST" });
-    const data = await res.json();
-    setRecalculating(false);
-    if (!res.ok) {
-      toast.error("Gagal refresh: " + data.error);
-      return;
+    try {
+      const res = await fetch(`/api/payroll/periods/${periodId}/recalculate`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error("Gagal refresh: " + data.error);
+        return;
+      }
+      toast.success(`Dihitung ulang dari absensi terbaru (${data.updated} karyawan).`);
+      load();
+    } finally {
+      setRecalculating(false);
     }
-    toast.success(`Dihitung ulang dari absensi terbaru (${data.updated} karyawan).`);
-    load();
   }
 
   const categoryLabel = CATEGORY_LABEL[category] ?? category;
@@ -262,8 +272,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
         body: JSON.stringify({ itemIds }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        toast.error("Gagal download slip: " + err.error);
+        toast.error("Gagal download slip: " + (await readErrorMessage(res)));
         return;
       }
       const blob = await res.blob();
@@ -288,8 +297,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
     try {
       const res = await fetch(`/api/payroll/periods/${periodId}/export-excel`);
       if (!res.ok) {
-        const err = await res.json();
-        toast.error("Gagal download Excel: " + err.error);
+        toast.error("Gagal download Excel: " + (await readErrorMessage(res)));
         return;
       }
       const blob = await res.blob();
@@ -309,11 +317,12 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (loading) return <LoadingState />;
   if (!period) return <p className="text-sm text-muted-foreground">Periode tidak ditemukan.</p>;
 
   return (
     <div className="max-w-full grid gap-6">
+      <ConfirmDialog {...confirmDlg.props} />
       <div>
         <Link
           href={`/hr/payroll/${category}`}
@@ -346,7 +355,22 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
               {exportingExcel ? "Menyiapkan Excel..." : category === "kantor" ? "Download Excel" : "Download Excel (2 Sheet)"}
             </Button>
             {!readOnly && (
-              <Button variant="outline" size="sm" onClick={toggleStatus} disabled={togglingStatus}>
+              <Button
+                variant={isFinal ? "outline" : "default"}
+                size="sm"
+                disabled={togglingStatus}
+                onClick={() =>
+                  confirmDlg.ask({
+                    title: isFinal ? "Buka kembali periode ini?" : "Finalisasi periode gaji?",
+                    description: isFinal
+                      ? "Periode kembali ke status Draft dan bisa diedit lagi. Slip gaji yang sudah dibagikan mungkin jadi tidak sesuai."
+                      : "Setelah final, angka gaji terkunci dan tidak bisa diedit. Karyawan bisa melihat slip gajinya di Portal.",
+                    confirmLabel: isFinal ? "Buka Kembali" : "Finalisasi",
+                    destructive: isFinal,
+                    onConfirm: toggleStatus,
+                  })
+                }
+              >
                 {isFinal ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                 {isFinal ? "Buka Kembali" : "Finalisasi"}
               </Button>
@@ -717,7 +741,7 @@ export default function PayrollPeriodDetailPage({ params }: { params: Promise<{ 
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={() => setEditingId(null)}>Selesai</Button>
+                <Button onClick={() => setEditingId(null)}>Tutup</Button>
               </DialogFooter>
             </>
           )}

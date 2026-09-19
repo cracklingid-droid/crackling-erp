@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { LoadingState } from "@/app/components/LoadingState";
 import { useAuth, type AuthUser } from "./useAuth";
 
 const AuthCtx = createContext<{ user: AuthUser | null; logout: () => void }>({
@@ -13,9 +14,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-sm text-muted-foreground">
-        Memuat...
-      </div>
+      <LoadingState variant="screen" />
     );
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { LoadingState } from "@/app/components/LoadingState";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,14 +85,24 @@ export default function JadwalInterviewPage({ params }: { params: Promise<{ toke
   }
 
   if (state.status === "loading") {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Memuat...</div>;
+    return <LoadingState variant="screen" />;
   }
 
   if (state.status === "error") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
-        <p className="text-sm text-muted-foreground">{state.message}</p>
-        <Link href="/lowongan" className="text-primary text-sm underline">Lihat lowongan</Link>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-8 pb-8 text-center grid gap-4">
+            <MessageCircle className="h-10 w-10 text-muted-foreground mx-auto" />
+            <div className="grid gap-1.5">
+              <h1 className="font-heading font-semibold text-xl">Jadwal Tidak Tersedia</h1>
+              <p className="text-sm text-muted-foreground">{state.message}</p>
+            </div>
+            <Link href="/lowongan" className="text-primary text-sm underline underline-offset-4">
+              Lihat lowongan lain
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }

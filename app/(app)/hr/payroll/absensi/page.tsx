@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { readErrorMessage } from "@/lib/fetch-json";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -89,8 +90,7 @@ export default function UploadAbsensiPage() {
         body: JSON.stringify({ machineName: rawName, employeeId }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        toast.error("Gagal simpan konfirmasi: " + err.error);
+        toast.error("Gagal simpan konfirmasi: " + (await readErrorMessage(res)));
         return;
       }
       setNameMatches((prev) => ({
@@ -171,7 +171,7 @@ export default function UploadAbsensiPage() {
       setDetectNote(null);
       detectMapping(data.rows);
     } catch (err) {
-      toast.error("Gagal baca file: " + (err instanceof Error ? err.message : "unknown"));
+      toast.error("Gagal baca file. Periksa koneksi lalu coba lagi.");
     } finally {
       setParsing(false);
     }
@@ -260,12 +260,12 @@ export default function UploadAbsensiPage() {
               dari Database Karyawan (mis. nama panggilan), sistem akan menawarkan saran pencocokan sebelum diimport.
             </p>
           </div>
-          <div className="shrink-0 flex flex-col items-end gap-1">
-            <Link href="/hr/payroll/absensi/alias" className="text-sm text-primary hover:underline whitespace-nowrap">
-              Kelola Alias Nama
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Link href="/hr/payroll/absensi/alias">
+              <Button variant="outline" size="sm" className="whitespace-nowrap">Kelola Alias Nama</Button>
             </Link>
-            <Link href="/hr/payroll/absensi/lokasi" className="text-sm text-primary hover:underline whitespace-nowrap">
-              Lokasi Absensi Mandiri
+            <Link href="/hr/payroll/absensi/lokasi">
+              <Button variant="outline" size="sm" className="whitespace-nowrap">Lokasi Absensi Mandiri</Button>
             </Link>
           </div>
         </div>

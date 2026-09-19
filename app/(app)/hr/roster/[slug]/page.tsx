@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, use as usePromise } from "react";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
+import { EmptyState } from "@/app/components/EmptyState";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronLeft, ChevronRight, Copy, CopyPlus } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Copy, CopyPlus } from "lucide-react";
 import { slugToOutlet, addWeeks, dateKey, formatDayLabel } from "@/lib/roster";
 
 type RosterData = {
@@ -45,8 +48,9 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
     if (!outlet) return;
     setLoading(true);
     fetch(`/api/roster?outlet=${encodeURIComponent(outlet)}&weekStart=${dateKey(anchor)}`)
-      .then((r) => r.json())
+      .then(readJson)
       .then(setData)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -161,13 +165,13 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
       <Card>
         <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, -1))}>
+            <Button variant="outline" size="icon" aria-label="Minggu sebelumnya" title="Minggu sebelumnya" onClick={() => setAnchor((a) => addWeeks(a, -1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm font-medium">
               {data ? `${formatDayLabel(new Date(data.days[0]))} - ${formatDayLabel(new Date(data.days[6]))}` : "..."}
             </span>
-            <Button variant="outline" size="icon" onClick={() => setAnchor((a) => addWeeks(a, 1))}>
+            <Button variant="outline" size="icon" aria-label="Minggu berikutnya" title="Minggu berikutnya" onClick={() => setAnchor((a) => addWeeks(a, 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -175,16 +179,17 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
             <Button variant="outline" size="sm" onClick={copyFromLastWeek} disabled={copyingLastWeek || loading || !data}>
               <CopyPlus className="h-3.5 w-3.5" /> {copyingLastWeek ? "Menyalin..." : "Salin dari Minggu Lalu"}
             </Button>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 navigator.clipboard.writeText(publicUrl);
                 toast.success("Link roster disalin.");
               }}
-              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <Copy className="h-3.5 w-3.5" /> Salin link untuk karyawan
-            </button>
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -195,9 +200,9 @@ export default function RosterOutletPage({ params }: { params: Promise<{ slug: s
         </CardHeader>
         <CardContent className="min-w-0 overflow-x-auto">
           {loading || !data ? (
-            <p className="text-sm text-muted-foreground">Memuat...</p>
+            <LoadingState variant="section" />
           ) : data.employees.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada karyawan aktif di outlet ini.</p>
+            <EmptyState icon={CalendarDays} title="Belum ada karyawan aktif di outlet ini" description="Karyawan muncul di roster setelah statusnya Aktif di Database Karyawan." />
           ) : (
             <table className="w-full text-sm border-collapse">
               <thead>

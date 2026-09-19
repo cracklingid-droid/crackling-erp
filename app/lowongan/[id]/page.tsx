@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { RequiredMark } from "@/app/components/RequiredMark";
+import { LoadingState } from "@/app/components/LoadingState";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,7 +115,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
         })
         .catch(() => {});
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal upload CV");
+      toast.error("Gagal upload CV. Periksa koneksi lalu coba lagi.");
     }
     setUploadingCv(false);
     e.target.value = "";
@@ -148,23 +150,26 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
     setSubmitting(true);
-    const res = await fetch("/api/public/apply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobPostingId: Number(id), ...form, cvUrl, cvTextPreview, agreedB2, agreedLongShift, agreedNoPinjol, agreedStartSoon }),
-    });
-    setSubmitting(false);
-    if (res.ok) {
-      const data = await res.json();
-      toast.success("Lamaran diterima. Lanjut ke psikotest.");
-      router.push(`/psikotes/${data.token}`);
-    } else {
-      const err = await res.json();
-      toast.error(err.error ?? "Gagal mengirim lamaran");
+    try {
+      const res = await fetch("/api/public/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobPostingId: Number(id), ...form, cvUrl, cvTextPreview, agreedB2, agreedLongShift, agreedNoPinjol, agreedStartSoon }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success("Lamaran diterima. Lanjut ke psikotest.");
+        router.push(`/psikotes/${data.token}`);
+      } else {
+        const err = await res.json();
+        toast.error(err.error ?? "Gagal mengirim lamaran");
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Memuat...</div>;
+  if (loading) return <LoadingState variant="screen" />;
   if (notFound || !posting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
@@ -199,13 +204,15 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 </Label>
                 {cvFileName ? (
                   <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                    <span className="flex items-center gap-2 truncate">
-                      <FileCheck className="h-4 w-4 text-primary shrink-0" /> {cvFileName}
+                    <span className="flex min-w-0 items-center gap-2">
+                      <FileCheck className="h-4 w-4 text-primary shrink-0" /> <span className="min-w-0 truncate">{cvFileName}</span>
                     </span>
                     <button
                       type="button"
+                      aria-label="Hapus CV"
+                      title="Hapus CV"
                       onClick={() => { setCvUrl(""); setCvFileName(""); setCvTextPreview(""); setAutofilled([]); }}
-                      className="text-muted-foreground hover:text-foreground shrink-0"
+                      className="-m-2 shrink-0 rounded-md p-2 text-muted-foreground hover:text-foreground"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -225,32 +232,32 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
               </div>
 
               <div className="grid gap-1.5">
-                <Label>Nama Lengkap</Label>
+                <Label>Nama Lengkap<RequiredMark /></Label>
                 <Input required value={form.name} onChange={(e) => set("name")(e.target.value)} />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <Label>Email</Label>
+                  <Label>Email<RequiredMark /></Label>
                   <Input required type="email" value={form.email} onChange={(e) => set("email")(e.target.value)} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label>No. HP / WhatsApp</Label>
+                  <Label>No. HP / WhatsApp<RequiredMark /></Label>
                   <Input required value={form.phone} onChange={(e) => set("phone")(e.target.value)} />
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <Label>Tempat Lahir</Label>
+                  <Label>Tempat Lahir<RequiredMark /></Label>
                   <Input required value={form.birthPlace} onChange={(e) => set("birthPlace")(e.target.value)} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label>Tanggal Lahir</Label>
+                  <Label>Tanggal Lahir<RequiredMark /></Label>
                   <Input required type="date" max={maxBirthDate()} value={form.birthDate} onChange={(e) => set("birthDate")(e.target.value)} />
                   <p className="text-xs text-muted-foreground">Pelamar minimal berusia {MIN_AGE} tahun.</p>
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label>Jenis Kelamin</Label>
+                <Label>Jenis Kelamin<RequiredMark /></Label>
                 <Select value={form.gender} onValueChange={(v) => v && set("gender")(v)}>
                   <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
                   <SelectContent>
@@ -260,11 +267,11 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label>Alamat Lengkap</Label>
+                <Label>Alamat Lengkap<RequiredMark /></Label>
                 <Textarea required rows={2} value={form.address} onChange={(e) => set("address")(e.target.value)} />
               </div>
               <div className="grid gap-1.5">
-                <Label>Lokasi/Cabang yang Diinginkan</Label>
+                <Label>Lokasi/Cabang yang Diinginkan<RequiredMark /></Label>
                 {posting.isOfficePosition ? (
                   <Input required value={form.preferredOutlet} onChange={(e) => set("preferredOutlet")(e.target.value)} placeholder="mis. Kantor Pusat" />
                 ) : (
@@ -278,7 +285,7 @@ export default function LowonganDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <Label>Pendidikan Terakhir</Label>
+                  <Label>Pendidikan Terakhir<RequiredMark /></Label>
                   <Select value={form.lastEducation} onValueChange={(v) => v && set("lastEducation")(v)}>
                     <SelectTrigger><SelectValue placeholder="Pilih..." /></SelectTrigger>
                     <SelectContent>

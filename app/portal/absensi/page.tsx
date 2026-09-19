@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { readJson, errorMessage } from "@/lib/fetch-json";
+import { LoadingState } from "@/app/components/LoadingState";
 import { upload } from "@vercel/blob/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,8 +75,9 @@ export default function PortalAbsensiPage() {
   function load() {
     setLoading(true);
     fetch("/api/portal/attendance")
-      .then((r) => r.json())
+      .then(readJson)
       .then(setData)
+      .catch((e) => toast.error(errorMessage(e, "Gagal memuat data")))
       .finally(() => setLoading(false));
   }
 
@@ -203,7 +206,7 @@ export default function PortalAbsensiPage() {
         toast.error(json.error || "Gagal absen");
       }
     } catch (err) {
-      toast.error("Gagal upload foto: " + (err instanceof Error ? err.message : "unknown"));
+      toast.error("Gagal upload foto. Periksa koneksi lalu coba lagi.");
     } finally {
       setSubmitting(false);
     }
@@ -253,7 +256,7 @@ export default function PortalAbsensiPage() {
       <Card>
         <CardContent className="grid gap-4 py-5">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Memuat...</p>
+            <LoadingState variant="section" rows={2} />
           ) : (
             <>
               <div className="grid gap-1.5 text-sm">
@@ -289,7 +292,7 @@ export default function PortalAbsensiPage() {
       <div>
         <h2 className="text-sm font-medium text-muted-foreground mb-2">Riwayat 14 Hari Terakhir</h2>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Memuat...</p>
+          <LoadingState variant="section" rows={2} />
         ) : !data || data.history.length === 0 ? (
           <EmptyState icon={History} title="Belum ada riwayat absensi" />
         ) : (
