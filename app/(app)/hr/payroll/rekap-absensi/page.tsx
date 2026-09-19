@@ -24,6 +24,9 @@ type RecapRow = {
   totalMinutes: number;
   lateCount: number;
   scheduleStart: string | null;
+  // Hanya ada kalau filter 1 hari (Dari = Sampai).
+  clockInTime?: string | null;
+  clockOutTime?: string | null;
 };
 
 function formatHours(minutes: number): string {
@@ -87,6 +90,7 @@ export default function RekapAbsensiPage() {
         const restoRows = rows?.filter((r) => employeeCategory(r.outlet) === "outlet");
         const kantorRows = rows?.filter((r) => employeeCategory(r.outlet) === "kantor");
         const tabRows = tab === "outlet" ? restoRows : kantorRows;
+        const showTimes = !!rows?.some((r) => r.clockInTime !== undefined);
         return (
           <>
             <Tabs value={tab} onValueChange={(v) => setTab(v as "outlet" | "kantor")}>
@@ -102,6 +106,8 @@ export default function RekapAbsensiPage() {
                   <TableRow>
                     <TableHead>Nama</TableHead>
                     <TableHead>Jabatan / Outlet</TableHead>
+                    {showTimes && <TableHead className="text-right">Jam Datang</TableHead>}
+                    {showTimes && <TableHead className="text-right">Jam Pulang</TableHead>}
                     <TableHead className="text-right">Hari Hadir</TableHead>
                     <TableHead className="text-right">Terlambat</TableHead>
                     <TableHead className="text-right">Total Jam Kerja</TableHead>
@@ -109,7 +115,7 @@ export default function RekapAbsensiPage() {
                 </TableHeader>
                 <TableBody>
                   {tabRows?.length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-muted-foreground">Tidak ada karyawan aktif di kategori ini.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={showTimes ? 7 : 5} className="text-muted-foreground">Tidak ada karyawan aktif di kategori ini.</TableCell></TableRow>
                   )}
                   {tabRows?.map((r) => (
                     <TableRow key={r.id}>
@@ -119,6 +125,12 @@ export default function RekapAbsensiPage() {
                       <TableCell className="text-sm text-muted-foreground">
                         {[r.position, r.outlet].filter(Boolean).join(" · ") || "-"}
                       </TableCell>
+                      {showTimes && (
+                        <TableCell className={`text-right tabular-nums ${r.clockInTime ? "" : "text-muted-foreground"}`}>{r.clockInTime ?? "-"}</TableCell>
+                      )}
+                      {showTimes && (
+                        <TableCell className={`text-right tabular-nums ${r.clockOutTime ? "" : "text-muted-foreground"}`}>{r.clockOutTime ?? "-"}</TableCell>
+                      )}
                       <TableCell className={`text-right tabular-nums ${r.daysPresent === 0 ? "text-muted-foreground" : ""}`}>
                         {r.daysPresent === 0 ? "Tidak ada data" : r.daysPresent}
                       </TableCell>
