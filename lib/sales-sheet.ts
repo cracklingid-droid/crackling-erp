@@ -1,3 +1,5 @@
+import * as XLSX from "xlsx";
+
 // Baca sheet "Sales Recapitulation Detail Report" (export POS asli, dibagikan
 // Kevin 2026-09-12) - beda dari sheet "Daily Qty Per Menu" yang dipakai
 // laporan COGS Warehouse (itu cuma qty per menu, sheet ini transaksi
@@ -79,7 +81,58 @@ async function fetchSheetDailyTotals(fileId: string, hrOutletName: string): Prom
   return Array.from(byDate.entries()).map(([date, totalOmzet]) => ({ outletName: hrOutletName, date, totalOmzet }));
 }
 
-export async function fetchAllDailySales(): Promise<DailySalesRow[]> {
-  const results = await Promise.all(SALES_SHEETS.map((s) => fetchSheetDailyTotals(s.fileId, s.hrOutletName)));
-  return results.flat();
+// Fatgai: beda format dari GS/KG - BUKAN export POS "Sales Recapitulation",
+// tapi sheet "Settlement" di database Fatgai (Google Sheets, dibagikan Kevin
+// 2026-09-19). Omzet = kolom B "Total Sales (POPCORN)", 1 baris per hari
+// (kolom A = tanggal serial Excel). Diambil sbg xlsx (gid sheet tidak
+// diketahui) & dibaca pakai SheetJS. Baris tanpa angka di kolom B (hari
+// belum diisi / tanggal ke depan) dilewati, bukan dianggap Rp0.
+const FATGAI_SETTLEMENT = {
+  url: "https://docs.google.com/spreadsheets/d/1RpUnmPBow0-v51IYpUvv4O4GwRlh7DOw/export?format=xlsx",
+  sheetName: "Settlement",
+  hrOutletName: "Fatgai",
+};
+
+async function fetchFatgaiDailySales(): Promise<DailySalesRow[]> {
+  const { url, sheetName, hrOutletName } = FATGAI_SETTLEMENT;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Gagal ambil sheet penjualan ${hrOutletName}: HTTP ${res.status}`);
+  if ((res.headers.get("content-type") ?? "").includes("text/html")) {
+    throw new Error(`Sheet penjualan ${hrOutletName} tidak bisa diakses publik lagi (sharing mungkin diubah jadi terbatas)`);
+  }
+  const workbook = XLSX.read(Buffer.from(await res.arrayBuffer()), { type: "buffer", cellDates: false });
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) throw new Error(`Sheet "${sheetName}" tidak ditemukan di file penjualan ${hrOutletName} (nama sheet mungkin berubah)`);
+
+  const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
+  const header = String(grid[0]?.[1] ?? "").toLowerCase();
+  if (!header.includes("sales")) {
+    throw new Error(`Format sheet penjualan ${hrOutletName} berubah: kolom B seharusnya "Total Sales" tapi terbaca "${String(grid[0]?.[1] ?? "")}"`);
+  }
+
+  const rows: DailySalesRow[] = [];
+  for (let r = 1; r < grid.length; r++) {
+    const serial = grid[r]?.[0];
+    const total = grid[r]?.[1];
+    if (typeof serial !== "number" || typeof total !== "number" || !Number.isFinite(total)) continue;
+    const p = XLSX.SSF.parse_date_code(serial);
+    if (!p) continue;
+    const date = `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
+    rows.push({ outletName: hrOutletName, date, totalOmzet: Math.round(total) });
+  }
+  return rows;
+}
+
+// GS/KG wajib berhasil (error dilempar seperti biasa). Fatgai dipisah: kalau
+// sumbernya gagal, GS/KG tetap tersinkron & pesan gagalnya dikembalikan
+// sbg warning supaya kelihatan di UI, tidak diam-diam hilang.
+export async function fetchAllDailySales(): Promise<{ rows: DailySalesRow[]; warnings: string[] }> {
+  const [main, fatgai] = await Promise.all([
+    Promise.all(SALES_SHEETS.map((s) => fetchSheetDailyTotals(s.fileId, s.hrOutletName))),
+    fetchFatgaiDailySales().then(
+      (rows) => ({ rows, warning: null as string | null }),
+      (e: unknown) => ({ rows: [] as DailySalesRow[], warning: e instanceof Error ? e.message : "Gagal ambil sheet penjualan Fatgai" })
+    ),
+  ]);
+  return { rows: [...main.flat(), ...fatgai.rows], warnings: fatgai.warning ? [fatgai.warning] : [] };
 }

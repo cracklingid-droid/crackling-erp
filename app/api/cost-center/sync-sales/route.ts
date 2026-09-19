@@ -22,8 +22,9 @@ export async function POST() {
   if (!hasFullAccess(user)) return NextResponse.json({ error: "Tidak punya akses" }, { status: 403 });
 
   let rows;
+  let warnings: string[];
   try {
-    rows = await fetchAllDailySales();
+    ({ rows, warnings } = await fetchAllDailySales());
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Gagal mengambil data sheet" }, { status: 502 });
   }
@@ -48,6 +49,7 @@ export async function POST() {
     ok: true,
     totalRows: rows.length,
     byOutlet: Array.from(byOutlet.entries()).map(([outletName, days]) => ({ outletName, days })),
+    warnings,
     syncedAt: new Date().toISOString(),
   });
 }

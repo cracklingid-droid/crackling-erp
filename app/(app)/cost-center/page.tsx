@@ -242,6 +242,7 @@ export default function CostCenterPage() {
       toast.success(
         `Omzet disinkron: ${data.totalRows} hari (${data.byOutlet.map((o: { outletName: string; days: number }) => `${o.outletName} ${o.days} hari`).join(", ")}). Biaya Gaji & Biaya Pemakaian ikut ter-refresh (selalu real-time).`
       );
+      for (const w of (data.warnings ?? []) as string[]) toast.warning(w);
       loadDaily();
       loadDetail();
     } finally {
